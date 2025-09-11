@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Pulse · Mega Flexo Troubleshooting</title>
+  <title>Pulse Â· Mega Flexo Troubleshooting</title>
   <link rel="stylesheet" href="index.css">
 </head>
 
@@ -20,8 +20,8 @@
         <div class="menu"> <button class="menu-btn" id="openTs">Troubleshoot</button>
           <div id="ts-picker" class="card" hidden>
             <div class="muted">Pick an issue:</div>
-            <select id="tsSelect" class="select"> <option value="">— Select a problem —</option> </select>
-            <div class="muted" style="margin-top:8px">…or search:</div> <input id="q" type="text" class="input" placeholder="Search symptoms, causes, fixes…">
+            <select id="tsSelect" class="select"> <option value="">â€” Select a problem â€”</option> </select>
+            <div class="muted" style="margin-top:8px">â€¦or search:</div> <input id="q" type="text" class="input" placeholder="Search symptoms, causes, fixesâ€¦">
             <button id="goTs" class="btn primary">Open Troubleshooting</button>
           </div> <button class="menu-btn" data-goto="puretone">PureTone&reg;</button>
           <button class="menu-btn" data-goto="monolox">Monolox&reg;</button>
@@ -32,7 +32,7 @@
       </section> <!-- Troubleshoot -->
       <section id="view-guide" class="view" hidden> <button class="back-btn" data-back>Back</button>
         <div class="card">
-          <div class="row"> <select id="tsSelectTop" class="select"> <option value="">All issues</option> </select> <input id="qTop" type="text" class="input" placeholder="Filter… (e.g., cure, adhesion, foaming)">
+          <div class="row"> <select id="tsSelectTop" class="select"> <option value="">All issues</option> </select> <input id="qTop" type="text" class="input" placeholder="Filterâ€¦ (e.g., cure, adhesion, foaming)">
           </div>
         </div>
         <div id="cards" class="cards"></div>
@@ -44,7 +44,7 @@
       </section> <!-- PureTone section -->
       <section id="view-puretone" class="view" hidden> <button class="back-btn" data-back>Back</button>
         <div class="card">
-          <h3>PureTone&reg; – High-strength, single-pigment bases</h3>
+          <h3>PureTone&reg; â€“ High-strength, single-pigment bases</h3>
           <p class="muted">Lower film weight to hit colour ? faster cure, cleaner dots, shorter approvals. Ideal for
             extended gamut and ultra-fast changeovers.</p>
           <ul class="list">
@@ -64,7 +64,7 @@
       </section> <!-- Monolox section -->
       <section id="view-monolox" class="view" hidden> <button class="back-btn" data-back>Back</button>
         <div class="card">
-          <h3>Monolox&reg; – Fixed anilox methodology</h3>
+          <h3>Monolox&reg; â€“ Fixed anilox methodology</h3>
           <p class="muted">Reduce changeovers and variability by locking BCM/LPI to artwork classes. Predictable film
             weight stabilises tone curves, cure and colour.</p>
           <ul class="list">
@@ -88,9 +88,9 @@
         <div class="card">
           <h3>7 Wastes in Flexo (TIMWOOD)</h3>
           <p class="muted">Transport: needless moves between press stages.</p>
-          <p class="muted">Inventory: excess ink SKUs—standardise with PureTone&reg;.</p>
-          <p class="muted">Motion: long walks for anilox swaps—fix with Monolox&reg;.</p>
-          <p class="muted">Waiting: colour approval delays—lock standards.</p>
+          <p class="muted">Inventory: excess ink SKUsâ€”standardise with PureTone&reg;.</p>
+          <p class="muted">Motion: long walks for anilox swapsâ€”fix with Monolox&reg;.</p>
+          <p class="muted">Waiting: colour approval delaysâ€”lock standards.</p>
           <p class="muted">Overproduction: trial-and-error make-readies.</p>
           <p class="muted">Overprocessing: duplicate adjustments across sites.</p>
           <p class="muted">Defects: reprints from colour/cure misses.</p>
@@ -115,21 +115,21 @@
             <div class="hr"></div>
             <label>Mins/CO (current) <input type="number" id="i_minsPerChangeoverNow" class="input"></label>
             <label>Mins/CO (with Monolox/PureTone) <input type="number" id="i_minsPerChangeoverWith" class="input"></label>
-            <label>Press £/hour <input type="number" id="i_pressCostPerHour" class="input"></label>
+            <label>Press Â£/hour <input type="number" id="i_pressCostPerHour" class="input"></label>
             <div class="hr"></div>
             <label>Waste/CO (m) current <input type="number" id="i_wasteMetersNow" class="input"></label>
             <label>Waste/CO (m) with <input type="number" id="i_wasteMetersWith" class="input"></label>
-            <label>Substrate £/m <input type="number" id="i_substrateCostPerMeter" class="input"></label>
+            <label>Substrate Â£/m <input type="number" id="i_substrateCostPerMeter" class="input"></label>
             <div class="hr"></div> <label>Speed gain % <input type="number" id="i_speedGainPct" class="input"></label>
             <label>Run hours/month <input type="number" id="i_runHoursPerMonth" class="input"></label>
-            <label>Value extra capacity £/h <input type="number" id="i_marginPerHour" class="input"></label>
+            <label>Value extra capacity Â£/h <input type="number" id="i_marginPerHour" class="input"></label>
           </div>
         </div>
         <div class="card">
           <h3 class="CalcLabel">Results</h3>
           <div class="grid-3 small">
-            <label>Implementation cost £ <input type="number" id="i_implementationCost" class="input"></label>
-            <div>Payback (months) <div id="out_paybackMonths" class="big">—</div>
+            <label>Implementation cost Â£ <input type="number" id="i_implementationCost" class="input"></label>
+            <div>Payback (months) <div id="out_paybackMonths" class="big">â€”</div>
             </div>
             <div>ROI % (annual/cost) <div id="out_roiPct" class="big">0%</div>
             </div>
@@ -138,21 +138,21 @@
             <div>
               <div class="kv">Time saved / month</div>
               <div class="big" id="out_timeSavedHoursPerMonth">0 h</div>
-              <div class="muted">£<span id="out_timeSavingsValue">0</span> value</div>
+              <div class="muted">Â£<span id="out_timeSavingsValue">0</span> value</div>
             </div>
             <div>
               <div class="kv">Waste saved / month</div>
               <div class="big"><span id="out_wasteSavedMetersPerMonth">0</span> m</div>
-              <div class="muted">£<span id="out_wasteSavingsValue">0</span> value</div>
+              <div class="muted">Â£<span id="out_wasteSavingsValue">0</span> value</div>
             </div>
             <div>
               <div class="kv">Speed/capacity value</div>
-              <div class="big">£<span id="out_speedValue">0</span></div>
+              <div class="big">Â£<span id="out_speedValue">0</span></div>
               <div class="muted"><span id="out_speedHoursFreed">0</span> h equivalent</div>
             </div>
             <div class="hr"></div>
-            <div class="total">Estimated monthly savings: £<span id="out_monthlySavings">0</span></div>
-            <div class="total">Estimated annual savings: £<span id="out_annualSavings">0</span></div>
+            <div class="total">Estimated monthly savings: Â£<span id="out_monthlySavings">0</span></div>
+            <div class="total">Estimated annual savings: Â£<span id="out_annualSavings">0</span></div>
           </div>
         </div>
       </section>
