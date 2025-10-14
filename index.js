@@ -175,7 +175,7 @@ function computeRoi(i) {
 
 // ---------------- State/els ----------------
 const els = {
-    views: ['main', 'guide', 'puretone', 'monolox', 'knowledge', 'classes', 'roi'],
+    views: ['main', 'guide', 'puretone', 'monolox', 'knowledge', 'classes', 'roi', 'ink'],
     main: document.getElementById('view-main'),
     guide: document.getElementById('view-guide'),
     classCards: document.getElementById('classCards'),
