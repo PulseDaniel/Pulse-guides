@@ -29,11 +29,12 @@
     .pill { font-size:.8rem; color:#98a2b3; }
     .muted { color:#7b8496; font-size:.85rem; }
     fieldset { border: 1px dashed #242938; border-radius: 10px; padding: 10px; }
-    legend { font-size:.85rem; color:#9aa4b2; padding: 0 6px; }
+    legend { font-size:.85rem; color:#9aa2b3; padding: 0 6px; }
     .mode { display:flex; gap:10px; align-items:center; }
     .disabled input { opacity:.5; }
     .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
-    .formula-box h2 { margin-top:0; font-size:1rem; color:#ccc; }
+    .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
+    .formula-box ul { margin:0; padding-left:18px; }
     @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -41,7 +42,7 @@
   <div class="app">
     <div class="card">
       <h1>Ink Colour Matcher</h1>
-      <p class="pill">Input a colour and find the closest Pantone ink.</p>
+      <p class="pill">Defaults to L*a*b*. Switch modes if you’re feeling spicy.</p>
 
       <fieldset>
         <legend>Input Mode</legend>
@@ -93,132 +94,209 @@
 
       <div id="formulaBox" class="formula-box" style="display:none;">
         <h2 id="formulaTitle"></h2>
-        <pre id="formulaContent"></pre>
+        <ul id="formulaList"></ul>
       </div>
     </div>
   </div>
 
 <script>
 let COLOURS = [];
-let FORMULAS = [];
+let FORMULAS = {}; // object with multiple arrays inside
 
-// ===== Utility functions =====
+// ===== Utils =====
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 function hexToRgb(hex){ hex=(hex||'').replace('#','').trim(); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); if(!/^([0-9a-fA-F]{6})$/.test(hex))return null; const i=parseInt(hex,16); return{r:(i>>16)&255,g:(i>>8)&255,b:i&255};}
 function rgbStrToRgb(str){const p=(str||'').split(',').map(s=>s.trim()).map(Number); if(p.length!==3||p.some(x=>isNaN(x)))return null; return{r:clamp(Math.round(p[0]),0,255),g:clamp(Math.round(p[1]),0,255),b:clamp(Math.round(p[2]),0,255)};}
 function rgbToHex(r,g,b){return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();}
-function srgbToLab(r,g,b){const sr=[r,g,b].map(v=>v/255).map(c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4));const X=sr[0]*0.4124564+sr[1]*0.3575761+sr[2]*0.1804375;const Y=sr[0]*0.2126729+sr[1]*0.7151522+sr[2]*0.0721750;const Z=sr[0]*0.0193339+sr[1]*0.1191920+sr[2]*0.9503041;const Xn=0.95047,Yn=1,Zn=1.08883;const fx=f(X/Xn),fy=f(Y/Yn),fz=f(Z/Zn);return{L:116*fy-16,a:500*(fx-fy),b:200*(fy-fz)};function f(t){return t>0.008856?Math.cbrt(t):(7.787*t+16/116);}}
-function labToSrgb(L,a,b){const Yn=1,Xn=0.95047,Zn=1.08883;const fy=(L+16)/116;const fx=fy+(a/500);const fz=fy-(b/200);const fx3=fx**3,fy3=fy**3,fz3=fz**3;const X=Xn*(fx3>0.008856?fx3:(fx-16/116)/7.787);const Y=Yn*(fy3>0.008856?fy3:(fy-16/116)/7.787);const Z=Zn*(fz3>0.008856?fz3:(fz-16/116)/7.787);function enc(c){return c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;}let r=clamp(Math.round(enc(3.2404542*X-1.5371385*Y-0.4985314*Z)*255),0,255);let g=clamp(Math.round(enc(-0.9692660*X+1.8760108*Y+0.0415560*Z)*255),0,255);let b2=clamp(Math.round(enc(0.0556434*X-0.2040259*Y+1.0572252*Z)*255),0,255);return{r,g,b:b2};}
-function deltaE2000(l1,l2){const{L:L1,a:a1,b:b1}=l1,{L:L2,a:a2,b:b2}=l2;const deg2rad=Math.PI/180,rad2deg=180/Math.PI;const avgLp=(L1+L2)/2;const C1=Math.sqrt(a1*a1+b1*b1),C2=Math.sqrt(a2*a2+b2*b2),avgC=(C1+C2)/2;const G=0.5*(1-Math.sqrt((avgC**7)/((avgC**7)+(25**7))));const a1p=(1+G)*a1,a2p=(1+G)*a2;const C1p=Math.sqrt(a1p**2+b1*b1),C2p=Math.sqrt(a2p**2+b2*b2),avgCp=(C1p+C2p)/2;const h1p=hp(a1p,b1),h2p=hp(a2p,b2);let avgHp=Math.abs(h1p-h2p)>180?(h1p+h2p+360)/2:(h1p+h2p)/2;const T=1-0.17*Math.cos((avgHp-30)*deg2rad)+0.24*Math.cos((2*avgHp)*deg2rad)+0.32*Math.cos((3*avgHp+6)*deg2rad)-0.20*Math.cos((4*avgHp-63)*deg2rad);let dHp=h2p-h1p;if(Math.abs(dHp)>180)dHp-=360*Math.sign(dHp);const dLp=L2-L1,dCp=C2p-C1p,dHp_term=2*Math.sqrt(C1p*C2p)*Math.sin((dHp/2)*deg2rad);const Sl=1+(0.015*((avgLp-50)**2))/Math.sqrt(20+((avgLp-50)**2)),Sc=1+0.045*avgCp,Sh=1+0.015*avgCp*T;const deltaTheta=30*Math.exp(-((avgHp-275)/25)**2);const Rc=2*Math.sqrt((avgCp**7)/((avgCp**7)+(25**7)));const Rt=-Rc*Math.sin(2*deltaTheta*deg2rad);return Math.sqrt((dLp/Sl)**2+(dCp/Sc)**2+(dHp_term/Sh)**2+Rt*(dCp/Sc)*(dHp_term/Sh));function hp(a,b){if(a===0&&b===0)return 0;let h=Math.atan2(b,a)*rad2deg;if(h<0)h+=360;return h;}}
+function srgbToLab(r,g,b){const sr=[r,g,b].map(v=>v/255).map(c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4));const X=sr[0]*0.4124564+sr[1]*0.3575761+sr[2]*0.1804375;const Y=sr[0]*0.2126729+sr[1]*0.7151522+sr[2]*0.072175;const Z=sr[0]*0.0193339+sr[1]*0.119192+sr[2]*0.9503041;const Xn=0.95047,Yn=1,Zn=1.08883;const fx=f(X/Xn),fy=f(Y/Yn),fz=f(Z/Zn);return{L:116*fy-16,a:500*(fx-fy),b:200*(fy-fz)};function f(t){return t>0.008856?Math.cbrt(t):(7.787*t+16/116);}}
+function labToSrgb(L,a,b){const Yn=1,Xn=0.95047,Zn=1.08883;const fy=(L+16)/116;const fx=fy+(a/500);const fz=fy-(b/200);const fx3=Math.pow(fx,3),fy3=Math.pow(fy,3),fz3=Math.pow(fz,3);const X=Xn*(fx3>0.008856?fx3:(fx-16/116)/7.787);const Y=Yn*(fy3>0.008856?fy3:(fy-16/116)/7.787);const Z=Zn*(fz3>0.008856?fz3:(fz-16/116)/7.787);function enc(c){return c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;}let r=clamp(Math.round(enc(3.2404542*X-1.5371385*Y-0.4985314*Z)*255),0,255);let g=clamp(Math.round(enc(-0.9692660*X+1.8760108*Y+0.0415560*Z)*255),0,255);let b2=clamp(Math.round(enc(0.0556434*X-0.2040259*Y+1.0572252*Z)*255),0,255);return{r,g,b:b2};}
 
-// ===== Matching =====
-function findClosest(mode,inputs){
-  if(!COLOURS.length)return[];
-  const list=COLOURS.map(d=>({...d}));
+// CIEDE2000 (no ** operator anywhere)
+function deltaE2000(l1,l2){
+  const L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
+  const deg2rad=Math.PI/180, rad2deg=180/Math.PI;
+  const avgLp=(L1+L2)/2;
+  const C1=Math.sqrt(a1*a1+b1*b1), C2=Math.sqrt(a2*a2+b2*b2), avgC=(C1+C2)/2;
+  const G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
+  const a1p=(1+G)*a1, a2p=(1+G)*a2;
+  const C1p=Math.sqrt(a1p*a1p+b1*b1), C2p=Math.sqrt(a2p*a2p+b2*b2), avgCp=(C1p+C2p)/2;
+  const h1p=hp(a1p,b1), h2p=hp(a2p,b2);
+  let avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
+  const T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad) + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
+  let dHp = h2p - h1p; if (Math.abs(dHp)>180) dHp -= 360*Math.sign(dHp);
+  const dLp=L2-L1, dCp=C2p-C1p;
+  const dHp_term = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp/2)*deg2rad);
+  const Sl = 1 + (0.015*Math.pow((avgLp-50),2)) / Math.sqrt(20 + Math.pow((avgLp-50),2));
+  const Sc = 1 + 0.045*avgCp;
+  const Sh = 1 + 0.015*avgCp*T;
+  const deltaTheta = 30 * Math.exp(-1 * Math.pow(((avgHp-275)/25),2));
+  const Rc = 2 * Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7) + Math.pow(25,7)));
+  const Rt = -Rc * Math.sin(2*deltaTheta*deg2rad);
+  return Math.sqrt(
+    Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_term/Sh,2) + Rt*(dCp/Sc)*(dHp_term/Sh)
+  );
+  function hp(a,b){ if(a===0&&b===0) return 0; let h=Math.atan2(b,a)*rad2deg; if(h<0)h+=360; return h; }
+}
+
+// ===== Matching (correct field names) =====
+function findClosest(mode, inputs){
+  if(!COLOURS.length) return [];
+  const list = COLOURS.map(d => ({...d}));
   if(mode==='lab'){
-    const L=Number(inputs.L),a=Number(inputs.a),b=Number(inputs.b);
-    if([L,a,b].some(x=>isNaN(x)))return[];
+    const L=Number(inputs.L), a=Number(inputs.a), b=Number(inputs.b);
+    if([L,a,b].some(x=>isNaN(x))) return [];
     const target={L,a,b};
-    return list.map(d=>({...d,score:deltaE2000(target,{L:d.L,a:d.a,b:d.b})}))
+    return list.map(d => ({...d, score: deltaE2000(target, {L:d.L, a:d.a, b:d.b})}))
                .sort((x,y)=>x.score-y.score);
   }
   if(mode==='rgb'){
-    const rgb=rgbStrToRgb(inputs.rgb||''); if(!rgb)return[];
-    return list.map(d=>({...d,score:Math.hypot(rgb.r-d.R,rgb.g-d.G,rgb.b-d.B)}))
+    const rgb=rgbStrToRgb(inputs.rgb||''); if(!rgb) return [];
+    return list.map(d => ({...d, score: Math.hypot(rgb.r-d.r, rgb.g-d.g, rgb.b-d.b_rgb)}))
                .sort((x,y)=>x.score-y.score);
   }
   if(mode==='hex'){
-    const rgb=hexToRgb(inputs.hex||''); if(!rgb)return[];
-    return list.map(d=>({...d,score:Math.hypot(rgb.r-d.R,rgb.g-d.G,rgb.b-d.B)}))
+    const rgb=hexToRgb(inputs.hex||''); if(!rgb) return [];
+    return list.map(d => ({...d, score: Math.hypot(rgb.r-d.r, rgb.g-d.g, rgb.b-d.b_rgb)}))
                .sort((x,y)=>x.score-y.score);
   }
-  return[];
+  return [];
 }
 
 // ===== UI =====
-const $=sel=>document.querySelector(sel);
-const tbody=$("#resultsTable tbody");
-const sw=$("#targetSwatch");
-const formulaBox=$("#formulaBox"),formulaTitle=$("#formulaTitle"),formulaContent=$("#formulaContent");
+const $ = s => document.querySelector(s);
+const tbody = $("#resultsTable tbody");
+const sw = $("#targetSwatch");
+const formulaBox = $("#formulaBox");
+const formulaTitle = $("#formulaTitle");
+const formulaList = $("#formulaList");
 
 function renderResults(list){
-  tbody.innerHTML="";
-  list.slice(0,100).forEach((row,idx)=>{
-    const tr=document.createElement("tr");
-    tr.className="result-row";
-    const hx=row.HEX.startsWith("#")?row.HEX:"#"+row.HEX;
-    tr.innerHTML=`<td>${idx+1}</td><td>${row.Pantone}</td><td>${row.score.toFixed(2)}</td>
-      <td>${hx}</td><td>${row.R},${row.G},${row.B}</td>
-      <td>${row.L.toFixed(2)},${row.a.toFixed(2)},${row.b.toFixed(2)}</td>
-      <td><div class='swatch' style='background:${hx}'></div></td>`;
-    tr.addEventListener("click",()=>showFormula(row.Pantone));
+  tbody.innerHTML = "";
+  list.slice(0, 100).forEach((row, idx) => {
+    const tr = document.createElement("tr");
+    tr.className = "result-row";
+    const hx = "#" + (row.hex || (row.hex===0? "000000" : "")).toString().toUpperCase();
+    const hexStr = (row.hex ? (row.hex.startsWith("#")?row.hex:("#"+row.hex)).toUpperCase() : rgbToHex(row.r,row.g,row.b_rgb));
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${row.name}</td>
+      <td>${row.score.toFixed(2)}</td>
+      <td>${hexStr}</td>
+      <td>${row.r}, ${row.g}, ${row.b_rgb}</td>
+      <td>${row.L.toFixed(2)}, ${row.a.toFixed(2)}, ${row.b.toFixed(2)}</td>
+      <td><div class="swatch" style="background:${hexStr}"></div></td>
+    `;
+    tr.addEventListener("click", () => showFormula(row.name));
     tbody.appendChild(tr);
   });
 }
 
-function showFormula(name){
-  const formula=FORMULAS.find(f=>f.Pantone===name);
-  if(!formula){formulaBox.style.display="none";return;}
+function showFormula(colourName){
+  const formula = findFormula(colourName);
+  if(!formula){ formulaBox.style.display="none"; return; }
   formulaBox.style.display="block";
-  formulaTitle.textContent=name+" Formula";
-  formulaContent.textContent=JSON.stringify(formula.Formula,null,2);
+  formulaTitle.textContent = `${colourName} — DC Formula`;
+  formulaList.innerHTML = "";
+  const items = [];
+  // Normalise keys like "Ingredient 1", "%", "2%", etc.
+  const mapping = [
+    ["Ingredient 1","%"],
+    ["Ingredient 2","2%"],
+    ["Ingredient 3","%3"],
+    ["Ingredient 4","%4"]
+  ];
+  mapping.forEach(([inkKey,pctKey])=>{
+    const ink = formula[inkKey];
+    const pct = formula[pctKey];
+    if(ink && pct!=null){
+      const li = document.createElement("li");
+      li.textContent = `${ink} — ${pct}%`;
+      items.push(li);
+    }
+  });
+  if(!items.length){
+    const li = document.createElement("li");
+    li.textContent = "No breakdown available.";
+    items.push(li);
+  }
+  items.forEach(li => formulaList.appendChild(li));
+}
+
+function findFormula(colourName){
+  // DC_Formulas.json is an object whose values are arrays of entries with "Colour" and ingredient keys
+  for(const arr of Object.values(FORMULAS)){
+    if(Array.isArray(arr)){
+      const hit = arr.find(e => e.Colour === colourName);
+      if(hit) return hit;
+    }
+  }
+  return null;
+}
+
+function currentMode(){ return document.querySelector('input[name="mode"]:checked').value; }
+
+function updateModeUI(){
+  const mode = currentMode();
+  [["lab","labGroup"],["rgb","rgbGroup"],["hex","hexGroup"]].forEach(([m,id])=>{
+    const el = document.getElementById(id);
+    const on = (m===mode);
+    el.classList.toggle("disabled", !on);
+    el.querySelectorAll("input").forEach(inp => inp.disabled = !on);
+  });
+  updateTargetEcho();
 }
 
 function updateTargetEcho(){
-  const mode=document.querySelector('input[name="mode"]:checked').value;
+  const mode = currentMode();
   let hex='',label='';
   if(mode==='lab'){
-    const L=$("#L").value,a=$("#a").value,b=$("#b").value;
-    if([L,a,b].every(v=>v!=='')&&![L,a,b].some(isNaN)){
-      const rgb=labToSrgb(Number(L),Number(a),Number(b));
-      hex=rgbToHex(rgb.r,rgb.g,rgb.b);
-      label=`L*a*b*: ${L},${a},${b} • ${hex}`;
+    const L=$("#L").value, a=$("#a").value, b=$("#b").value;
+    if([L,a,b].every(v=>v!=='' && !isNaN(Number(v)))){
+      const rgb = labToSrgb(Number(L), Number(a), Number(b));
+      hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+      label = `L*a*b*: ${Number(L).toFixed(2)}, ${Number(a).toFixed(2)}, ${Number(b).toFixed(2)} • ${hex}`;
     }
   } else if(mode==='rgb'){
-    const rgb=rgbStrToRgb($("#rgb").value);
-    if(rgb){hex=rgbToHex(rgb.r,rgb.g,rgb.b);label=`RGB: ${rgb.r},${rgb.g},${rgb.b} • ${hex}`;}
+    const rgb = rgbStrToRgb($("#rgb").value);
+    if(rgb){ hex = rgbToHex(rgb.r, rgb.g, rgb.b); label = `RGB: ${rgb.r}, ${rgb.g}, ${rgb.b} • ${hex}`; }
   } else {
-    const hx=$("#hex").value.trim();
-    const rgb=hexToRgb(hx);
-    if(rgb){hex=(hx.startsWith('#')?hx:'#'+hx).toUpperCase();label=`HEX: ${hex}`;}
+    const hx = $("#hex").value.trim();
+    const rgb = hexToRgb(hx);
+    if(rgb){ hex = (hx.startsWith('#')?hx:'#'+hx).toUpperCase(); label = `HEX: ${hex}`; }
   }
-  sw.style.background=hex||"#0000";
-  $("#targetLabel").textContent=label||"No input yet";
+  sw.style.background = hex || "#0000";
+  $("#targetLabel").textContent = label || "No input yet";
 }
 
-document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change',()=>{
-  const m=r.value;
-  ["lab","rgb","hex"].forEach(g=>{
-    const grp=$("#"+g+"Group");
-    const enabled=(g===m);
-    grp.classList.toggle('disabled',!enabled);
-    grp.querySelectorAll('input').forEach(i=>i.disabled=!enabled);
-  });
-  updateTargetEcho();
-}));
+// Events
+document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change', updateModeUI));
+["L","a","b","rgb","hex"].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener("input", updateTargetEcho); });
 
-["L","a","b","rgb","hex"].forEach(id=>{
-  const el=document.getElementById(id);
-  if(el)el.addEventListener("input",updateTargetEcho);
-});
-
-$("#findBtn").addEventListener("click",()=>{
-  const mode=document.querySelector('input[name="mode"]:checked').value;
-  const inputs={L:$("#L").value,a:$("#a").value,b:$("#b").value,rgb:$("#rgb").value,hex:$("#hex").value};
-  const results=findClosest(mode,inputs);
+$("#findBtn").addEventListener("click", ()=>{
+  const mode = currentMode();
+  const inputs = { L:$("#L").value, a:$("#a").value, b:$("#b").value, rgb:$("#rgb").value, hex:$("#hex").value };
+  const results = findClosest(mode, inputs);
   renderResults(results);
   updateTargetEcho();
+  formulaBox.style.display = "none";
 });
-$("#clearBtn").addEventListener("click",()=>{["L","a","b","rgb","hex"].forEach(id=>$("#"+id).value="");tbody.innerHTML="";updateTargetEcho();formulaBox.style.display="none";});
+$("#clearBtn").addEventListener("click", ()=>{
+  ["L","a","b","rgb","hex"].forEach(id => $("#"+id).value="");
+  tbody.innerHTML = "";
+  updateTargetEcho();
+  formulaBox.style.display = "none";
+});
 
 // ===== Load JSON =====
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
   fetch('DC_Formulas.json').then(r=>r.json())
-]).then(([colours,formulas])=>{
-  COLOURS=colours;
-  FORMULAS=formulas;
-  $("#countLabel").textContent=COLOURS.length;
+]).then(([colours, formulas])=>{
+  COLOURS = colours;         // expects [{ name, L, a, b, r, g, b_rgb, hex }, ...]
+  FORMULAS = formulas;       // expects { "D5v": [ { Colour, "Ingredient 1", "%", ... }, ... ], ... }
+  $("#countLabel").textContent = COLOURS.length;
+  // optional: initial alphabetical list to show it's loaded
+  renderResults(COLOURS.map(d=>({...d, score: 9999})).sort((a,b)=>a.name.localeCompare(b.name)));
 }).catch(err=>{
   alert("Error loading JSON files: "+err);
 });
