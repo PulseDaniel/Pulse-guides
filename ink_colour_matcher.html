@@ -281,7 +281,6 @@ Promise.all([
   COLOURS = colours;         // [{ name, L, a, b, r, g, b_rgb, hex }, ...]
   FORMULAS = formulas;       // { "D5v": [ { Colour, "Ingredient 1", "%", ... }, ... ], ... }
   $("#countLabel").textContent = COLOURS.length;
-  renderResults(COLOURS.map(d=>({...d, score: 9999})).sort((a,b)=>a.name.localeCompare(b.name)));
 }).catch(err=>{
   alert("Error loading JSON files: "+err);
 });
