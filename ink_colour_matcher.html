@@ -56,12 +56,16 @@
           <label for="pms">Search by PMS (number only)</label>
           <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
         </div>
-        <div style="align-self:end;">
-          <button class="btn" id="pmsBtn">Find PMS</button>
+        <div>
+          <label for="illuminant">Illuminant / White</label>
+          <select id="illuminant">
+            <option value="D50" selected>D50 (2°)</option>
+            <option value="D65">D65 (2°)</option>
+          </select>
         </div>
       </div>
 
-      <div class="flex" style="margin-top:12px;">
+      <div class="flex" style="margin-top:12px;"> style="margin-top:12px;">
         <button class="btn" id="findBtn">Find Closest</button>
         <button class="btn" id="clearBtn">Clear</button>
       </div>
@@ -112,6 +116,7 @@
         </thead>
         <tbody id="resultsTbody"></tbody>
       </table>
+      <div class="muted">Showing top <span id="limitEcho">8</span> closest.</div>
       <div id="formulaPanel" class="formula-box" style="display:none;"></div>
     </div>
   </div>
@@ -121,9 +126,13 @@
 const $ = sel => document.querySelector(sel);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-// Bradford D50 -> D65 (for sRGB display; math stays D50)
+function getRefWhite(){
+  const mode = (document.querySelector('#illuminant')?.value)||'D50';
+  if(mode==='D65') return {Xn:0.95047, Yn:1, Zn:1.08883, tag:'D65'};
+  return {Xn:0.96422, Yn:1, Zn:0.82521, tag:'D50'};
+}
+// Bradford D50 -> D65 (for sRGB display; math stays in chosen white)
 function d50ToD65([X,Y,Z]){
-  // Simple 3x3 Bradford matrix from D50 to D65
   const M = [
     [ 0.9555766, -0.0230393, 0.0631636],
     [-0.0282895,  1.0099416, 0.0210077],
@@ -135,17 +144,14 @@ function d50ToD65([X,Y,Z]){
     M[2][0]*X + M[2][1]*Y + M[2][2]*Z
   ];
 }
-
 function labToXyz(L,a,b){
-  // D50 reference white (2°)
-  const Yn=1, Xn=0.96422, Zn=0.82521;
+  const {Xn,Yn,Zn} = getRefWhite();
   const fy=(L+16)/116;
   const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function xyzToLab(X,Y,Z){
-  // D50 reference white (2°)
-  const Xn=0.96422, Yn=1, Zn=0.82521;
+  const {Xn,Yn,Zn} = getRefWhite();
   const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
   const L = 116*f(Y/Yn)-16;
   const a = 500*(f(X/Xn)-f(Y/Yn));
@@ -153,6 +159,18 @@ function xyzToLab(X,Y,Z){
   return {L,a,b};
 }
 function labToSrgb(L,a,b){
+  const {tag} = getRefWhite();
+  const {X,Y,Z} = labToXyz(L,a,b);
+  const [Xd,Yd,Zd] = (tag==='D50') ? d50ToD65([X,Y,Z]) : [X,Y,Z];
+  let r =  3.2406*Xd -1.5372*Yd -0.4986*Zd;
+  let g = -0.9689*Xd +1.8758*Yd +0.0415*Zd;
+  let b2=  0.0557*Xd -0.2040*Yd +1.0570*Zd;
+  const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
+  r=clamp(Math.round(lin[0]*255),0,255);
+  g=clamp(Math.round(lin[1]*255),0,255);
+  b2=clamp(Math.round(lin[2]*255),0,255);
+  return {r,g,b:b2};
+}(L,a,b){
   // Lab (D50) -> XYZ (D50)
   const {X,Y,Z} = labToXyz(L,a,b);
   // Adapt to D65 for sRGB display
@@ -275,6 +293,29 @@ function findClosest(){
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
+  })).sort((a,b)=>a.de-b.de).slice(0,8);
+
+  $('#limitEcho').textContent = 8;
+  const tbody = $('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr'); tr.className='result-row';
+    const rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML = `
+      <td>${r.name}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${r.L.toFixed(2)}</td>
+      <td>${r.a.toFixed(2)}</td>
+      <td>${r.b.toFixed(2)}</td>
+      <td>${r.de.toFixed(2)}</td>`;
+    tr.addEventListener('click', ()=> showFormulaFor(r.name));
+    tbody.appendChild(tr);
+  });
+}
+  const rows = COLOURS.map(c=>({
+    raw: c,
+    name: c.name || c.Colour || c.color || '—',
+    L:c.L, a:c.a, b:c.b,
+    de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
   })).sort((a,b)=>a.de-b.de).slice(0,100);
 
   const tbody = $('#resultsTbody'); tbody.innerHTML='';
@@ -342,8 +383,19 @@ function findByPms(){
 
 // ===== Predictor =====
 function buildCombinedBasis(){
-  // Use all measured concentrations; average white/black twins at each conc
-  const basis = []; // {name, ink, conc, vec:[X,Y,Z], scale}
+  // Linear XYZ-over-white basis at representative strength per ink
+  const basis = []; // {name, ink, vec:[X,Y,Z]}
+  for (const ink of Object.keys(ASSORTMENT)){
+    const W = (ASSORTMENT[ink].white||[]);
+    if(!W.length) continue;
+    // pick highest concentration available over white
+    const pick = W.slice().sort((a,b)=>b.conc-a.conc)[0];
+    const xyz = labToXyz(pick.L, pick.a, pick.b);
+    const norm = Math.max(1e-9, Math.hypot(xyz.X, xyz.Y, xyz.Z));
+    basis.push({ name: ink, ink, vec:[xyz.X/norm, xyz.Y/norm, xyz.Z/norm], scale:norm });
+  }
+  return basis;
+}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]);
     const B = (ASSORTMENT[ink].black||[]);
@@ -385,6 +437,64 @@ function nnlsProject(A, y, iters=1600){
 }
 function suggestFormula(){
   const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
+  const basis = buildCombinedBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
+  const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
+
+  // Target XYZ (same white as selected)
+  const tXYZ = labToXyz(targetLab.L, targetLab.a, targetLab.b);
+  const nT = Math.max(1e-9, Math.hypot(tXYZ.X, tXYZ.Y, tXYZ.Z));
+  const y=[tXYZ.X/nT, tXYZ.Y/nT, tXYZ.Z/nT];
+
+  // Build A (3 x n) from per-ink over-white XYZ
+  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+
+  // Multiplicative NNLS on linear reflectance basis
+  let w = (function nnls(A,y,iters=2000){
+    const m=A.length, n=A[0].length; let w=new Array(n).fill(1/n);
+    const AT = Array.from({length:n},(_,j)=>A.map(row=>row[j]));
+    const ATy = new Array(n).fill(0);
+    for(let j=0;j<n;j++){ let s=0; for(let i=0;i<m;i++) s += AT[j][i]*y[i]; ATy[j]=s; }
+    const ATA = Array.from({length:n},()=>new Array(n).fill(0));
+    for(let i=0;i<n;i++) for(let j=0;j<n;j++){ let s=0; for(let k=0;k<m;k++) s+= AT[i][k]*A[k][j]; ATA[i][j]=s; }
+    for(let it=0; it<iters; it++){
+      const ATAw = new Array(n).fill(0);
+      for(let i=0;i<n;i++){ let s=0; for(let j=0;j<n;j++) s += ATA[i][j]*w[j]; ATAw[i]=s; }
+      for(let j=0;j<n;j++){
+        const denom = Math.max(1e-9, ATAw[j]);
+        w[j] = Math.max(0, w[j] * (ATy[j]/denom));
+      }
+      let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } else { w.fill(1/n); }
+    }
+    return w;
+  })(A,y,2000);
+
+  // Keep top-K
+  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val);
+  const kept = withIdx.slice(0, maxInks);
+  const picks = kept.map(k=>({ name: basis[k.idx].name, weight: k.val }));
+  const sumw = picks.reduce((a,b)=>a+b.weight,0)||1; picks.forEach(p=> p.weight = p.weight/sumw);
+
+  // Predict mix XYZ (linear combo in original scale)
+  const mix=[0,0,0];
+  picks.forEach(p=>{
+    const b = basis.find(x=>x.name===p.name);
+    mix[0] += p.weight * b.vec[0]*b.scale;
+    mix[1] += p.weight * b.vec[1]*b.scale;
+    mix[2] += p.weight * b.vec[2]*b.scale;
+  });
+  const mixLab = xyzToLab(mix[0], mix[1], mix[2]);
+  const dE = deltaE2000(mixLab, targetLab);
+  const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+
+  let html = `<h2>Suggested Formula</h2>`;
+  html += `<div class="stack" style="align-items:center;">
+    <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
+    <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong> (${document.querySelector('#illuminant').value})</div>
+  </div>`;
+  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
+  html += `<div class="muted">Linear over‑white XYZ basis at representative strength per ink; NNLS, sum=100%. Toggle D50/D65 above to compare.</div>`;
+  const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
+}
   const basis = buildCombinedBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
   const tXYZ = labToXyz(targetLab.L, targetLab.a, targetLab.b);
