@@ -343,26 +343,56 @@ function buildWhiteBasis(){
   }
   return basis;
 }
-function nnlsProject(A, y, iters=1600){
-  const m=A.length, n=A[0].length;
-  let w = new Array(n).fill(1/n);
-  const AT = Array.from({length:n},(_,j)=>A.map(row=>row[j]));
-  const ATy = new Array(n).fill(0);
-  for(let j=0;j<n;j++){ let s=0; for(let i=0;i<m;i++) s += AT[j][i]*y[i]; ATy[j]=s; }
-  const ATA = Array.from({length:n},()=>new Array(n).fill(0));
-  for(let i=0;i<n;i++) for(let j=0;j<n;j++){ let s=0; for(let k=0;k<m;k++) s+= AT[i][k]*A[k][j]; ATA[i][j]=s; }
-  for(let it=0; it<iters; it++){
-    const ATAw = new Array(n).fill(0);
-    for(let i=0;i<n;i++){ let s=0; for(let j=0;j<n;j++) s += ATA[i][j]*w[j]; ATAw[i]=s; }
-    for(let j=0;j<n;j++){
-      const denom = Math.max(1e-9, ATAw[j]);
-      w[j] = Math.max(0, w[j] * (ATy[j]/denom));
-    }
-    let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } else { w.fill(1/n); }
+// Quadratic-program exact-fit on the probability simplex (w >= 0, sum w = 1)
+// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2
+function fwSimplex(A, y, iters=2000, seed){
+  // A is 3xN, y is 3
+  const N = A[0].length;
+  // init w on simplex
+  let w = new Array(N).fill(0);
+  if (seed && seed.length === N) {
+    let s = seed.reduce((a,b)=>a+b,0); if (s > 0) w = seed.map(v=>Math.max(0,v)/s); else w[0]=1;
+  } else {
+    w[0] = 1; // start at first vertex
   }
+  // helper: Aw and gradient g = 2 A^T (A w - y)
+  function matVec(A, v){ return [
+    A[0].reduce((s,aj,j)=>s+aj*v[j],0),
+    A[1].reduce((s,aj,j)=>s+aj*v[j],0),
+    A[2].reduce((s,aj,j)=>s+aj*v[j],0)
+  ]; }
+  let Aw = matVec(A, w);
+  for (let t=0; t<iters; t++){
+    const r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]]; // residual
+    // gradient component g_k = 2 a_k · r, where a_k is column k
+    let bestK = 0, bestVal = Infinity;
+    for (let k=0; k<N; k++){
+      const gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
+      if (gk < bestVal){ bestVal = gk; bestK = k; }
+    }
+    // direction toward vertex e_bestK
+    const dir = new Array(N).fill(0); dir[bestK] = 1; // e_k
+    const v = [
+      A[0][bestK] - Aw[0],
+      A[1][bestK] - Aw[1],
+      A[2][bestK] - Aw[2]
+    ];
+    const num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
+    const den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    let gamma = num/den; // exact line search on quadratic
+    if (!Number.isFinite(gamma)) gamma = 0;
+    gamma = Math.max(0, Math.min(1, gamma));
+    // update w and Aw
+    for (let j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*dir[j]; }
+    Aw = [(1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK]];
+    // early stop when residual tiny
+    if ((r[0]*r[0]+r[1]*r[1]+r[2]*r[2]) < 1e-10) break;
+  }
+  // numeric cleanup
+  let s = w.reduce((a,b)=>a+b,0) || 1; w = w.map(v=>Math.max(0,v)/s);
   return w;
 }
-function suggestFormula(){
+function suggestFormula()(){
   const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
   const basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
@@ -374,12 +404,19 @@ function suggestFormula(){
   // Design matrix A (3 x N)
   const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
 
-  // NNLS on raw XYZ
-  let w = nnlsProject(A, y, 1600);
+  // Simplex-constrained quadratic fit (exact line search FW)
+  // Seed with a lightness-aware guess favouring extender if present
+  let seed = new Array(basis.length).fill(0);
+  // favour any columns whose ink name contains 'EXTENDER' or matches DC21-001/DC21-002
+  for (let j=0;j<basis.length;j++){
+    const ink = String(basis[j].ink||'').toUpperCase();
+    if (ink.includes('EXTENDER') || /DC21-00[12]/.test(ink)) seed[j] = 1;
+  }
+  let seedSum = seed.reduce((a,b)=>a+b,0);
+  if (seedSum === 0) seed[0] = 1; else seed = seed.map(v=>v/seedSum);
+  let w = fwSimplex(A, y, 2000, seed);
 
-  // Enforce convex combination (sum to 1) so white/extender can carry lightness
-  let sumw = w.reduce((a,b)=>a+b,0);
-  if(sumw>0) w = w.map(v=>v/sumw);
+  // weights already sum to 1 by construction(v=>v/sumw);
 
   // Predicted mix directly from column weights (no re-averaging)
   const mixXYZ = [0,0,0];
@@ -388,7 +425,7 @@ function suggestFormula(){
     mixXYZ[1] += w[j]*basis[j].vec[1];
     mixXYZ[2] += w[j]*basis[j].vec[2];
   }
-  const mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
+  const mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
   const dE = deltaE2000(mixLab, targetLab);
   const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
 
@@ -455,11 +492,16 @@ function runSelfTests(){
   const back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
   console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
 
-  // sRGB swatch clamp
-  const sw = labToSrgb(100, 0, 0);
-  console.assert([sw.r,sw.g,sw.b].every(v=>v>=0 && v<=255), 'sRGB out of 0..255');
+  // Simplex solver exact fit on convex hull: pick from two vertices
+  // columns at (1,0,0) and (0,1,0), target is (0.25, 0.75, 0)
+  const Atest = [[1,0],[0,1],[0,0]]; const ytest=[0.25,0.75,0];
+  const wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
+  const err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
+                         Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
+                         0);
+  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(v=>v>=-1e-9), 'FW simplex exact convex combo failed');
 }
-try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
+try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }(e){ console.warn('Self-tests failed:', e); }
 </script>
 </body>
 </html>
