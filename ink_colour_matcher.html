@@ -412,7 +412,7 @@ function suggestFormula(){
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
   html += `<div class="formula-grid">` + merged.map(p=>`<div class="fg-ink">${p.ink}</div><div class="fg-pct">${(p.weight*100).toFixed(1)}%</div>`).join('') + `</div>`;
-  html += `<div class="muted">Over‑white basis across concentrations, column‑normalised + multiplicative NNLS (Lab/XYZ in D50). For tighter fit later, we can add opacity-aware compositing.</div>`;
+  html += `<div class="muted">Over‑white basis across concentrations, column‑normalised + multiplicative NNLS (Lab/XYZ in D65). For tighter fit later, we can add opacity-aware compositing.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
