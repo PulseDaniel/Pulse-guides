@@ -68,13 +68,7 @@
         <button class="btn" id="clearBtn">Clear</button>
         <span class="muted" id="statusMsg" aria-live="polite"></span>
       </div>
-
-      <div class="formula-box" style="margin-top:12px;">
-        <h2>What does “Distance” mean?</h2>
-        <p class="muted">Distance = <strong>ΔE00 (CIEDE2000)</strong> computed in D65/2° to match your dataset. k<sub>L</sub>=k<sub>C</sub>=k<sub>H</sub>=1.</p>
-      </div>
-
-      <!-- Predictor Controls -->
+<!-- Predictor Controls -->
       <div class="formula-box" id="predictorBox">
         <h2>Suggest Formula (uses over‑white only)</h2>
         <div class="row2" style="margin-bottom:8px;">
@@ -82,7 +76,6 @@
             <label for="maxInks">Max inks in recipe</label>
             <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
           </div>
-          <div class="muted" style="align-self:end;">Basis uses only over‑white measurements for prediction.</div>
         </div>
         <div class="flex">
           <button class="btn" id="suggestBtn">Suggest Formula</button>
@@ -430,7 +423,6 @@ function suggestFormula(){
     + '<div class="muted">Predicted: L '+mixLab.L.toFixed(2)+' a '+mixLab.a.toFixed(2)+' b '+mixLab.b.toFixed(2)+' · ΔE00: <strong>'+dE.toFixed(2)+'</strong></div>'
     + '</div>';
   html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
-  html += '<div class="muted">Over‑white basis in raw XYZ (D65). Simplex-constrained quadratic fit (Frank–Wolfe, exact line search). Weights are non‑negative and sum to 1.</div>';
   var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
