@@ -182,6 +182,18 @@ let COLOURS = [];// from colours.json
 let FORMULAS = {};// from DC_Formulas.json
 let ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
 
+// Formula name normalisation index
+function normaliseName(s){
+  return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
+}
+let FORMULAS_NORM = {};
+function buildFormulaIndex(){
+  FORMULAS_NORM = {};
+  for(const key of Object.keys(FORMULAS||{})){
+    FORMULAS_NORM[normaliseName(key)] = FORMULAS[key];
+  }
+}
+
 // ===== UI helpers =====
 function updateTargetEcho(){
   const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
@@ -218,10 +230,24 @@ function findClosest(){
     tbody.appendChild(tr);
   });
 }
+
+// Robust formula lookup
+function extractPmsNumber(name){
+  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
+}
 function showFormulaFor(colourName){
   const panel = $('#formulaPanel');
-  const list = (FORMULAS[colourName]||[]);
-  if(!list.length){ panel.style.display='none'; return; }
+  let list = (FORMULAS[colourName]);
+  if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
+  if(!list){
+    const want = extractPmsNumber(colourName);
+    if(want){
+      const hitKey = Object.keys(FORMULAS||{}).find(k => (extractPmsNumber(k)||'') === want);
+      if(hitKey) list = FORMULAS[hitKey];
+    }
+  }
+  if(!list || !list.length){ panel.style.display='none'; return; }
   let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
   list.forEach(item=>{ html += `<li>${item["Ingredient 1"]||item.Ingredient||item.ingredient||'Ink'} — ${item['%']||item.pct||item.percent||'?'}%</li>`; });
   html += '</ul>';
@@ -229,50 +255,66 @@ function showFormulaFor(colourName){
 }
 
 // ===== PMS Search =====
-function extractPmsNumber(name){
-  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
-  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
-}
 function findByPms(){
-  const q = ($('#pms').value||'').trim().toUpperCase(); if(!q){ alert('Enter a PMS number'); return; }
+  const qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
+  const q = qRaw.replace(/^PANTONE\s*/,'');
   const hits = COLOURS.filter(c=>{
     const p = extractPmsNumber(c.name||c.Colour||c.color||'');
     return p && p.includes(q);
   });
+  const tbody = $('#resultsTbody'); tbody.innerHTML='';
   if(!hits.length){ alert('No PMS match found'); return; }
-  // Pick the first hit; populate Lab and run match
-  const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); findClosest(); showFormulaFor(c.name||c.Colour||c.color||'');
+  hits.slice(0,100).forEach(c=>{
+    const rgb=labToSrgb(c.L,c.a,c.b);
+    const tr=document.createElement('tr'); tr.className='result-row';
+    tr.innerHTML = `
+      <td>${c.name||c.Colour||c.color||'—'}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${(+c.L).toFixed(2)}</td>
+      <td>${(+c.a).toFixed(2)}</td>
+      <td>${(+c.b).toFixed(2)}</td>
+      <td>—</td>`;
+    tr.addEventListener('click', ()=>{ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
+    tbody.appendChild(tr);
+  });
+  const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho();
 }
 
-// ===== Predictor (dual-backing basis) =====
+// ===== Predictor (dual-backing with column normalisation + multiplicative NNLS) =====
 function buildCombinedBasis(){
-  const basis = [];// {name, xyz}
+  const basis = [];// {name, vec:[X,Y,Z], scale:number}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]).slice().sort((a,b)=>b.conc-a.conc);
     const B = (ASSORTMENT[ink].black||[]).slice().sort((a,b)=>b.conc-a.conc);
     if(!W.length && !B.length) continue;
-    // fallback if one side missing
-    const pickW = W.length? W[0] : null; const pickB = B.length? B[0] : null;
+    const pickW = W[0] || null; const pickB = B[0] || null;
     const xw = pickW? labToXyz(pickW.L,pickW.a,pickW.b) : null;
     const xb = pickB? labToXyz(pickB.L,pickB.a,pickB.b) : null;
     let X,Y,Z;
-    if(xw && xb){ // average the two backings to stabilise basis
-      X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2;
-    } else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
+    if(xw && xb){ X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2; }
+    else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
     else { X=xb.X; Y=xb.Y; Z=xb.Z; }
-    basis.push({ name: ink, xyz:[X,Y,Z] });
+    const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
+    basis.push({ name: ink, vec:[X/norm, Y/norm, Z/norm], scale:norm });
   }
   return basis;
 }
-function nnlsProject(A, y, opts={sumToOne:true, maxIter:600, step:0.2}){
-  const m=A.length, n=A[0].length; let w = new Array(n).fill(0);
-  let bestIdx=0, bestDot=-Infinity; for(let j=0;j<n;j++){ let dot=0; for(let i=0;i<m;i++) dot += A[i][j]*y[i]; if(dot>bestDot){bestDot=dot; bestIdx=j;} }
-  w[bestIdx]=1;
-  for(let it=0; it<opts.maxIter; it++){
-    const Aw = new Array(m).fill(0); for(let i=0;i<m;i++){ for(let j=0;j<n;j++){ Aw[i]+=A[i][j]*w[j]; } }
-    const grad = new Array(n).fill(0); for(let j=0;j<n;j++){ for(let i=0;i<m;i++){ grad[j]+=A[i][j]*(Aw[i]-y[i]); } }
-    for(let j=0;j<n;j++){ w[j] -= opts.step * grad[j]; w[j] = Math.max(0, w[j]); }
-    if(opts.sumToOne){ let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } }
+function nnlsProject(A, y, iters=1600){
+  const m=A.length, n=A[0].length;
+  let w = new Array(n).fill(1/n);
+  const AT = Array.from({length:n},(_,j)=>A.map(row=>row[j]));
+  const ATy = new Array(n).fill(0);
+  for(let j=0;j<n;j++){ let s=0; for(let i=0;i<m;i++) s += AT[j][i]*y[i]; ATy[j]=s; }
+  const ATA = Array.from({length:n},()=>new Array(n).fill(0));
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){ let s=0; for(let k=0;k<m;k++) s+= AT[i][k]*A[k][j]; ATA[i][j]=s; }
+  for(let it=0; it<iters; it++){
+    const ATAw = new Array(n).fill(0);
+    for(let i=0;i<n;i++){ let s=0; for(let j=0;j<n;j++) s += ATA[i][j]*w[j]; ATAw[i]=s; }
+    for(let j=0;j<n;j++){
+      const denom = Math.max(1e-9, ATAw[j]);
+      w[j] = Math.max(0, w[j] * (ATy[j]/denom));
+    }
+    let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } else { w.fill(1/n); }
   }
   return w;
 }
@@ -280,29 +322,32 @@ function suggestFormula(){
   const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
   const basis = buildCombinedBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
-  const yxyz = labToXyz(targetLab.L, targetLab.a, targetLab.b); const y=[yxyz.X,yxyz.Y,yxyz.Z];
-  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.xyz[0]); A[1].push(b.xyz[1]); A[2].push(b.xyz[2]); });
-  let w = nnlsProject(A, y, {sumToOne:true, maxIter:800, step:0.15});
-  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-4).sort((a,b)=>b.val-a.val);
+  const tXYZ = labToXyz(targetLab.L, targetLab.a, targetLab.b);
+  const tNorm = Math.max(1e-9, Math.hypot(tXYZ.X,tXYZ.Y,tXYZ.Z));
+  const y=[tXYZ.X/tNorm, tXYZ.Y/tNorm, tXYZ.Z/tNorm];
+  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+  let w = nnlsProject(A, y, 1600);
+  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val);
   const kept = withIdx.slice(0, maxInks);
-  const A2=[[],[],[]]; kept.forEach(k=>{ A2[0].push(A[0][k.idx]); A2[1].push(A[1][k.idx]); A2[2].push(A[2][k.idx]); });
-  const w2 = nnlsProject(A2, y, {sumToOne:true, maxIter:800, step:0.12});
-  const picks = kept.map((k,i)=>({ name: basis[k.idx].name, weight: w2[i] }));
-  const total = picks.reduce((a,b)=>a+b.weight,0) || 1; picks.forEach(p=> p.weight = p.weight / total * 100);
-  const mixX = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[0], 0);
-  const mixY = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[1], 0);
-  const mixZ = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[2], 0);
-  const mixLab = xyzToLab(mixX, mixY, mixZ);
+  const picks = kept.map(k=>({ name: basis[k.idx].name, weight: k.val }));
+  const sumw = picks.reduce((a,b)=>a+b.weight,0)||1; picks.forEach(p=> p.weight = p.weight/sumw);
+  const mix = [0,0,0];
+  picks.forEach(p=>{
+    const b = basis.find(x=>x.name===p.name);
+    mix[0] += p.weight * b.vec[0]*b.scale;
+    mix[1] += p.weight * b.vec[1]*b.scale;
+    mix[2] += p.weight * b.vec[2]*b.scale;
+  });
+  const mixLab = xyzToLab(mix[0], mix[1], mix[2]);
   const dE = deltaE2000(mixLab, targetLab);
-
   const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
   let html = `<h2>Suggested Formula</h2>`;
   html += `<div class="stack" style="align-items:center;">
     <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
-  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${p.weight.toFixed(1)}%</li>`).join('') + `</ul>`;
-  html += `<div class="muted">Basis = average of per‑ink highest‑load XYZ over white & black backings (uses both at once). Next step: opacity‑aware compositing.</div>`;
+  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
+  html += `<div class="muted">Dual-backing basis with column normalisation + multiplicative NNLS. Next step: opacity-aware compositing.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
@@ -324,6 +369,7 @@ Promise.all([
   fetch('assortment_colour_data.json').then(r=>r.json())
 ]).then(([colours, formulas, assortment])=>{
   COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
+  buildFormulaIndex();
   $('#countLabel').textContent = COLOURS.length;
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
