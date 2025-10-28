@@ -137,18 +137,22 @@ function labToSrgb(L,a,b){
   return {r,g,b:b2};
 }
 function labToXyz(L,a,b){
-  const Yn=1, Xn=0.95047, Zn=1.08883;
+  // Use D50 reference white (2°) to match Pantone/measurement convention
+  const Yn=1, Xn=0.96422, Zn=0.82521;
   const fy=(L+16)/116;
   const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
+};
 }
 function xyzToLab(X,Y,Z){
-  const Xn=0.95047, Yn=1, Zn=1.08883;
+  // Use D50 reference white (2°)
+  const Xn=0.96422, Yn=1, Zn=0.82521;
   const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
   const L = 116*f(Y/Yn)-16;
   const a = 500*(f(X/Xn)-f(Y/Yn));
   const b = 200*(f(Y/Yn)-f(Z/Zn));
   return {L,a,b};
+};
 }
 
 // ΔE2000 (kL=kC=kH=1)
@@ -194,6 +198,63 @@ let FORMULAS_NORM = {};
 let COLOUR_TO_FORMULA = {};
 function buildFormulaIndex(){
   FORMULAS_NORM = {};
+  COLOUR_TO_FORMULA = {};
+  // If DC_Formulas.json is a sheet-like object (e.g., {Sheet1: [...]}), fold all arrays
+  const rows = [];
+  if (Array.isArray(FORMULAS)) {
+    rows.push(...FORMULAS);
+  } else if (FORMULAS && typeof FORMULAS === 'object') {
+    for (const k of Object.keys(FORMULAS)) {
+      if (Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
+      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object') {
+        // nested? push values that look like rows
+        const maybe = FORMULAS[k];
+        if (Array.isArray(maybe.rows)) rows.push(...maybe.rows);
+      }
+    }
+  }
+  // Build a map: colour name -> array of {ink, percent}
+  const byColour = new Map();
+  rows.forEach(r=>{
+    const cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
+    if(!cname) return;
+    const items = [];
+    for (let i=1;i<=8;i++){
+      const ink = r[`Ingredient ${i}`] || r[`Ink ${i}`] || r[`INGREDIENT ${i}`];
+      if(!ink) continue;
+      // find matching percent column for this index ("%", "2%", "%2", etc.)
+      const candKeys = ["%","% "+i, `${i}%`, `%${i}`];
+      let pct = null;
+      for (const kk of candKeys){ if (kk in r && r[kk]!=null && r[kk]!=="") { pct = r[kk]; break; } }
+      // fallback: first key containing '%'
+      if (pct===null){
+        for (const key of Object.keys(r)){
+          if (/%/.test(key) && (String(key).includes(String(i)) || i===1)) { pct = r[key]; break; }
+        }
+      }
+      if (pct===null) pct = '';
+      items.push({ink, percent:pct});
+    }
+    const arr = byColour.get(cname) || [];
+    arr.push(...items);
+    byColour.set(cname, arr);
+    FORMULAS_NORM[normaliseName(cname)] = arr;
+  });
+  // Pre-bind colour library names to this map via exact and PMS-number match
+  (COLOURS||[]).forEach(c=>{
+    const name = c.name||c.Colour||c.color||'';
+    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = normaliseName(name); return; }
+    const norm = normaliseName(name);
+    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
+    const p = extractPmsNumber(name);
+    if(p){
+      // search through keys in byColour that share PMS number
+      for (const key of byColour.keys()){
+        if ((extractPmsNumber(key)||'')===p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
+      }
+    }
+  });
+};
   for(const key of Object.keys(FORMULAS||{})){
     FORMULAS_NORM[normaliseName(key)] = FORMULAS[key];
   }
@@ -252,17 +313,24 @@ function findClosest(){
 function showFormulaFor(colourName){
   const panel = $('#formulaPanel');
   let list = null;
-  // try pre-bound key
   const bound = COLOUR_TO_FORMULA[colourName];
   if(bound) list = FORMULAS_NORM[bound];
-  // try raw lookups
-  if(!list) list = (FORMULAS[colourName]);
   if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
-  // try PMS fallback
   if(!list){
     const want = extractPmsNumber(colourName);
     if(want){
-      const hitKey = Object.keys(FORMULAS||{}).find(k => (extractPmsNumber(k)||'') === want);
+      // try find any formula key with same PMS number
+      for (const key in FORMULAS_NORM){
+        if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
+      }
+    }
+  }
+  if(!list || !list.length){ panel.style.display='none'; return; }
+  let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
+  list.forEach(item=>{ html += `<li>${item.ink || item.Ink || 'Ink'}${item.percent!==''?` — ${item.percent}%`:''}</li>`; });
+  html += '</ul>';
+  panel.innerHTML = html; panel.style.display='block';
+}).find(k => (extractPmsNumber(k)||'') === want);
       if(hitKey) list = FORMULAS[hitKey];
     }
   }
