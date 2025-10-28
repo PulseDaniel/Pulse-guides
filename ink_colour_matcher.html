@@ -120,119 +120,123 @@
   </div>
 
 <script>
+(function(){
+'use strict';
 // ===== Utilities =====
-const $ = sel => document.querySelector(sel);
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+function $(sel){ return document.querySelector(sel); }
+function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
 // D65 reference white (2°)
 function labToXyz(L,a,b){
-  const Yn=1, Xn=0.95047, Zn=1.08883;
-  const fy=(L+16)/116;
-  const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
+  var Yn=1, Xn=0.95047, Zn=1.08883;
+  var fy=(L+16)/116;
+  var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function xyzToLab(X,Y,Z){
-  const Xn=0.95047, Yn=1, Zn=1.08883;
-  const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
-  const L = 116*f(Y/Yn)-16;
-  const a = 500*(f(X/Xn)-f(Y/Yn));
-  const b = 200*(f(Y/Yn)-f(Z/Zn));
-  return {L,a,b};
+  var Xn=0.95047, Yn=1, Zn=1.08883;
+  var f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
+  var L = 116*f(Y/Yn)-16;
+  var a = 500*(f(X/Xn)-f(Y/Yn));
+  var b = 200*(f(Y/Yn)-f(Z/Zn));
+  return {L:L,a:a,b:b};
 }
 function labToSrgb(L,a,b){
   // Lab (D65) -> XYZ (D65) -> sRGB
-  const {X,Y,Z} = labToXyz(L,a,b);
-  let r =  3.2406*X -1.5372*Y -0.4986*Z;
-  let g = -0.9689*X +1.8758*Y +0.0415*Z;
-  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
-  const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
+  var xyz = labToXyz(L,a,b);
+  var X=xyz.X, Y=xyz.Y, Z=xyz.Z;
+  var r =  3.2406*X -1.5372*Y -0.4986*Z;
+  var g = -0.9689*X +1.8758*Y +0.0415*Z;
+  var b2=  0.0557*X -0.2040*Y +1.0570*Z;
+  var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; });
   r=clamp(Math.round(lin[0]*255),0,255);
   g=clamp(Math.round(lin[1]*255),0,255);
   b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r,g,b:b2};
+  return {r:r,g:g,b:b2};
 }
 
 // ΔE2000 (kL=kC=kH=1)
+function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
 function deltaE2000(l1,l2){
-  const L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
-  const deg2rad=Math.PI/180;
-  const avgLp=(L1+L2)/2;
-  const C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
-  const G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
-  const a1p=(1+G)*a1, a2p=(1+G)*a2;
-  const C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
-  const hp=(x,y)=>{const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360)};
-  const h1p=hp(a1p,b1), h2p=hp(a2p,b2);
-  let avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
-  const T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
-            + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
-  let dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
-  const dLp = L2 - L1;
-  const dCp = C2p - C1p;
-  const dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
-  const Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
-  const Sc = 1 + 0.045*avgCp;
-  const Sh = 1 + 0.015*avgCp*T;
-  const Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
-            * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
+  var L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
+  var deg2rad=Math.PI/180;
+  var avgLp=(L1+L2)/2;
+  var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
+  var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
+  var a1p=(1+G)*a1, a2p=(1+G)*a2;
+  var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
+  var h1p=hp(a1p,b1), h2p=hp(a2p,b2);
+  var avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
+  var T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
+          + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
+  var dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
+  var dLp = L2 - L1;
+  var dCp = C2p - C1p;
+  var dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
+  var Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
+  var Sc = 1 + 0.045*avgCp;
+  var Sh = 1 + 0.015*avgCp*T;
+  var Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
+          * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
   return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
 // ===== State =====
-let COLOURS = [];// from colours.json
-let FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
-let ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
+var COLOURS = [];// from colours.json
+var FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
+var ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
 
 // Name & PMS helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
-  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
   return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
 
-let FORMULAS_NORM = {};
-let COLOUR_TO_FORMULA = {};
+var FORMULAS_NORM = {};
+var COLOUR_TO_FORMULA = {};
 function buildFormulaIndex(){
-  const rows = [];
+  var rows = [];
   FORMULAS_NORM = {};
   COLOUR_TO_FORMULA = {};
   // Flatten workbook-style DC_Formulas
   if (Array.isArray(FORMULAS)) {
-    rows.push(...FORMULAS);
+    rows.push.apply(rows, FORMULAS);
   } else if (FORMULAS && typeof FORMULAS === 'object') {
-    for (const k of Object.keys(FORMULAS)) {
-      if (Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
+    Object.keys(FORMULAS).forEach(function(k){
+      if (Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
       else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
-        rows.push(...FORMULAS[k].rows);
+        rows.push.apply(rows, FORMULAS[k].rows);
       }
-    }
+    });
   }
   // Build per-colour arrays of inks
-  const byColour = new Map();
-  rows.forEach(r => {
-    const cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
+  var byColour = new Map();
+  rows.forEach(function(r){
+    var cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
     if (!cname) return;
-    const items = [];
-    for (let i = 1; i <= 12; i++) {
-      const ink = r[`Ingredient ${i}`] || r[`Ink ${i}`] || r[`INGREDIENT ${i}`] || r[`ingredient ${i}`];
+    var items = [];
+    for (var i = 1; i <= 12; i++) {
+      var ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
       if (!ink) continue;
-      let pct = r[`%${i}`] || r[`${i}%`] || r[`% ${i}`] || r[`Percent ${i}`] || r[`Percent${i}`] || r['%'] || '';
-      items.push({ ink, percent: pct });
+      var pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
+      items.push({ ink: ink, percent: pct });
     }
-    const arr = byColour.get(cname) || [];
-    arr.push(...items);
+    var arr = byColour.get(cname) || [];
+    arr.push.apply(arr, items);
     byColour.set(cname, arr);
     FORMULAS_NORM[normaliseName(cname)] = arr;
   });
   // Pre-bind colour names to best formula key
-  (COLOURS || []).forEach(c => {
-    const name = c.name || c.Colour || c.color || '';
-    const norm = normaliseName(name);
+  (COLOURS || []).forEach(function(c){
+    var name = c.name || c.Colour || c.color || '';
+    var norm = normaliseName(name);
     if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
     if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
-    const p = extractPmsNumber(name);
+    var p = extractPmsNumber(name);
     if (p) {
-      for (const key of byColour.keys()){
+      byColour.keys();
+      for (var key of byColour.keys()){
         if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
       }
     }
@@ -241,62 +245,58 @@ function buildFormulaIndex(){
 
 // ===== UI helpers =====
 function updateTargetEcho(){
-  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(v=>Number.isNaN(v))){ $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return; }
-  $('#targetEcho').textContent = `Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
-  const rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(function(v){ return Number.isNaN(v); })){
+    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
+  }
+  $('#targetEcho').textContent = 'Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
+  var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
 }
 
 // ===== Matching =====
 function getTargetLab(){
-  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L,a,b};
+  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
 }
 function findClosest(){
-  const target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-  const rows = COLOURS.map(c=>({
+  var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+  var rows = COLOURS.map(function(c){ return {
     raw: c,
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  })).sort((a,b)=>a.de-b.de).slice(0,8); // limit to 8 for a compact list
+  }; }).sort(function(a,b){ return a.de-b.de; }).slice(0,8); // limit to 8 for a compact list
 
-  const tbody = $('#resultsTbody'); tbody.innerHTML='';
-  rows.forEach(r=>{
-    const tr=document.createElement('tr'); tr.className='result-row';
-    const rgb=labToSrgb(r.L,r.a,r.b);
-    tr.innerHTML = `
-      <td>${r.name}</td>
-      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
-      <td>${r.L.toFixed(2)}</td>
-      <td>${r.a.toFixed(2)}</td>
-      <td>${r.b.toFixed(2)}</td>
-      <td>${r.de.toFixed(2)}</td>`;
-    tr.addEventListener('click', ()=> showFormulaFor(r.name));
+  var tbody = $('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(function(r){
+    var tr=document.createElement('tr'); tr.className='result-row';
+    var rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML = '\n      <td>'+r.name+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+r.L.toFixed(2)+'</td>\n      <td>'+r.a.toFixed(2)+'</td>\n      <td>'+r.b.toFixed(2)+'</td>\n      <td>'+r.de.toFixed(2)+'</td>';
+    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
     tbody.appendChild(tr);
   });
 }
 
 function showFormulaFor(colourName){
-  const panel = $('#formulaPanel');
-  let list = null;
-  const bound = COLOUR_TO_FORMULA[colourName];
+  var panel = $('#formulaPanel');
+  var list = null;
+  var bound = COLOUR_TO_FORMULA[colourName];
   if(bound) list = FORMULAS_NORM[bound];
   if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
   if(!list){
-    const want = extractPmsNumber(colourName);
+    var want = extractPmsNumber(colourName);
     if(want){
-      for (const key in FORMULAS_NORM){
+      for (var key in FORMULAS_NORM){
         if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
       }
     }
   }
   if(!list || !list.length){ panel.style.display='none'; return; }
-  let html = `<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
-  list.forEach(item=>{
-    const name = item.ink || item.Ink || 'Ink';
-    const pct = item.percent!==''? `${item.percent}%` : '';
-    html += `<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`;
+  var html = '<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
+  list.forEach(function(item){
+    var name = item.ink || item.Ink || 'Ink';
+    var pct = item.percent!==''? (item.percent+'%') : '';
+    html += '<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>';
   });
   html += '</div>';
   panel.innerHTML = html; panel.style.display='block';
@@ -304,204 +304,189 @@ function showFormulaFor(colourName){
 
 // ===== PMS Search =====
 function findByPms(){
-  const qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
-  const q = qRaw.replace(/^PANTONE\s*/,'');
-  const hits = COLOURS.filter(c=>{
-    const p = extractPmsNumber(c.name||c.Colour||c.color||'');
+  var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
+  var q = qRaw.replace(/^PANTONE\s*/,'');
+  var hits = COLOURS.filter(function(c){
+    var p = extractPmsNumber(c.name||c.Colour||c.color||'');
     return p && p.includes(q);
   });
-  const tbody = $('#resultsTbody'); tbody.innerHTML='';
+  var tbody = $('#resultsTbody'); tbody.innerHTML='';
   if(!hits.length){ alert('No PMS match found'); return; }
-  hits.slice(0,8).forEach(c=>{ // also limit to 8 here
-    const rgb=labToSrgb(c.L,c.a,c.b);
-    const tr=document.createElement('tr'); tr.className='result-row';
-    tr.innerHTML = `
-      <td>${c.name||c.Colour||c.color||'—'}</td>
-      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
-      <td>${(+c.L).toFixed(2)}</td>
-      <td>${(+c.a).toFixed(2)}</td>
-      <td>${(+c.b).toFixed(2)}</td>
-      <td>—</td>`;
-    tr.addEventListener('click', ()=>{ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
+  hits.slice(0,8).forEach(function(c){ // also limit to 8 here
+    var rgb=labToSrgb(c.L,c.a,c.b);
+    var tr=document.createElement('tr'); tr.className='result-row';
+    tr.innerHTML = '\n      <td>'+(c.name||c.Colour||c.color||'—')+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+(+c.L).toFixed(2)+'</td>\n      <td>'+(+c.a).toFixed(2)+'</td>\n      <td>'+(+c.b).toFixed(2)+'</td>\n      <td>—</td>';
+    tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
     tbody.appendChild(tr);
   });
-  const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho();
+  var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
 }
 
 // ===== Predictor (white‑only basis, raw XYZ in D65) =====
 function buildWhiteBasis(){
   // Build basis using ONLY over-white measurements at each concentration.
   // IMPORTANT: keep raw XYZ magnitude (no column normalisation) so lightness is preserved.
-  const basis = []; // {name, ink, conc, vec:[X,Y,Z]}
-  for (const ink of Object.keys(ASSORTMENT)){
-    const W = (ASSORTMENT[ink].white||[]);
-    if (!W.length) continue;
-    W.slice().sort((a,b)=>a.conc-b.conc).forEach(entry=>{
-      const {X,Y,Z} = labToXyz(entry.L, entry.a, entry.b); // D65
-      basis.push({ name: `${ink}@${entry.conc}%`, ink, conc: entry.conc, vec:[X, Y, Z] });
+  var basis = []; // {name, ink, conc, vec:[X,Y,Z]}
+  Object.keys(ASSORTMENT).forEach(function(ink){
+    var W = (ASSORTMENT[ink].white||[]);
+    if (!W.length) return;
+    W.slice().sort(function(a,b){ return a.conc-b.conc; }).forEach(function(entry){
+      var xyz = labToXyz(entry.L, entry.a, entry.b); // D65
+      basis.push({ name: ink+'@'+entry.conc+'%', ink: ink, conc: entry.conc, vec:[xyz.X, xyz.Y, xyz.Z] });
     });
-  }
+  });
   return basis;
 }
-// Quadratic-program exact-fit on the probability simplex (w >= 0, sum w = 1)
-// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2
-function fwSimplex(A, y, iters=2000, seed){
-  // A is 3xN, y is 3
-  const N = A[0].length;
-  // init w on simplex
-  let w = new Array(N).fill(0);
-  if (seed && seed.length === N) {
-    let s = seed.reduce((a,b)=>a+b,0); if (s > 0) w = seed.map(v=>Math.max(0,v)/s); else w[0]=1;
+
+// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2, with simplex constraints (w>=0, sum w=1)
+function fwSimplex(A, y, iters, seed){
+  if (iters==null) iters=2000;
+  var N = A[0].length;
+  var w = new Array(N).fill(0);
+  if (seed && seed.length===N){
+    var s0 = seed.reduce(function(a,b){return a+b;},0);
+    if (s0>0) w = seed.map(function(v){ return Math.max(0,v)/s0; }); else w[0]=1;
   } else {
-    w[0] = 1; // start at first vertex
+    w[0]=1;
   }
-  // helper: Aw and gradient g = 2 A^T (A w - y)
-  function matVec(A, v){ return [
-    A[0].reduce((s,aj,j)=>s+aj*v[j],0),
-    A[1].reduce((s,aj,j)=>s+aj*v[j],0),
-    A[2].reduce((s,aj,j)=>s+aj*v[j],0)
-  ]; }
-  let Aw = matVec(A, w);
-  for (let t=0; t<iters; t++){
-    const r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]]; // residual
-    // gradient component g_k = 2 a_k · r, where a_k is column k
-    let bestK = 0, bestVal = Infinity;
-    for (let k=0; k<N; k++){
-      const gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
-      if (gk < bestVal){ bestVal = gk; bestK = k; }
-    }
-    // direction toward vertex e_bestK
-    const dir = new Array(N).fill(0); dir[bestK] = 1; // e_k
-    const v = [
-      A[0][bestK] - Aw[0],
-      A[1][bestK] - Aw[1],
-      A[2][bestK] - Aw[2]
+  function matVec(A, v){
+    return [
+      A[0].reduce(function(s,aj,j){return s+aj*v[j];},0),
+      A[1].reduce(function(s,aj,j){return s+aj*v[j];},0),
+      A[2].reduce(function(s,aj,j){return s+aj*v[j];},0)
     ];
-    const num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
-    const den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-    let gamma = num/den; // exact line search on quadratic
-    if (!Number.isFinite(gamma)) gamma = 0;
-    gamma = Math.max(0, Math.min(1, gamma));
-    // update w and Aw
-    for (let j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*dir[j]; }
-    Aw = [(1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK]];
-    // early stop when residual tiny
-    if ((r[0]*r[0]+r[1]*r[1]+r[2]*r[2]) < 1e-10) break;
   }
-  // numeric cleanup
-  let s = w.reduce((a,b)=>a+b,0) || 1; w = w.map(v=>Math.max(0,v)/s);
+  var Aw = matVec(A, w);
+  for (var t=0;t<iters;t++){
+    var r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]];
+    var bestK=0, bestVal=Infinity;
+    for (var k=0;k<N;k++){
+      var gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
+      if (gk < bestVal){ bestVal=gk; bestK=k; }
+    }
+    var v = [ A[0][bestK]-Aw[0], A[1][bestK]-Aw[1], A[2][bestK]-Aw[2] ];
+    var num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
+    var den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    var gamma = num/den; if (!Number.isFinite(gamma)) gamma=0; gamma=Math.max(0, Math.min(1, gamma));
+    for (var j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*(j===bestK?1:0); }
+    Aw = [ (1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK] ];
+    var res2 = r[0]*r[0]+r[1]*r[1]+r[2]*r[2];
+    if (res2 < 1e-10) break;
+  }
+  var s = w.reduce(function(a,b){return a+b;},0) || 1; w = w.map(function(v){ return Math.max(0,v)/s; });
   return w;
 }
-function suggestFormula()(){
-  const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
-  const basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
-  const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
+
+function suggestFormula(){
+  var targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
+  var basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
+  var maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
 
   // Target in raw XYZ (D65)
-  const t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
-  const y = [t.X, t.Y, t.Z];
+  var t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
+  var y = [t.X, t.Y, t.Z];
 
   // Design matrix A (3 x N)
-  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+  var A=[[],[],[]]; basis.forEach(function(b){ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
 
-  // Simplex-constrained quadratic fit (exact line search FW)
-  // Seed with a lightness-aware guess favouring extender if present
-  let seed = new Array(basis.length).fill(0);
-  // favour any columns whose ink name contains 'EXTENDER' or matches DC21-001/DC21-002
-  for (let j=0;j<basis.length;j++){
-    const ink = String(basis[j].ink||'').toUpperCase();
-    if (ink.includes('EXTENDER') || /DC21-00[12]/.test(ink)) seed[j] = 1;
+  // Seed: favour extender columns if present
+  var seed = new Array(basis.length).fill(0);
+  for (var j=0;j<basis.length;j++){
+    var ink = String(basis[j].ink||'').toUpperCase();
+    if (ink.indexOf('EXTENDER')>-1 || /\bDC21-00[12]\b/.test(ink)) seed[j] = 1;
   }
-  let seedSum = seed.reduce((a,b)=>a+b,0);
-  if (seedSum === 0) seed[0] = 1; else seed = seed.map(v=>v/seedSum);
-  let w = fwSimplex(A, y, 2000, seed);
+  var seedSum = seed.reduce(function(a,b){return a+b;},0);
+  if (seedSum === 0) seed[0] = 1; else seed = seed.map(function(v){ return v/seedSum; });
 
-  // weights already sum to 1 by construction(v=>v/sumw);
+  // Simplex-constrained quadratic fit
+  var w = fwSimplex(A, y, 2000, seed);
 
   // Predicted mix directly from column weights (no re-averaging)
-  const mixXYZ = [0,0,0];
-  for(let j=0;j<basis.length;j++){
-    mixXYZ[0] += w[j]*basis[j].vec[0];
-    mixXYZ[1] += w[j]*basis[j].vec[1];
-    mixXYZ[2] += w[j]*basis[j].vec[2];
+  var mixXYZ = [0,0,0];
+  for(var j2=0;j2<basis.length;j2++){
+    mixXYZ[0] += w[j2]*basis[j2].vec[0];
+    mixXYZ[1] += w[j2]*basis[j2].vec[1];
+    mixXYZ[2] += w[j2]*basis[j2].vec[2];
   }
-  const mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
-  const dE = deltaE2000(mixLab, targetLab);
-  const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+  var mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
+  var dE = deltaE2000(mixLab, targetLab);
+  var rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
 
   // Collapse weights by ink for display, then keep top-k inks
-  const byInk = new Map();
-  for(let j=0;j<basis.length;j++){
-    if(w[j] <= 1e-9) continue;
-    byInk.set(basis[j].ink, (byInk.get(basis[j].ink)||0) + w[j]);
+  var byInk = new Map();
+  for(var jj=0;jj<basis.length;jj++){
+    if(w[jj] <= 1e-9) continue;
+    byInk.set(basis[jj].ink, (byInk.get(basis[jj].ink)||0) + w[jj]);
   }
-  let merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink,weight}))
-                    .sort((a,b)=>b.weight-a.weight)
+  var merged = Array.from(byInk.entries()).map(function(pair){ return {ink:pair[0], weight:pair[1]}; })
+                    .sort(function(a,b){ return b.weight-a.weight; })
                     .slice(0, maxInks);
-  const dispSum = merged.reduce((a,b)=>a+b.weight,0)||1; // renormalise for pretty %s
-  merged.forEach(p=> p.weight = p.weight/dispSum);
+  var dispSum = merged.reduce(function(a,b){return a+b.weight;},0)||1; // renormalise for pretty %s
+  merged.forEach(function(p){ p.weight = p.weight/dispSum; });
 
-  let html = `<h2>Suggested Formula</h2>`;
-  html += `<div class="stack" style="align-items:center;">
-    <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
-    <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
-  </div>`;
-  html += `<div class="formula-grid">` + merged.map(p=>`<div class=\"fg-ink\">${p.ink}</div><div class=\"fg-pct\">${(p.weight*100).toFixed(1)}%</div>`).join('') + `</div>`;
-  html += `<div class="muted">Over‑white basis in raw XYZ (D65). NNLS with convex weights (sum=1) so extender/light inks can carry L*. No column or target normalisation.</div>`;
-  const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
+  var html = '<h2>Suggested Formula</h2>';
+  html += '<div class="stack" style="align-items:center;">'
+    + '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div>'
+    + '<div class="muted">Predicted: L '+mixLab.L.toFixed(2)+' a '+mixLab.a.toFixed(2)+' b '+mixLab.b.toFixed(2)+' · ΔE00: <strong>'+dE.toFixed(2)+'</strong></div>'
+    + '</div>';
+  html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
+  html += '<div class="muted">Over‑white basis in raw XYZ (D65). Simplex-constrained quadratic fit (Frank–Wolfe, exact line search). Weights are non‑negative and sum to 1.</div>';
+  var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
 // ===== Wire up =====
 $('#findBtn').addEventListener('click', findClosest);
-$('#clearBtn').addEventListener('click', ()=>{
+$('#clearBtn').addEventListener('click', function(){
   $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
   $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
   $('#suggestedFormula').style.display='none';
 });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
-['L','a','b'].forEach(id=> $('#'+id).addEventListener('input', updateTargetEcho));
+['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
 // ===== Load JSON =====
 Promise.all([
-  fetch('colours.json').then(r=>r.json()),
-  fetch('DC_Formulas.json').then(r=>r.json()),
-  fetch('assortment_colour_data.json').then(r=>r.json())
-]).then(([colours, formulas, assortment])=>{
+  fetch('colours.json').then(function(r){ return r.json(); }),
+  fetch('DC_Formulas.json').then(function(r){ return r.json(); }),
+  fetch('assortment_colour_data.json').then(function(r){ return r.json(); })
+]).then(function(tuple){
+  var colours = tuple[0], formulas = tuple[1], assortment = tuple[2];
   COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
   buildFormulaIndex();
   $('#countLabel').textContent = COLOURS.length;
-}).catch(err=>{ alert('Error loading JSON: '+err); });
+}).catch(function(err){ alert('Error loading JSON: '+err); });
 
 updateTargetEcho();
 
 // ===== Self-tests =====
-function approx(a,b,eps=1e-3){ return Math.abs(a-b) <= eps; }
+function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 function runSelfTests(){
   // ΔE should be 0 for identical colours
-  const c = {L:50,a:0,b:0};
+  var c = {L:50,a:0,b:0};
   console.assert(approx(deltaE2000(c,c), 0), 'ΔE00(identity) != 0');
 
   // Symmetry
-  const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
+  var c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
   console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
 
   // Lab -> XYZ -> Lab round-trip (D65)
-  const t={L:70,a:20,b:30};
-  const xyz = labToXyz(t.L,t.a,t.b);
-  const back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
+  var t={L:70,a:20,b:30};
+  var xyz = labToXyz(t.L,t.a,t.b);
+  var back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
   console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
 
   // Simplex solver exact fit on convex hull: pick from two vertices
   // columns at (1,0,0) and (0,1,0), target is (0.25, 0.75, 0)
-  const Atest = [[1,0],[0,1],[0,0]]; const ytest=[0.25,0.75,0];
-  const wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
-  const err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
-                         Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
-                         0);
-  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(v=>v>=-1e-9), 'FW simplex exact convex combo failed');
+  var Atest = [[1,0],[0,1],[0,0]]; var ytest=[0.25,0.75,0];
+  var wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
+  var err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
+                       Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
+                       0);
+  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(function(v){ return v>=-1e-9; }), 'FW simplex exact convex combo failed');
 }
-try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }(e){ console.warn('Self-tests failed:', e); }
+try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
+})();
 </script>
 </body>
 </html>
