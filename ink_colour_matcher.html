@@ -56,12 +56,8 @@
           <label for="pms">Search by PMS (number only)</label>
           <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
         </div>
-        <div>
-          <label for="illuminant">Illuminant / White</label>
-          <select id="illuminant">
-            <option value="D50" selected>D50 (2°)</option>
-            <option value="D65">D65 (2°)</option>
-          </select>
+        <div style="align-self:end;">
+          <button class="btn" id="pmsBtn">Find PMS</button>
         </div>
       </div>
 
@@ -77,13 +73,13 @@
 
       <!-- Predictor Controls -->
       <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula</h2>
+        <h2>Suggest Formula (uses both backings)</h2>
         <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="maxInks">Max inks in recipe</label>
             <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
           </div>
-          <div class="muted" style="align-self:end;">Toggle D50/D65 above to compare.</div>
+          <div class="muted" style="align-self:end;">Basis combines over‑white and over‑black responses.</div>
         </div>
         <div class="flex">
           <button class="btn" id="suggestBtn">Suggest Formula</button>
@@ -116,7 +112,6 @@
         </thead>
         <tbody id="resultsTbody"></tbody>
       </table>
-      <div class="muted">Showing top <span id="limitEcho">8</span> closest.</div>
       <div id="formulaPanel" class="formula-box" style="display:none;"></div>
     </div>
   </div>
@@ -126,13 +121,9 @@
 const $ = sel => document.querySelector(sel);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-function getRefWhite(){
-  const mode = (document.querySelector('#illuminant')?.value)||'D50';
-  if(mode==='D65') return {Xn:0.95047, Yn:1, Zn:1.08883, tag:'D65'};
-  return {Xn:0.96422, Yn:1, Zn:0.82521, tag:'D50'};
-}
-// Bradford D50 -> D65 (for sRGB display; math stays in chosen white)
+// Bradford D50 -> D65 (for sRGB display; math stays D50)
 function d50ToD65([X,Y,Z]){
+  // Simple 3x3 Bradford matrix from D50 to D65
   const M = [
     [ 0.9555766, -0.0230393, 0.0631636],
     [-0.0282895,  1.0099416, 0.0210077],
@@ -144,14 +135,17 @@ function d50ToD65([X,Y,Z]){
     M[2][0]*X + M[2][1]*Y + M[2][2]*Z
   ];
 }
+
 function labToXyz(L,a,b){
-  const {Xn,Yn,Zn} = getRefWhite();
+  // D50 reference white (2°)
+  const Yn=1, Xn=0.96422, Zn=0.82521;
   const fy=(L+16)/116;
   const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function xyzToLab(X,Y,Z){
-  const {Xn,Yn,Zn} = getRefWhite();
+  // D50 reference white (2°)
+  const Xn=0.96422, Yn=1, Zn=0.82521;
   const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
   const L = 116*f(Y/Yn)-16;
   const a = 500*(f(X/Xn)-f(Y/Yn));
@@ -159,9 +153,11 @@ function xyzToLab(X,Y,Z){
   return {L,a,b};
 }
 function labToSrgb(L,a,b){
-  const {tag} = getRefWhite();
+  // Lab (D50) -> XYZ (D50)
   const {X,Y,Z} = labToXyz(L,a,b);
-  const [Xd,Yd,Zd] = (tag==='D50') ? d50ToD65([X,Y,Z]) : [X,Y,Z];
+  // Adapt to D65 for sRGB display
+  const [Xd, Yd, Zd] = d50ToD65([X,Y,Z]);
+  // XYZ (D65) -> linear sRGB
   let r =  3.2406*Xd -1.5372*Yd -0.4986*Zd;
   let g = -0.9689*Xd +1.8758*Yd +0.0415*Zd;
   let b2=  0.0557*Xd -0.2040*Yd +1.0570*Zd;
@@ -279,9 +275,8 @@ function findClosest(){
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  })).sort((a,b)=>a.de-b.de).slice(0,8);
+  })).sort((a,b)=>a.de-b.de).slice(0,100);
 
-  $('#limitEcho').textContent = 8;
   const tbody = $('#resultsTbody'); tbody.innerHTML='';
   rows.forEach(r=>{
     const tr=document.createElement('tr'); tr.className='result-row';
@@ -347,16 +342,25 @@ function findByPms(){
 
 // ===== Predictor =====
 function buildCombinedBasis(){
-  // Linear XYZ-over-white basis at representative strength per ink
-  const basis = []; // {name, ink, vec:[X,Y,Z], scale}
+  // Use all measured concentrations; average white/black twins at each conc
+  const basis = []; // {name, ink, conc, vec:[X,Y,Z], scale}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]);
-    if(!W.length) continue;
-    // pick highest concentration available over white
-    const pick = W.slice().sort((a,b)=>b.conc-a.conc)[0];
-    const xyz = labToXyz(pick.L, pick.a, pick.b);
-    const norm = Math.max(1e-9, Math.hypot(xyz.X, xyz.Y, xyz.Z));
-    basis.push({ name: ink, ink, vec:[xyz.X/norm, xyz.Y/norm, xyz.Z/norm], scale:norm });
+    const B = (ASSORTMENT[ink].black||[]);
+    const concSet = new Set([...W.map(x=>x.conc), ...B.map(x=>x.conc)]);
+    Array.from(concSet).sort((a,b)=>a-b).forEach(conc=>{
+      const w = W.find(x=>x.conc===conc) || null;
+      const b = B.find(x=>x.conc===conc) || null;
+      if(!w && !b) return;
+      const xw = w? labToXyz(w.L,w.a,w.b) : null;
+      const xb = b? labToXyz(b.L,b.a,b.b) : null;
+      let X,Y,Z;
+      if(xw && xb){ X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2; }
+      else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
+      else { X=xb.X; Y=xb.Y; Z=xb.Z; }
+      const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
+      basis.push({ name: `${ink}@${conc}%`, ink, conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+    });
   }
   return basis;
 }
@@ -383,48 +387,24 @@ function suggestFormula(){
   const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
   const basis = buildCombinedBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
-
-  // Target XYZ (same white as selected)
   const tXYZ = labToXyz(targetLab.L, targetLab.a, targetLab.b);
-  const nT = Math.max(1e-9, Math.hypot(tXYZ.X, tXYZ.Y, tXYZ.Z));
-  const y=[tXYZ.X/nT, tXYZ.Y/nT, tXYZ.Z/nT];
-
-  // Build A (3 x n) from per-ink over-white XYZ
+  const tNorm = Math.max(1e-9, Math.hypot(tXYZ.X,tXYZ.Y,tXYZ.Z));
+  const y=[tXYZ.X/tNorm, tXYZ.Y/tNorm, tXYZ.Z/tNorm];
   const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+  let w = nnlsProject(A, y, 1600);
+  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val).slice(0, Math.min(maxInks*2, w.length));
+  const byInk = new Map();
+  withIdx.forEach(k=>{ const col = basis[k.idx]; byInk.set(col.ink, (byInk.get(col.ink)||0) + k.val); });
+  const merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink, weight})).sort((a,b)=>b.weight-a.weight).slice(0, maxInks);
+  const sumw = merged.reduce((a,b)=>a+b.weight,0)||1; merged.forEach(p=> p.weight = p.weight/sumw);
 
-  // Multiplicative NNLS on linear reflectance basis
-  let w = (function nnls(A,y,iters=2000){
-    const m=A.length, n=A[0].length; let w=new Array(n).fill(1/n);
-    const AT = Array.from({length:n},(_,j)=>A.map(row=>row[j]));
-    const ATy = new Array(n).fill(0);
-    for(let j=0;j<n;j++){ let s=0; for(let i=0;i<m;i++) s += AT[j][i]*y[i]; ATy[j]=s; }
-    const ATA = Array.from({length:n},()=>new Array(n).fill(0));
-    for(let i=0;i<n;i++) for(let j=0;j<n;j++){ let s=0; for(let k=0;k<m;k++) s+= AT[i][k]*A[k][j]; ATA[i][j]=s; }
-    for(let it=0; it<iters; it++){
-      const ATAw = new Array(n).fill(0);
-      for(let i=0;i<n;i++){ let s=0; for(let j=0;j<n;j++) s += ATA[i][j]*w[j]; ATAw[i]=s; }
-      for(let j=0;j<n;j++){
-        const denom = Math.max(1e-9, ATAw[j]);
-        w[j] = Math.max(0, w[j] * (ATy[j]/denom));
-      }
-      let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } else { w.fill(1/n); }
-    }
-    return w;
-  })(A,y,2000);
-
-  // Keep top-K
-  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val);
-  const kept = withIdx.slice(0, maxInks);
-  const picks = kept.map(k=>({ name: basis[k.idx].name, weight: k.val }));
-  const sumw = picks.reduce((a,b)=>a+b.weight,0)||1; picks.forEach(p=> p.weight = p.weight/sumw);
-
-  // Predict mix XYZ (linear combo in original scale)
   const mix=[0,0,0];
-  picks.forEach(p=>{
-    const b = basis.find(x=>x.name===p.name);
-    mix[0] += p.weight * b.vec[0]*b.scale;
-    mix[1] += p.weight * b.vec[1]*b.scale;
-    mix[2] += p.weight * b.vec[2]*b.scale;
+  merged.forEach(p=>{
+    const cols = basis.filter(b=>b.ink===p.ink);
+    let X=0,Y=0,Z=0, t=0;
+    cols.forEach(c=>{ const mag=c.scale; X+=c.vec[0]*mag; Y+=c.vec[1]*mag; Z+=c.vec[2]*mag; t++; });
+    if(t>0){ X/=t; Y/=t; Z/=t; }
+    mix[0]+= p.weight*X; mix[1]+=p.weight*Y; mix[2]+=p.weight*Z;
   });
   const mixLab = xyzToLab(mix[0], mix[1], mix[2]);
   const dE = deltaE2000(mixLab, targetLab);
@@ -433,10 +413,10 @@ function suggestFormula(){
   let html = `<h2>Suggested Formula</h2>`;
   html += `<div class="stack" style="align-items:center;">
     <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
-    <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong> (${document.querySelector('#illuminant').value})</div>
+    <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
-  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
-  html += `<div class="muted">Linear over‑white XYZ basis at representative strength per ink; NNLS, sum=100%. Toggle D50/D65 above to compare.</div>`;
+  html += `<ul>` + merged.map(p=>`<li>${p.ink} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
+  html += `<div class="muted">Dual-backing basis across concentrations, column-normalised + multiplicative NNLS (Lab/XYZ in D50). For tighter fit, next step is opacity-aware compositing.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
@@ -450,7 +430,6 @@ $('#clearBtn').addEventListener('click', ()=>{
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(id=> $('#'+id).addEventListener('input', updateTargetEcho));
-$('#illuminant').addEventListener('change', ()=>{ updateTargetEcho(); if($('#resultsTbody').children.length){ findClosest(); } });
 
 // ===== Load JSON =====
 Promise.all([
