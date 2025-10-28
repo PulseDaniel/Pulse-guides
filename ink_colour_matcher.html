@@ -121,27 +121,19 @@
 const $ = sel => document.querySelector(sel);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-function labToSrgb(L,a,b){
-  // Lab(D50) -> XYZ(D50)
-  const Yn=1, Xn=0.96422, Zn=0.82521;
-  const fy=(L+16)/116;
-  const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
-  const xr = fx((a/500)+fy);
-  const yr = fx(fy);
-  const zr = fx(fy-(b/200));
-  let X = xr*Xn, Y=yr*Yn, Z=zr*Zn;
-
-  // OPTIONAL (display-only): adapt to D65 for sRGB matrix
-  // const v = d50ToD65([X,Y,Z]); X=v[0]; Y=v[1]; Z=v[2];
-
-  let r =  3.2406*X -1.5372*Y -0.4986*Z;
-  let g = -0.9689*X +1.8758*Y +0.0415*Z;
-  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
-  const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
-  r=clamp(Math.round(lin[0]*255),0,255);
-  g=clamp(Math.round(lin[1]*255),0,255);
-  b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r,g,b:b2};
+// Bradford D50 -> D65 (for sRGB display; math stays D50)
+function d50ToD65([X,Y,Z]){
+  // Simple 3x3 Bradford matrix from D50 to D65
+  const M = [
+    [ 0.9555766, -0.0230393, 0.0631636],
+    [-0.0282895,  1.0099416, 0.0210077],
+    [ 0.0122982, -0.0204830, 1.3299098]
+  ];
+  return [
+    M[0][0]*X + M[0][1]*Y + M[0][2]*Z,
+    M[1][0]*X + M[1][1]*Y + M[1][2]*Z,
+    M[2][0]*X + M[2][1]*Y + M[2][2]*Z
+  ];
 }
 
 function labToXyz(L,a,b){
@@ -151,7 +143,6 @@ function labToXyz(L,a,b){
   const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
-
 function xyzToLab(X,Y,Z){
   // D50 reference white (2°)
   const Xn=0.96422, Yn=1, Zn=0.82521;
@@ -160,6 +151,21 @@ function xyzToLab(X,Y,Z){
   const a = 500*(f(X/Xn)-f(Y/Yn));
   const b = 200*(f(Y/Yn)-f(Z/Zn));
   return {L,a,b};
+}
+function labToSrgb(L,a,b){
+  // Lab (D50) -> XYZ (D50)
+  const {X,Y,Z} = labToXyz(L,a,b);
+  // Adapt to D65 for sRGB display
+  const [Xd, Yd, Zd] = d50ToD65([X,Y,Z]);
+  // XYZ (D65) -> linear sRGB
+  let r =  3.2406*Xd -1.5372*Yd -0.4986*Zd;
+  let g = -0.9689*Xd +1.8758*Yd +0.0415*Zd;
+  let b2=  0.0557*Xd -0.2040*Yd +1.0570*Zd;
+  const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
+  r=clamp(Math.round(lin[0]*255),0,255);
+  g=clamp(Math.round(lin[1]*255),0,255);
+  b2=clamp(Math.round(lin[2]*255),0,255);
+  return {r,g,b:b2};
 }
 
 // ΔE2000 (kL=kC=kH=1)
@@ -190,91 +196,61 @@ function deltaE2000(l1,l2){
 
 // ===== State =====
 let COLOURS = [];// from colours.json
-let FORMULAS = {};// from DC_Formulas.json
+let FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
 let ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
 
-// Formula name normalisation index + mapping from colour library to formulas
-function normaliseName(s){
-  return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
-}
+// Name & PMS helpers
+function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
   if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
   return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
+
 let FORMULAS_NORM = {};
 let COLOUR_TO_FORMULA = {};
 function buildFormulaIndex(){
+  const rows = [];
   FORMULAS_NORM = {};
   COLOUR_TO_FORMULA = {};
-  // If DC_Formulas.json is a sheet-like object (e.g., {Sheet1: [...]}), fold all arrays
-  const rows = [];
+  // Flatten workbook-style DC_Formulas
   if (Array.isArray(FORMULAS)) {
     rows.push(...FORMULAS);
   } else if (FORMULAS && typeof FORMULAS === 'object') {
     for (const k of Object.keys(FORMULAS)) {
       if (Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
-      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object') {
-        // nested? push values that look like rows
-        const maybe = FORMULAS[k];
-        if (Array.isArray(maybe.rows)) rows.push(...maybe.rows);
+      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
+        rows.push(...FORMULAS[k].rows);
       }
     }
   }
-  // Build a map: colour name -> array of {ink, percent}
+  // Build per-colour arrays of inks
   const byColour = new Map();
-  rows.forEach(r=>{
+  rows.forEach(r => {
     const cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
-    if(!cname) return;
+    if (!cname) return;
     const items = [];
-    for (let i=1;i<=8;i++){
-      const ink = r[`Ingredient ${i}`] || r[`Ink ${i}`] || r[`INGREDIENT ${i}`];
-      if(!ink) continue;
-      // find matching percent column for this index ("%", "2%", "%2", etc.)
-      const candKeys = ["%","% "+i, `${i}%`, `%${i}`];
-      let pct = null;
-      for (const kk of candKeys){ if (kk in r && r[kk]!=null && r[kk]!=="") { pct = r[kk]; break; } }
-      // fallback: first key containing '%'
-      if (pct===null){
-        for (const key of Object.keys(r)){
-          if (/%/.test(key) && (String(key).includes(String(i)) || i===1)) { pct = r[key]; break; }
-        }
-      }
-      if (pct===null) pct = '';
-      items.push({ink, percent:pct});
+    for (let i = 1; i <= 12; i++) {
+      const ink = r[`Ingredient ${i}`] || r[`Ink ${i}`] || r[`INGREDIENT ${i}`] || r[`ingredient ${i}`];
+      if (!ink) continue;
+      let pct = r[`%${i}`] || r[`${i}%`] || r[`% ${i}`] || r[`Percent ${i}`] || r[`Percent${i}`] || r['%'] || '';
+      items.push({ ink, percent: pct });
     }
     const arr = byColour.get(cname) || [];
     arr.push(...items);
     byColour.set(cname, arr);
     FORMULAS_NORM[normaliseName(cname)] = arr;
   });
-  // Pre-bind colour library names to this map via exact and PMS-number match
-  (COLOURS||[]).forEach(c=>{
-    const name = c.name||c.Colour||c.color||'';
-    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = normaliseName(name); return; }
+  // Pre-bind colour names to best formula key
+  (COLOURS || []).forEach(c => {
+    const name = c.name || c.Colour || c.color || '';
     const norm = normaliseName(name);
+    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
     if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
     const p = extractPmsNumber(name);
-    if(p){
-      // search through keys in byColour that share PMS number
+    if (p) {
       for (const key of byColour.keys()){
-        if ((extractPmsNumber(key)||'')===p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
+        if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
       }
-    }
-  });
-};
-  for(const key of Object.keys(FORMULAS||{})){
-    FORMULAS_NORM[normaliseName(key)] = FORMULAS[key];
-  }
-  // pre-bind any colours to exact/best-matching formula keys
-  COLOUR_TO_FORMULA = {};
-  (COLOURS||[]).forEach(c=>{
-    const name = c.name||c.Colour||c.color||'';
-    const norm = normaliseName(name);
-    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
-    const p = extractPmsNumber(name);
-    if(p){
-      const hit = Object.keys(FORMULAS_NORM).find(k => (extractPmsNumber(k)||'') === p);
-      if(hit) COLOUR_TO_FORMULA[name] = hit;
     }
   });
 }
@@ -326,7 +302,6 @@ function showFormulaFor(colourName){
   if(!list){
     const want = extractPmsNumber(colourName);
     if(want){
-      // try find any formula key with same PMS number
       for (const key in FORMULAS_NORM){
         if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
       }
@@ -335,26 +310,6 @@ function showFormulaFor(colourName){
   if(!list || !list.length){ panel.style.display='none'; return; }
   let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
   list.forEach(item=>{ html += `<li>${item.ink || item.Ink || 'Ink'}${item.percent!==''?` — ${item.percent}%`:''}</li>`; });
-  html += '</ul>';
-  panel.innerHTML = html; panel.style.display='block';
-}).find(k => (extractPmsNumber(k)||'') === want);
-      if(hitKey) list = FORMULAS[hitKey];
-    }
-  }
-  if(!list){ panel.style.display='none'; return; }
-  // allow object or array
-  const arr = Array.isArray(list) ? list : Object.values(list);
-  if(!arr.length){ panel.style.display='none'; return; }
-  let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
-  arr.forEach(item=>{
-    const keys = Object.keys(item||{});
-    // try to detect ink name & percent columns generically
-    const inkKey = keys.find(k=>/ingredient/i.test(k)) || keys.find(k=>/ink/i.test(k)) || keys[0];
-    const pctKey = keys.find(k=>/^%$|percent|pct/i.test(k));
-    const ink = item[inkKey];
-    const pct = pctKey? item[pctKey] : '';
-    html += `<li>${ink ?? 'Ink'}${pct!==''?` — ${pct}%`:''}</li>`;
-  });
   html += '</ul>';
   panel.innerHTML = html; panel.style.display='block';
 }
@@ -385,14 +340,13 @@ function findByPms(){
   const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho();
 }
 
-// ===== Predictor (multi-concentration dual-backing, column normalisation + multiplicative NNLS) =====
+// ===== Predictor =====
 function buildCombinedBasis(){
-  // Build basis columns for each ink at each measured concentration (averaging white/black when both present).
-  const basis = []; // {name: 'INK@conc', ink:'INK', conc:number, vec:[X,Y,Z], scale:number}
+  // Use all measured concentrations; average white/black twins at each conc
+  const basis = []; // {name, ink, conc, vec:[X,Y,Z], scale}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]);
     const B = (ASSORTMENT[ink].black||[]);
-    // collect unique concentration levels
     const concSet = new Set([...W.map(x=>x.conc), ...B.map(x=>x.conc)]);
     Array.from(concSet).sort((a,b)=>a-b).forEach(conc=>{
       const w = W.find(x=>x.conc===conc) || null;
@@ -405,7 +359,7 @@ function buildCombinedBasis(){
       else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
       else { X=xb.X; Y=xb.Y; Z=xb.Z; }
       const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
-      basis.push({ name: `${ink}@${conc}%`, ink: ink, conc: conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+      basis.push({ name: `${ink}@${conc}%`, ink, conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
     });
   }
   return basis;
@@ -438,22 +392,14 @@ function suggestFormula(){
   const y=[tXYZ.X/tNorm, tXYZ.Y/tNorm, tXYZ.Z/tNorm];
   const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
   let w = nnlsProject(A, y, 1600);
-  // keep top columns then merge by ink (sum concentrations)
   const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val).slice(0, Math.min(maxInks*2, w.length));
-  // merge weights by ink name
   const byInk = new Map();
-  withIdx.forEach(k=>{
-    const col = basis[k.idx];
-    byInk.set(col.ink, (byInk.get(col.ink)||0) + k.val);
-  });
-  // prune to maxInks by total ink contribution
+  withIdx.forEach(k=>{ const col = basis[k.idx]; byInk.set(col.ink, (byInk.get(col.ink)||0) + k.val); });
   const merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink, weight})).sort((a,b)=>b.weight-a.weight).slice(0, maxInks);
   const sumw = merged.reduce((a,b)=>a+b.weight,0)||1; merged.forEach(p=> p.weight = p.weight/sumw);
 
-  // Reconstruct predicted XYZ using per-ink average of selected columns
   const mix=[0,0,0];
   merged.forEach(p=>{
-    // average column back to an approximate per-ink XYZ using weighted mean of that ink's basis columns
     const cols = basis.filter(b=>b.ink===p.ink);
     let X=0,Y=0,Z=0, t=0;
     cols.forEach(c=>{ const mag=c.scale; X+=c.vec[0]*mag; Y+=c.vec[1]*mag; Z+=c.vec[2]*mag; t++; });
@@ -470,7 +416,7 @@ function suggestFormula(){
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
   html += `<ul>` + merged.map(p=>`<li>${p.ink} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
-  html += `<div class="muted">Basis uses all measured concentrations (averaged over white/black), with column normalisation and NNLS. For lower ΔE, next step is opacity-aware compositing and per-ink response curves.</div>`;
+  html += `<div class="muted">Dual-backing basis across concentrations, column-normalised + multiplicative NNLS (Lab/XYZ in D50). For tighter fit, next step is opacity-aware compositing.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
