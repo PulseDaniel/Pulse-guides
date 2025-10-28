@@ -182,16 +182,33 @@ let COLOURS = [];// from colours.json
 let FORMULAS = {};// from DC_Formulas.json
 let ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
 
-// Formula name normalisation index
+// Formula name normalisation index + mapping from colour library to formulas
 function normaliseName(s){
   return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
 }
+function extractPmsNumber(name){
+  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
+}
 let FORMULAS_NORM = {};
+let COLOUR_TO_FORMULA = {};
 function buildFormulaIndex(){
   FORMULAS_NORM = {};
   for(const key of Object.keys(FORMULAS||{})){
     FORMULAS_NORM[normaliseName(key)] = FORMULAS[key];
   }
+  // pre-bind any colours to exact/best-matching formula keys
+  COLOUR_TO_FORMULA = {};
+  (COLOURS||[]).forEach(c=>{
+    const name = c.name||c.Colour||c.color||'';
+    const norm = normaliseName(name);
+    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
+    const p = extractPmsNumber(name);
+    if(p){
+      const hit = Object.keys(FORMULAS_NORM).find(k => (extractPmsNumber(k)||'') === p);
+      if(hit) COLOUR_TO_FORMULA[name] = hit;
+    }
+  });
 }
 
 // ===== UI helpers =====
@@ -210,6 +227,7 @@ function getTargetLab(){
 function findClosest(){
   const target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
   const rows = COLOURS.map(c=>({
+    raw: c,
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
@@ -231,15 +249,16 @@ function findClosest(){
   });
 }
 
-// Robust formula lookup
-function extractPmsNumber(name){
-  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
-  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
-}
 function showFormulaFor(colourName){
   const panel = $('#formulaPanel');
-  let list = (FORMULAS[colourName]);
+  let list = null;
+  // try pre-bound key
+  const bound = COLOUR_TO_FORMULA[colourName];
+  if(bound) list = FORMULAS_NORM[bound];
+  // try raw lookups
+  if(!list) list = (FORMULAS[colourName]);
   if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
+  // try PMS fallback
   if(!list){
     const want = extractPmsNumber(colourName);
     if(want){
@@ -247,9 +266,20 @@ function showFormulaFor(colourName){
       if(hitKey) list = FORMULAS[hitKey];
     }
   }
-  if(!list || !list.length){ panel.style.display='none'; return; }
+  if(!list){ panel.style.display='none'; return; }
+  // allow object or array
+  const arr = Array.isArray(list) ? list : Object.values(list);
+  if(!arr.length){ panel.style.display='none'; return; }
   let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
-  list.forEach(item=>{ html += `<li>${item["Ingredient 1"]||item.Ingredient||item.ingredient||'Ink'} — ${item['%']||item.pct||item.percent||'?'}%</li>`; });
+  arr.forEach(item=>{
+    const keys = Object.keys(item||{});
+    // try to detect ink name & percent columns generically
+    const inkKey = keys.find(k=>/ingredient/i.test(k)) || keys.find(k=>/ink/i.test(k)) || keys[0];
+    const pctKey = keys.find(k=>/^%$|percent|pct/i.test(k));
+    const ink = item[inkKey];
+    const pct = pctKey? item[pctKey] : '';
+    html += `<li>${ink ?? 'Ink'}${pct!==''?` — ${pct}%`:''}</li>`;
+  });
   html += '</ul>';
   panel.innerHTML = html; panel.style.display='block';
 }
@@ -280,22 +310,28 @@ function findByPms(){
   const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho();
 }
 
-// ===== Predictor (dual-backing with column normalisation + multiplicative NNLS) =====
+// ===== Predictor (multi-concentration dual-backing, column normalisation + multiplicative NNLS) =====
 function buildCombinedBasis(){
-  const basis = [];// {name, vec:[X,Y,Z], scale:number}
+  // Build basis columns for each ink at each measured concentration (averaging white/black when both present).
+  const basis = []; // {name: 'INK@conc', ink:'INK', conc:number, vec:[X,Y,Z], scale:number}
   for (const ink of Object.keys(ASSORTMENT)){
-    const W = (ASSORTMENT[ink].white||[]).slice().sort((a,b)=>b.conc-a.conc);
-    const B = (ASSORTMENT[ink].black||[]).slice().sort((a,b)=>b.conc-a.conc);
-    if(!W.length && !B.length) continue;
-    const pickW = W[0] || null; const pickB = B[0] || null;
-    const xw = pickW? labToXyz(pickW.L,pickW.a,pickW.b) : null;
-    const xb = pickB? labToXyz(pickB.L,pickB.a,pickB.b) : null;
-    let X,Y,Z;
-    if(xw && xb){ X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2; }
-    else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
-    else { X=xb.X; Y=xb.Y; Z=xb.Z; }
-    const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
-    basis.push({ name: ink, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+    const W = (ASSORTMENT[ink].white||[]);
+    const B = (ASSORTMENT[ink].black||[]);
+    // collect unique concentration levels
+    const concSet = new Set([...W.map(x=>x.conc), ...B.map(x=>x.conc)]);
+    Array.from(concSet).sort((a,b)=>a-b).forEach(conc=>{
+      const w = W.find(x=>x.conc===conc) || null;
+      const b = B.find(x=>x.conc===conc) || null;
+      if(!w && !b) return;
+      const xw = w? labToXyz(w.L,w.a,w.b) : null;
+      const xb = b? labToXyz(b.L,b.a,b.b) : null;
+      let X,Y,Z;
+      if(xw && xb){ X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2; }
+      else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
+      else { X=xb.X; Y=xb.Y; Z=xb.Z; }
+      const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
+      basis.push({ name: `${ink}@${conc}%`, ink: ink, conc: conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+    });
   }
   return basis;
 }
@@ -327,27 +363,39 @@ function suggestFormula(){
   const y=[tXYZ.X/tNorm, tXYZ.Y/tNorm, tXYZ.Z/tNorm];
   const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
   let w = nnlsProject(A, y, 1600);
-  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val);
-  const kept = withIdx.slice(0, maxInks);
-  const picks = kept.map(k=>({ name: basis[k.idx].name, weight: k.val }));
-  const sumw = picks.reduce((a,b)=>a+b.weight,0)||1; picks.forEach(p=> p.weight = p.weight/sumw);
-  const mix = [0,0,0];
-  picks.forEach(p=>{
-    const b = basis.find(x=>x.name===p.name);
-    mix[0] += p.weight * b.vec[0]*b.scale;
-    mix[1] += p.weight * b.vec[1]*b.scale;
-    mix[2] += p.weight * b.vec[2]*b.scale;
+  // keep top columns then merge by ink (sum concentrations)
+  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val).slice(0, Math.min(maxInks*2, w.length));
+  // merge weights by ink name
+  const byInk = new Map();
+  withIdx.forEach(k=>{
+    const col = basis[k.idx];
+    byInk.set(col.ink, (byInk.get(col.ink)||0) + k.val);
+  });
+  // prune to maxInks by total ink contribution
+  const merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink, weight})).sort((a,b)=>b.weight-a.weight).slice(0, maxInks);
+  const sumw = merged.reduce((a,b)=>a+b.weight,0)||1; merged.forEach(p=> p.weight = p.weight/sumw);
+
+  // Reconstruct predicted XYZ using per-ink average of selected columns
+  const mix=[0,0,0];
+  merged.forEach(p=>{
+    // average column back to an approximate per-ink XYZ using weighted mean of that ink's basis columns
+    const cols = basis.filter(b=>b.ink===p.ink);
+    let X=0,Y=0,Z=0, t=0;
+    cols.forEach(c=>{ const mag=c.scale; X+=c.vec[0]*mag; Y+=c.vec[1]*mag; Z+=c.vec[2]*mag; t++; });
+    if(t>0){ X/=t; Y/=t; Z/=t; }
+    mix[0]+= p.weight*X; mix[1]+=p.weight*Y; mix[2]+=p.weight*Z;
   });
   const mixLab = xyzToLab(mix[0], mix[1], mix[2]);
   const dE = deltaE2000(mixLab, targetLab);
   const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+
   let html = `<h2>Suggested Formula</h2>`;
   html += `<div class="stack" style="align-items:center;">
     <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
-  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
-  html += `<div class="muted">Dual-backing basis with column normalisation + multiplicative NNLS. Next step: opacity-aware compositing.</div>`;
+  html += `<ul>` + merged.map(p=>`<li>${p.ink} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
+  html += `<div class="muted">Basis uses all measured concentrations (averaged over white/black), with column normalisation and NNLS. For lower ΔE, next step is opacity-aware compositing and per-ink response curves.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
