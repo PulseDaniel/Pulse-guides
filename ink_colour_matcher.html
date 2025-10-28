@@ -3,289 +3,331 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher</title>
+  <title>Ink Colour Matcher + Predictor</title>
   <style>
     :root { --gap: 12px; --radius: 14px; }
     * { box-sizing: border-box; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial; margin: 0; padding: 24px; background: #0b0c10; color: #e6e6e6; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
     h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    .app { max-width: 1100px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 380px 1fr; align-items: start; }
-    .card { background: #111318; border: 1px solid #22252e; border-radius: var(--radius); padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,25); }
-    label { display: block; font-size: .85rem; color: #98a2b3; margin-bottom: 6px; }
-    input { width: 100%; padding: 10px 12px; border-radius: 10px; background: #0e1015; border: 1px solid #2a2f3a; color: #e6e6e6; }
-    input::placeholder { color: #7b8496; }
-    .row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--gap); }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); }
-    .chip { display:inline-flex; align-items:center; gap:8px; padding:8px 10px; border-radius:999px; border:1px solid #2a2f3a; background:#0e1015; font-size:.85rem; }
-    .swatch { width: 3.1rem; height: 2.1rem; border-radius: 6px; border: 1px solid rgba(255,255,255,2); }
-    .btn { cursor: pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
-    .btn:hover { filter: brightness(1.1); }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px dashed #242938; font-variant-numeric: tabular-nums; }
-    th { color: #9aa4b2; font-weight: 600; }
+    .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
+    .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
+    input, select { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
+    input::placeholder { color:#7b8496; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
+    .btn:hover { filter:brightness(1.1); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
+    th { color:#9aa4b2; font-weight:600; }
     .result-row { transition: background .2s; cursor:pointer; }
-    .result-row:hover { background: rgba(255,255,255,05); color: #000; }
-    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap; }
+    .result-row:hover { background: rgba(255,255,255,.05); }
+    .swatch { width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
     .pill { font-size:.8rem; color:#98a2b3; }
     .muted { color:#7b8496; font-size:.85rem; }
-    fieldset { border: 1px dashed #242938; border-radius: 10px; padding: 10px; }
-    legend { font-size:.85rem; color:#9aa2b3; padding: 0 6px; }
-    .mode { display:flex; gap:10px; align-items:center; }
-    .disabled input { opacity:.5; }
     .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
     .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
     .formula-box ul { margin:0; padding-left:18px; }
+    .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .flex { display:flex; gap:8px; }
     @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="app">
+    <!-- Left Column: Target + Controls -->
     <div class="card">
-      <h1>Ink Colour Matcher</h1>
-      <p class="pill">Input &amp; matching in <strong>L*a*b* (D50/2°)</strong> using <strong>ΔE00</strong>.</p>
-
-      <fieldset>
-        <legend>Input (CIELAB D50/2°)</legend>
-        <div class="mode">
-          <label><input type="radio" name="mode" value="lab" checked> L*a*b*</label>
-          <!-- RGB & HEX options intentionally hidden -->
+      <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
+        <h1>Ink Colour Matcher</h1>
+        <div class="pill">
+          <span id="countLabel">0</span> reference colours
         </div>
-      </fieldset>
+      </div>
 
-      <div id="labGroup" class="row" style="margin-top:12px;">
+      <div class="row" style="margin-top:12px;">
         <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
         <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
         <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
       </div>
 
-      <!-- RGB/HEX groups hidden (kept for minimal change footprint) -->
-      <div id="rgbGroup" class="row2 disabled" style="display:none;">
-        <div><label for="rgb">RGB (comma)</label><input id="rgb" type="text" placeholder="R,G,B" disabled></div>
-        <div class="muted" style="align-self:end;">e.g. 120, 34, 90</div>
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="pms">Search by PMS (number only)</label>
+          <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+        </div>
+        <div style="align-self:end;">
+          <button class="btn" id="pmsBtn">Find PMS</button>
+        </div>
       </div>
 
-      <div id="hexGroup" class="row2 disabled" style="display:none;">
-        <div><label for="hex">HEX</label><input id="hex" type="text" placeholder="#RRGGBB" disabled></div>
-        <div class="muted" style="align-self:end;">e.g. #1A2B3C</div>
-      </div>
-
-      <div style="display:flex; gap:8px; margin-top:12px;">
+      <div class="flex" style="margin-top:12px;">
         <button class="btn" id="findBtn">Find Closest</button>
         <button class="btn" id="clearBtn">Clear</button>
       </div>
 
-      <!-- Distance explainer -->
       <div class="formula-box" style="margin-top:12px;">
         <h2>What does “Distance” mean?</h2>
-        <p class="muted">
-          Distance = <strong>ΔE00 (CIEDE2000)</strong> computed in <strong>L*a*b* D50/2°</strong> with k<sub>L</sub>=k<sub>C</sub>=k<sub>H</sub>=1.
-        </p>
+        <p class="muted">Distance = <strong>ΔE00 (CIEDE2000)</strong> computed in the same reference space used for the dataset. k<sub>L</sub>=k<sub>C</sub>=k<sub>H</sub>=1.</p>
       </div>
+
+      <!-- Predictor Controls -->
+      <div class="formula-box" id="predictorBox">
+        <h2>Suggest Formula (uses both backings)</h2>
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="maxInks">Max inks in recipe</label>
+            <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
+          </div>
+          <div class="muted" style="align-self:end;">Basis combines over‑white and over‑black responses.</div>
+        </div>
+        <div class="flex">
+          <button class="btn" id="suggestBtn">Suggest Formula</button>
+          <div id="predictMsg" class="muted" style="align-self:center;"></div>
+        </div>
+        <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+      </div>
+
     </div>
 
+    <!-- Right Column: Results -->
     <div class="card">
-      <div class="top">
-        <div class="chip"><span class="swatch" id="targetSwatch"></span> <span id="targetLabel">No input yet</span></div>
-        <div class="pill"><span id="countLabel">0</span> colours loaded</div>
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h1>Closest Matches</h1>
+        <div class="stack" style="align-items:center;">
+          <div class="swatch" id="targetSwatch" title="Target"></div>
+          <div class="muted" id="targetEcho">Target: –</div>
+        </div>
       </div>
-
-      <div style="overflow:auto; margin-top:12px; max-height: 60vh;">
-        <table id="resultsTable">
-          <thead>
-            <tr>
-              <th>Rank</th><th>Ink</th><th>Distance</th><th>HEX</th><th>RGB</th><th>Lab</th><th>Swatch</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div id="formulaBox" class="formula-box" style="display:none;">
-        <h2 id="formulaTitle"></h2>
-        <ul id="formulaList"></ul>
-      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Colour</th>
+            <th>Swatch</th>
+            <th>L*</th>
+            <th>a*</th>
+            <th>b*</th>
+            <th>Distance</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTbody"></tbody>
+      </table>
+      <div id="formulaPanel" class="formula-box" style="display:none;"></div>
     </div>
   </div>
 
 <script>
-let COLOURS = [];
-let FORMULAS = {}; // object with multiple arrays inside
+// ===== Utilities =====
+const $ = sel => document.querySelector(sel);
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-// ===== Utils =====
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-function hexToRgb(hex){ hex=(hex||'').replace('#','').trim(); if(hex.length===3)hex=hex.split('').map(c=>c+c).join(''); if(!/^([0-9a-fA-F]{6})$/.test(hex))return null; const i=parseInt(hex,16); return{r:(i>>16)&255,g:(i>>8)&255,b:i&255};}
-function rgbStrToRgb(str){const p=(str||'').split(',').map(s=>s.trim()).map(Number); if(p.length!==3||p.some(x=>isNaN(x)))return null; return{r:clamp(Math.round(p[0]),0,255),g:clamp(Math.round(p[1]),0,255),b:clamp(Math.round(p[2]),0,255)};}
-function rgbToHex(r,g,b){return '#' + [r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();}
-function srgbToLab(r,g,b){const sr=[r,g,b].map(v=>v/255).map(c=>c<=0.04045?c/12.92:Math.pow((c+0.055)/1.055,2.4));const X=sr[0]*0.4124564+sr[1]*0.3575761+sr[2]*0.1804375;const Y=sr[0]*0.2126729+sr[1]*0.7151522+sr[2]*0.072175;const Z=sr[0]*0.0193339+sr[1]*0.119192+sr[2]*0.9503041;const Xn=0.95047,Yn=1,Zn=1.08883;const fx=f(X/Xn),fy=f(Y/Yn),fz=f(Z/Zn);return{L:116*fy-16,a:500*(fx-fy),b:200*(fy-fz)};function f(t){return t>0.008856?Math.cbrt(t):(7.787*t+16/116);}}
-function labToSrgb(L,a,b){const Yn=1,Xn=0.95047,Zn=1.08883;const fy=(L+16)/116;const fx=fy+(a/500);const fz=fy-(b/200);const fx3=Math.pow(fx,3),fy3=Math.pow(fy,3),fz3=Math.pow(fz,3);const X=Xn*(fx3>0.008856?fx3:(fx-16/116)/7.787);const Y=Yn*(fy3>0.008856?fy3:(fy-16/116)/7.787);const Z=Zn*(fz3>0.008856?fz3:(fz-16/116)/7.787);function enc(c){return c<=0.0031308?12.92*c:1.055*Math.pow(c,1/2.4)-0.055;}let r=clamp(Math.round(enc(3.2404542*X-1.5371385*Y-0.4985314*Z)*255),0,255);let g=clamp(Math.round(enc(-0.9692660*X+1.8760108*Y+0.0415560*Z)*255),0,255);let b2=clamp(Math.round(enc(0.0556434*X-0.2040259*Y+1.0572252*Z)*255),0,255);return{r,g,b:b2};}
+function labToSrgb(L,a,b){
+  const Yn=1, Xn=0.95047, Zn=1.08883;
+  const fy=(L+16)/116;
+  const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
+  const xr = fx((a/500)+fy);
+  const yr = fx(fy);
+  const zr = fx(fy-(b/200));
+  const X = xr*Xn, Y=yr*Yn, Z=zr*Zn;
+  let r =  3.2406*X -1.5372*Y -0.4986*Z;
+  let g = -0.9689*X +1.8758*Y +0.0415*Z;
+  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
+  const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
+  r=clamp(Math.round(lin[0]*255),0,255); g=clamp(Math.round(lin[1]*255),0,255); b2=clamp(Math.round(lin[2]*255),0,255);
+  return {r,g,b:b2};
+}
+function labToXyz(L,a,b){
+  const Yn=1, Xn=0.95047, Zn=1.08883;
+  const fy=(L+16)/116;
+  const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
+  return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
+}
+function xyzToLab(X,Y,Z){
+  const Xn=0.95047, Yn=1, Zn=1.08883;
+  const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
+  const L = 116*f(Y/Yn)-16;
+  const a = 500*(f(X/Xn)-f(Y/Yn));
+  const b = 200*(f(Y/Yn)-f(Z/Zn));
+  return {L,a,b};
+}
 
-// CIEDE2000 (kL=kC=kH=1)
+// ΔE2000 (kL=kC=kH=1)
 function deltaE2000(l1,l2){
   const L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
   const deg2rad=Math.PI/180;
   const avgLp=(L1+L2)/2;
-  const C1=Math.sqrt(a1*a1+b1*b1), C2=Math.sqrt(a2*a2+b2*b2), avgC=(C1+C2)/2;
+  const C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
   const G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
   const a1p=(1+G)*a1, a2p=(1+G)*a2;
-  const C1p=Math.sqrt(a1p*a1p+b1*b1), C2p=Math.sqrt(a2p*a2p+b2*b2), avgCp=(C1p+C2p)/2;
+  const C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
+  const hp=(x,y)=>{const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360)};
   const h1p=hp(a1p,b1), h2p=hp(a2p,b2);
   let avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
-  const T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad) + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
-  let dHp = h2p - h1p; if (Math.abs(dHp)>180) dHp -= 360*Math.sign(dHp);
-  const dLp=L2-L1, dCp=C2p-C1p;
-  const dHp_term = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp/2)*deg2rad);
-  const Sl = 1 + (0.015*Math.pow((avgLp-50),2)) / Math.sqrt(20 + Math.pow((avgLp-50),2));
+  const T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
+            + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
+  let dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
+  const dLp = L2 - L1;
+  const dCp = C2p - C1p;
+  const dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
+  const Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
   const Sc = 1 + 0.045*avgCp;
   const Sh = 1 + 0.015*avgCp*T;
-  const deltaTheta = 30 * Math.exp(-1 * Math.pow(((avgHp-275)/25),2));
-  const Rc = 2 * Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7) + Math.pow(25,7)));
-  const Rt = -Rc * Math.sin(2*deltaTheta*deg2rad);
-  return Math.sqrt(
-    Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_term/Sh,2) + Rt*(dCp/Sc)*(dHp_term/Sh)
-  );
-  function hp(a,b){ if(a===0&&b===0) return 0; let h=Math.atan2(b,a)*180/Math.PI; if(h<0)h+=360; return h; }
+  const Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
+            * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
+  return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
-// ===== Matching (Lab-only) =====
-function findClosest(mode, inputs){
-  if(!COLOURS.length) return [];
-  const list = COLOURS.map(d => ({...d}));
-  // Force Lab path regardless of radio (RGB/HEX UI is hidden)
-  const L=Number(inputs.L), a=Number(inputs.a), b=Number(inputs.b);
-  if([L,a,b].some(x=>isNaN(x))) return [];
-  const target={L,a,b};
-  return list.map(d => ({...d, score: deltaE2000(target, {L:d.L, a:d.a, b:d.b})}))
-             .sort((x,y)=>x.score-y.score);
+// ===== State =====
+let COLOURS = [];// from colours.json
+let FORMULAS = {};// from DC_Formulas.json
+let ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
+
+// ===== UI helpers =====
+function updateTargetEcho(){
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))){ $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return; }
+  $('#targetEcho').textContent = `Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
+  const rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
 
-// ===== UI =====
-const $ = s => document.querySelector(s);
-const tbody = $("#resultsTable tbody");
-const sw = $("#targetSwatch");
-const formulaBox = $("#formulaBox");
-const formulaTitle = $("#formulaTitle");
-const formulaList = $("#formulaList");
+// ===== Matching =====
+function getTargetLab(){
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L,a,b};
+}
+function findClosest(){
+  const target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+  const rows = COLOURS.map(c=>({
+    name: c.name || c.Colour || c.color || '—',
+    L:c.L, a:c.a, b:c.b,
+    de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
+  })).sort((a,b)=>a.de-b.de).slice(0,100);
 
-function renderResults(list){
-  tbody.innerHTML = "";
-  list.slice(0, 100).forEach((row, idx) => {
-    const tr = document.createElement("tr");
-    tr.className = "result-row";
-    const hexStr = (row.hex ? (row.hex.startsWith("#")?row.hex:("#"+row.hex)).toUpperCase() : rgbToHex(row.r,row.g,row.b_rgb));
+  const tbody = $('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr'); tr.className='result-row';
+    const rgb=labToSrgb(r.L,r.a,r.b);
     tr.innerHTML = `
-      <td>${idx+1}</td>
-      <td>${row.name}</td>
-      <td>${row.score.toFixed(2)}</td>
-      <td>${hexStr}</td>
-      <td>${row.r}, ${row.g}, ${row.b_rgb}</td>
-      <td>${row.L.toFixed(2)}, ${row.a.toFixed(2)}, ${row.b.toFixed(2)}</td>
-      <td><div class="swatch" style="background:${hexStr}"></div></td>
-    `;
-    tr.addEventListener("click", () => showFormula(row.name));
+      <td>${r.name}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${r.L.toFixed(2)}</td>
+      <td>${r.a.toFixed(2)}</td>
+      <td>${r.b.toFixed(2)}</td>
+      <td>${r.de.toFixed(2)}</td>`;
+    tr.addEventListener('click', ()=> showFormulaFor(r.name));
     tbody.appendChild(tr);
   });
 }
+function showFormulaFor(colourName){
+  const panel = $('#formulaPanel');
+  const list = (FORMULAS[colourName]||[]);
+  if(!list.length){ panel.style.display='none'; return; }
+  let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
+  list.forEach(item=>{ html += `<li>${item["Ingredient 1"]||item.Ingredient||item.ingredient||'Ink'} — ${item['%']||item.pct||item.percent||'?'}%</li>`; });
+  html += '</ul>';
+  panel.innerHTML = html; panel.style.display='block';
+}
 
-function showFormula(colourName){
-  const formula = findFormula(colourName);
-  if(!formula){ formulaBox.style.display="none"; return; }
-  formulaBox.style.display="block";
-  formulaTitle.textContent = `${colourName} — DC Formula`;
-  formulaList.innerHTML = "";
-  const items = [];
-  const mapping = [
-    ["Ingredient 1","%"],
-    ["Ingredient 2","2%"],
-    ["Ingredient 3","%3"],
-    ["Ingredient 4","%4"]
-  ];
-  mapping.forEach(([inkKey,pctKey])=>{
-    const ink = formula[inkKey];
-    const pct = formula[pctKey];
-    if(ink && pct!=null){
-      const li = document.createElement("li");
-      li.textContent = `${ink} — ${pct}%`;
-      items.push(li);
-    }
+// ===== PMS Search =====
+function extractPmsNumber(name){
+  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
+}
+function findByPms(){
+  const q = ($('#pms').value||'').trim().toUpperCase(); if(!q){ alert('Enter a PMS number'); return; }
+  const hits = COLOURS.filter(c=>{
+    const p = extractPmsNumber(c.name||c.Colour||c.color||'');
+    return p && p.includes(q);
   });
-  if(!items.length){
-    const li = document.createElement("li");
-    li.textContent = "No breakdown available.";
-    items.push(li);
+  if(!hits.length){ alert('No PMS match found'); return; }
+  // Pick the first hit; populate Lab and run match
+  const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); findClosest(); showFormulaFor(c.name||c.Colour||c.color||'');
+}
+
+// ===== Predictor (dual-backing basis) =====
+function buildCombinedBasis(){
+  const basis = [];// {name, xyz}
+  for (const ink of Object.keys(ASSORTMENT)){
+    const W = (ASSORTMENT[ink].white||[]).slice().sort((a,b)=>b.conc-a.conc);
+    const B = (ASSORTMENT[ink].black||[]).slice().sort((a,b)=>b.conc-a.conc);
+    if(!W.length && !B.length) continue;
+    // fallback if one side missing
+    const pickW = W.length? W[0] : null; const pickB = B.length? B[0] : null;
+    const xw = pickW? labToXyz(pickW.L,pickW.a,pickW.b) : null;
+    const xb = pickB? labToXyz(pickB.L,pickB.a,pickB.b) : null;
+    let X,Y,Z;
+    if(xw && xb){ // average the two backings to stabilise basis
+      X=(xw.X+xb.X)/2; Y=(xw.Y+xb.Y)/2; Z=(xw.Z+xb.Z)/2;
+    } else if(xw){ X=xw.X; Y=xw.Y; Z=xw.Z; }
+    else { X=xb.X; Y=xb.Y; Z=xb.Z; }
+    basis.push({ name: ink, xyz:[X,Y,Z] });
   }
-  items.forEach(li => formulaList.appendChild(li));
+  return basis;
 }
-
-function findFormula(colourName){
-  for(const arr of Object.values(FORMULAS)){
-    if(Array.isArray(arr)){
-      const hit = arr.find(e => e.Colour === colourName);
-      if(hit) return hit;
-    }
+function nnlsProject(A, y, opts={sumToOne:true, maxIter:600, step:0.2}){
+  const m=A.length, n=A[0].length; let w = new Array(n).fill(0);
+  let bestIdx=0, bestDot=-Infinity; for(let j=0;j<n;j++){ let dot=0; for(let i=0;i<m;i++) dot += A[i][j]*y[i]; if(dot>bestDot){bestDot=dot; bestIdx=j;} }
+  w[bestIdx]=1;
+  for(let it=0; it<opts.maxIter; it++){
+    const Aw = new Array(m).fill(0); for(let i=0;i<m;i++){ for(let j=0;j<n;j++){ Aw[i]+=A[i][j]*w[j]; } }
+    const grad = new Array(n).fill(0); for(let j=0;j<n;j++){ for(let i=0;i<m;i++){ grad[j]+=A[i][j]*(Aw[i]-y[i]); } }
+    for(let j=0;j<n;j++){ w[j] -= opts.step * grad[j]; w[j] = Math.max(0, w[j]); }
+    if(opts.sumToOne){ let sum = w.reduce((a,b)=>a+b,0); if(sum>0){ for(let j=0;j<n;j++) w[j]/=sum; } }
   }
-  return null;
+  return w;
+}
+function suggestFormula(){
+  const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
+  const basis = buildCombinedBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
+  const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
+  const yxyz = labToXyz(targetLab.L, targetLab.a, targetLab.b); const y=[yxyz.X,yxyz.Y,yxyz.Z];
+  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.xyz[0]); A[1].push(b.xyz[1]); A[2].push(b.xyz[2]); });
+  let w = nnlsProject(A, y, {sumToOne:true, maxIter:800, step:0.15});
+  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-4).sort((a,b)=>b.val-a.val);
+  const kept = withIdx.slice(0, maxInks);
+  const A2=[[],[],[]]; kept.forEach(k=>{ A2[0].push(A[0][k.idx]); A2[1].push(A[1][k.idx]); A2[2].push(A[2][k.idx]); });
+  const w2 = nnlsProject(A2, y, {sumToOne:true, maxIter:800, step:0.12});
+  const picks = kept.map((k,i)=>({ name: basis[k.idx].name, weight: w2[i] }));
+  const total = picks.reduce((a,b)=>a+b.weight,0) || 1; picks.forEach(p=> p.weight = p.weight / total * 100);
+  const mixX = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[0], 0);
+  const mixY = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[1], 0);
+  const mixZ = picks.reduce((acc,p)=> acc + p.weight/100 * basis.find(b=>b.name===p.name).xyz[2], 0);
+  const mixLab = xyzToLab(mixX, mixY, mixZ);
+  const dE = deltaE2000(mixLab, targetLab);
+
+  const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+  let html = `<h2>Suggested Formula</h2>`;
+  html += `<div class="stack" style="align-items:center;">
+    <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
+    <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
+  </div>`;
+  html += `<ul>` + picks.map(p=>`<li>${p.name} — ${p.weight.toFixed(1)}%</li>`).join('') + `</ul>`;
+  html += `<div class="muted">Basis = average of per‑ink highest‑load XYZ over white & black backings (uses both at once). Next step: opacity‑aware compositing.</div>`;
+  const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
-function currentMode(){ return 'lab'; } // lock to Lab
-
-function updateModeUI(){
-  // Only Lab is visible; still keep the function for minimal change
-  [["lab","labGroup"],["rgb","rgbGroup"],["hex","hexGroup"]].forEach(([m,id])=>{
-    const el = document.getElementById(id);
-    const on = (m==='lab');
-    if(el){
-      el.classList.toggle("disabled", !on);
-      el.style.display = (m==='lab') ? "" : "none";
-      el.querySelectorAll("input").forEach(inp => inp.disabled = (m!=='lab'));
-    }
-  });
-  updateTargetEcho();
-}
-
-function updateTargetEcho(){
-  let hex='',label='';
-  const L=$("#L").value, a=$("#a").value, b=$("#b").value;
-  if([L,a,b].every(v=>v!=='' && !isNaN(Number(v)))){
-    const rgb = labToSrgb(Number(L), Number(a), Number(b));
-    hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-    label = `L*a*b*: ${Number(L).toFixed(2)}, ${Number(a).toFixed(2)}, ${Number(b).toFixed(2)} • ${hex}`;
-  }
-  sw.style.background = hex || "#0000";
-  $("#targetLabel").textContent = label || "No input yet";
-}
-
-// Events
-document.querySelectorAll('input[name="mode"]').forEach(r=>r.addEventListener('change', updateModeUI));
-["L","a","b","rgb","hex"].forEach(id => { const el=document.getElementById(id); if(el) el.addEventListener("input", updateTargetEcho); });
-
-$("#findBtn").addEventListener("click", ()=>{
-  const inputs = { L:$("#L").value, a:$("#a").value, b:$("#b").value };
-  const results = findClosest('lab', inputs);
-  renderResults(results);
-  updateTargetEcho();
-  formulaBox.style.display = "none";
+// ===== Wire up =====
+$('#findBtn').addEventListener('click', findClosest);
+$('#clearBtn').addEventListener('click', ()=>{
+  $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
+  $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
+  $('#suggestedFormula').style.display='none';
 });
-$("#clearBtn").addEventListener("click", ()=>{
-  ["L","a","b","rgb","hex"].forEach(id => { const el=$("#"+id); if(el) el.value=""; });
-  tbody.innerHTML = "";
-  updateTargetEcho();
-  formulaBox.style.display = "none";
-});
+$('#suggestBtn').addEventListener('click', suggestFormula);
+$('#pmsBtn').addEventListener('click', findByPms);
+['L','a','b'].forEach(id=> $('#'+id).addEventListener('input', updateTargetEcho));
 
 // ===== Load JSON =====
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
-  fetch('DC_Formulas.json').then(r=>r.json())
-]).then(([colours, formulas])=>{
-  COLOURS = colours;         // [{ name, L, a, b, r, g, b_rgb, hex }, ...]
-  FORMULAS = formulas;       // { "D5v": [ { Colour, "Ingredient 1", "%", ... }, ... ], ... }
-  $("#countLabel").textContent = COLOURS.length;
-}).catch(err=>{
-  alert("Error loading JSON files: "+err);
-});
+  fetch('DC_Formulas.json').then(r=>r.json()),
+  fetch('assortment_colour_data.json').then(r=>r.json())
+]).then(([colours, formulas, assortment])=>{
+  COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
+  $('#countLabel').textContent = COLOURS.length;
+}).catch(err=>{ alert('Error loading JSON: '+err); });
 
-// Initialise UI
-updateModeUI();
+updateTargetEcho();
 </script>
 </body>
 </html>
