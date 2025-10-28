@@ -70,7 +70,7 @@
 
       <div class="formula-box" style="margin-top:12px;">
         <h2>What does “Distance” mean?</h2>
-        <p class="muted">Distance = <strong>ΔE00 (CIEDE2000)</strong> computed in the same reference space used for the dataset. k<sub>L</sub>=k<sub>C</sub>=k<sub>H</sub>=1.</p>
+        <p class="muted">Distance = <strong>ΔE00 (CIEDE2000)</strong> computed in D65/2° to match your dataset. k<sub>L</sub>=k<sub>C</sub>=k<sub>H</sub>=1.</p>
       </div>
 
       <!-- Predictor Controls -->
@@ -123,30 +123,15 @@
 const $ = sel => document.querySelector(sel);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
-// Bradford D50 -> D65 (for sRGB display; math stays D50)
-function d50ToD65([X,Y,Z]){
-  const M = [
-    [ 0.9555766, -0.0230393, 0.0631636],
-    [-0.0282895,  1.0099416, 0.0210077],
-    [ 0.0122982, -0.0204830, 1.3299098]
-  ];
-  return [
-    M[0][0]*X + M[0][1]*Y + M[0][2]*Z,
-    M[1][0]*X + M[1][1]*Y + M[1][2]*Z,
-    M[2][0]*X + M[2][1]*Y + M[2][2]*Z
-  ];
-}
-
+// D65 reference white (2°)
 function labToXyz(L,a,b){
-  // D50 reference white (2°)
-  const Yn=1, Xn=0.96422, Zn=0.82521;
+  const Yn=1, Xn=0.95047, Zn=1.08883;
   const fy=(L+16)/116;
   const fx=f=>f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function xyzToLab(X,Y,Z){
-  // D50 reference white (2°)
-  const Xn=0.96422, Yn=1, Zn=0.82521;
+  const Xn=0.95047, Yn=1, Zn=1.08883;
   const f=t=>t>0.008856?Math.cbrt(t):(7.787*t+16/116);
   const L = 116*f(Y/Yn)-16;
   const a = 500*(f(X/Xn)-f(Y/Yn));
@@ -154,14 +139,11 @@ function xyzToLab(X,Y,Z){
   return {L,a,b};
 }
 function labToSrgb(L,a,b){
-  // Lab (D50) -> XYZ (D50)
+  // Lab (D65) -> XYZ (D65) -> sRGB
   const {X,Y,Z} = labToXyz(L,a,b);
-  // Adapt to D65 for sRGB display
-  const [Xd, Yd, Zd] = d50ToD65([X,Y,Z]);
-  // XYZ (D65) -> sRGB
-  let r =  3.2406*Xd -1.5372*Yd -0.4986*Zd;
-  let g = -0.9689*Xd +1.8758*Yd +0.0415*Zd;
-  let b2=  0.0557*Xd -0.2040*Yd +1.0570*Zd;
+  let r =  3.2406*X -1.5372*Y -0.4986*Z;
+  let g = -0.9689*X +1.8758*Y +0.0415*Z;
+  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
   const lin=[r,g,b2].map(v=>v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
   r=clamp(Math.round(lin[0]*255),0,255);
   g=clamp(Math.round(lin[1]*255),0,255);
@@ -345,17 +327,17 @@ function findByPms(){
   const c = hits[0]; $('#L').value = c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho();
 }
 
-// ===== Predictor (white‑only basis) =====
+// ===== Predictor (white‑only basis, raw XYZ in D65) =====
 function buildWhiteBasis(){
-  const basis = []; // {name, ink, conc, vec:[X,Y,Z], scale}
+  // Build basis using ONLY over-white measurements at each concentration.
+  // IMPORTANT: keep raw XYZ magnitude (no column normalisation) so lightness is preserved.
+  const basis = []; // {name, ink, conc, vec:[X,Y,Z]}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]);
     if (!W.length) continue;
     W.slice().sort((a,b)=>a.conc-b.conc).forEach(entry=>{
-      const xw = labToXyz(entry.L, entry.a, entry.b);
-      const X=xw.X, Y=xw.Y, Z=xw.Z;
-      const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
-      basis.push({ name: `${ink}@${entry.conc}%`, ink, conc: entry.conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+      const {X,Y,Z} = labToXyz(entry.L, entry.a, entry.b); // D65
+      basis.push({ name: `${ink}@${entry.conc}%`, ink, conc: entry.conc, vec:[X, Y, Z] });
     });
   }
   return basis;
@@ -383,36 +365,51 @@ function suggestFormula(){
   const targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
   const basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   const maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
-  const tXYZ = labToXyz(targetLab.L, targetLab.a, targetLab.b);
-  const tNorm = Math.max(1e-9, Math.hypot(tXYZ.X,tXYZ.Y,tXYZ.Z));
-  const y=[tXYZ.X/tNorm, tXYZ.Y/tNorm, tXYZ.Z/tNorm];
-  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
-  let w = nnlsProject(A, y, 1600);
-  const withIdx = w.map((val,idx)=>({val, idx})).filter(o=>o.val>1e-6).sort((a,b)=>b.val-a.val).slice(0, Math.min(maxInks*2, w.length));
-  const byInk = new Map();
-  withIdx.forEach(k=>{ const col = basis[k.idx]; byInk.set(col.ink, (byInk.get(col.ink)||0) + k.val); });
-  const merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink, weight})).sort((a,b)=>b.weight-a.weight).slice(0, maxInks);
-  const sumw = merged.reduce((a,b)=>a+b.weight,0)||1; merged.forEach(p=> p.weight = p.weight/sumw);
 
-  const mix=[0,0,0];
-  merged.forEach(p=>{
-    const cols = basis.filter(b=>b.ink===p.ink);
-    let X=0,Y=0,Z=0, t=0;
-    cols.forEach(c=>{ const mag=c.scale; X+=c.vec[0]*mag; Y+=c.vec[1]*mag; Z+=c.vec[2]*mag; t++; });
-    if(t>0){ X/=t; Y/=t; Z/=t; }
-    mix[0]+= p.weight*X; mix[1]+=p.weight*Y; mix[2]+=p.weight*Z;
-  });
-  const mixLab = xyzToLab(mix[0], mix[1], mix[2]);
+  // Target in raw XYZ (D65)
+  const t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
+  const y = [t.X, t.Y, t.Z];
+
+  // Design matrix A (3 x N)
+  const A=[[],[],[]]; basis.forEach(b=>{ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+
+  // NNLS on raw XYZ
+  let w = nnlsProject(A, y, 1600);
+
+  // Enforce convex combination (sum to 1) so white/extender can carry lightness
+  let sumw = w.reduce((a,b)=>a+b,0);
+  if(sumw>0) w = w.map(v=>v/sumw);
+
+  // Predicted mix directly from column weights (no re-averaging)
+  const mixXYZ = [0,0,0];
+  for(let j=0;j<basis.length;j++){
+    mixXYZ[0] += w[j]*basis[j].vec[0];
+    mixXYZ[1] += w[j]*basis[j].vec[1];
+    mixXYZ[2] += w[j]*basis[j].vec[2];
+  }
+  const mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
   const dE = deltaE2000(mixLab, targetLab);
   const rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+
+  // Collapse weights by ink for display, then keep top-k inks
+  const byInk = new Map();
+  for(let j=0;j<basis.length;j++){
+    if(w[j] <= 1e-9) continue;
+    byInk.set(basis[j].ink, (byInk.get(basis[j].ink)||0) + w[j]);
+  }
+  let merged = Array.from(byInk.entries()).map(([ink,weight])=>({ink,weight}))
+                    .sort((a,b)=>b.weight-a.weight)
+                    .slice(0, maxInks);
+  const dispSum = merged.reduce((a,b)=>a+b.weight,0)||1; // renormalise for pretty %s
+  merged.forEach(p=> p.weight = p.weight/dispSum);
 
   let html = `<h2>Suggested Formula</h2>`;
   html += `<div class="stack" style="align-items:center;">
     <div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div>
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
-  html += `<div class="formula-grid">` + merged.map(p=>`<div class="fg-ink">${p.ink}</div><div class="fg-pct">${(p.weight*100).toFixed(1)}%</div>`).join('') + `</div>`;
-  html += `<div class="muted">Over‑white basis across concentrations, column‑normalised + multiplicative NNLS (Lab/XYZ in D65). For tighter fit later, we can add opacity-aware compositing.</div>`;
+  html += `<div class="formula-grid">` + merged.map(p=>`<div class=\"fg-ink\">${p.ink}</div><div class=\"fg-pct\">${(p.weight*100).toFixed(1)}%</div>`).join('') + `</div>`;
+  html += `<div class="muted">Over‑white basis in raw XYZ (D65). NNLS with convex weights (sum=1) so extender/light inks can carry L*. No column or target normalisation.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
@@ -451,11 +448,15 @@ function runSelfTests(){
   const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
   console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
 
-  // Lab -> XYZ -> Lab round-trip (D50)
+  // Lab -> XYZ -> Lab round-trip (D65)
   const t={L:70,a:20,b:30};
   const xyz = labToXyz(t.L,t.a,t.b);
   const back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
-  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift');
+  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
+
+  // sRGB swatch clamp
+  const sw = labToSrgb(100, 0, 0);
+  console.assert([sw.r,sw.g,sw.b].every(v=>v>=0 && v<=255), 'sRGB out of 0..255');
 }
 try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
 </script>
