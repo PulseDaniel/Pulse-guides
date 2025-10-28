@@ -31,6 +31,9 @@
     .formula-box ul { margin:0; padding-left:18px; }
     .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .flex { display:flex; gap:8px; }
+    /* align formula ink names and percentages */
+    .formula-list { display:grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items:center; }
+    .formula-list .pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; }
     @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -275,7 +278,7 @@ function findClosest(){
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  })).sort((a,b)=>a.de-b.de).slice(0,100);
+  })).sort((a,b)=>a.de-b.de).slice(0,8);
 
   const tbody = $('#resultsTbody'); tbody.innerHTML='';
   rows.forEach(r=>{
@@ -308,9 +311,9 @@ function showFormulaFor(colourName){
     }
   }
   if(!list || !list.length){ panel.style.display='none'; return; }
-  let html = `<h2>Existing Formula: ${colourName}</h2><ul>`;
-  list.forEach(item=>{ html += `<li>${item.ink || item.Ink || 'Ink'}${item.percent!==''?` — ${item.percent}%`:''}</li>`; });
-  html += '</ul>';
+  let html = `<h2>Existing Formula: ${colourName}</h2><div class=\"formula-list\">`;
+  list.forEach(item=>{ const name = item.ink || item.Ink || 'Ink'; const pct = (item.percent!==''&&item.percent!=null)? `${item.percent}%` : ''; html += `<div class=\"ink\">${name}</div><div class=\"pct\">${pct}</div>`; });
+  html += '</div>';
   panel.innerHTML = html; panel.style.display='block';
 }
 
@@ -324,7 +327,7 @@ function findByPms(){
   });
   const tbody = $('#resultsTbody'); tbody.innerHTML='';
   if(!hits.length){ alert('No PMS match found'); return; }
-  hits.slice(0,100).forEach(c=>{
+  hits.slice(0,8).forEach(c=>{
     const rgb=labToSrgb(c.L,c.a,c.b);
     const tr=document.createElement('tr'); tr.className='result-row';
     tr.innerHTML = `
@@ -342,8 +345,20 @@ function findByPms(){
 
 // ===== Predictor =====
 function buildCombinedBasis(){
-  // Use all measured concentrations; average white/black twins at each conc
+  // WHITE-ONLY basis: use only over-white measurements for each ink at each concentration
   const basis = []; // {name, ink, conc, vec:[X,Y,Z], scale}
+  for (const ink of Object.keys(ASSORTMENT)){
+    const W = (ASSORTMENT[ink].white||[]);
+    if(!W.length) continue; // skip inks without white-backing data
+    W.forEach(row=>{
+      const xyz = labToXyz(row.L, row.a, row.b);
+      const X = xyz.X, Y = xyz.Y, Z = xyz.Z;
+      const norm = Math.max(1e-9, Math.hypot(X,Y,Z));
+      basis.push({ name: `${ink}@${row.conc}%`, ink, conc: row.conc, vec:[X/norm, Y/norm, Z/norm], scale:norm });
+    });
+  }
+  return basis;
+}
   for (const ink of Object.keys(ASSORTMENT)){
     const W = (ASSORTMENT[ink].white||[]);
     const B = (ASSORTMENT[ink].black||[]);
@@ -416,7 +431,7 @@ function suggestFormula(){
     <div class="muted">Predicted: L ${mixLab.L.toFixed(2)} a ${mixLab.a.toFixed(2)} b ${mixLab.b.toFixed(2)} · ΔE00: <strong>${dE.toFixed(2)}</strong></div>
   </div>`;
   html += `<ul>` + merged.map(p=>`<li>${p.ink} — ${(p.weight*100).toFixed(1)}%</li>`).join('') + `</ul>`;
-  html += `<div class="muted">Dual-backing basis across concentrations, column-normalised + multiplicative NNLS (Lab/XYZ in D50). For tighter fit, next step is opacity-aware compositing.</div>`;
+  html += `<div class="muted">White-only basis across concentrations, column-normalised + multiplicative NNLS (Lab/XYZ in D50). For tighter fit, next step is opacity-aware compositing.</div>`;
   const box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
 }
 
