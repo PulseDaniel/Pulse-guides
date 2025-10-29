@@ -172,16 +172,140 @@ let IFSX=null; // {wavelengths, colorants:[{name,R[]}], refs, meta}
 let SpectralMap=new Map();
 async function loadIFSX(){ if(IFSX) return IFSX; const res=await fetch('ifsx_reflectance_abs.json'); if(!res.ok) throw new Error('ifsx_reflectance_abs.json not found'); IFSX=await res.json(); SpectralMap.clear(); for(const c of IFSX.colorants){ const code=(c.name.split(' ')[0]||'').trim(); if(!c.R || c.R.length!==nm.length) continue; SpectralMap.set(code, { name:c.name, R:c.R.slice(), KS:c.R.map(Rinf_to_K_over_S) }); } return IFSX; }
 
-function getCandidateInks(){ const pool=[]; const seen=new Set(); for(const code of Object.keys(ASSORTMENT||{})){ if(SpectralMap.has(code) && !seen.has(code)){ const ink=SpectralMap.get(code); pool.push({code, name:ink.name, KS:ink.KS}); seen.add(code); } } // prefer extender/white first if present
-  pool.sort((a,b)=> (/(^|\s)DC21-001(\s|$)/.test(a.code)?-1: /(\s|^)DC21-001(\s|$)/.test(b.code)?1: a.code.localeCompare(b.code)));
-  return pool; }
+function getCandidateInks(){
+    const pool=[]; const seen=new Set();
+    for(const code of Object.keys(ASSORTMENT||{})){
+      if(SpectralMap.has(code) && !seen.has(code)){
+        const ink=SpectralMap.get(code);
+        // Precompute Lab(D50) for candidate filtering later
+        const CS=makeCS('D50');
+        const XYZ=spectrumToXYZ(ink.R, CS);
+        const Lab=xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS);
+        pool.push({code, name:ink.name, KS:ink.KS, R:ink.R, Lab});
+        seen.add(code);
+      }
+    }
+    // prefer extender/white first if present
+    pool.sort((a,b)=> (/(^|\\s)DC21-001(\\s|$)/.test(a.code)?-1: /(\\s|^)DC21-001(\\s|$)/.test(b.code)?1: a.code.localeCompare(b.code)));
+    return pool;
+  }
 
 function mixSpectrumKS(cands, weights){ const L=nm.length; const KS_mix=new Array(L).fill(0); for(let i=0;i<cands.length;i++){ const w=weights[i]; if(w<=0) continue; const KS=cands[i].KS; for(let j=0;j<L;j++) KS_mix[j]+= w*KS[j]; } return KS_mix.map(KS_to_Rinf); }
 
 function predictLabFromWeights(cands, weights, illum){ const R=mixSpectrumKS(cands, weights); const CS=makeCS(illum); const XYZ=spectrumToXYZ(R, CS); return xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS); }
 
-function suggestWeights(targetLab, maxInks, totalThickness, illum){ const cands=getCandidateInks(); if(cands.length===0) throw new Error('No spectral inks found that match your assortment.'); // greedy select + projected coord descent
-  const active=[], w=[]; let rem=totalThickness; let bestLab={L:0,a:0,b:0}, bestDE=Infinity; // seed with extender/white if present
+function suggestWeights(targetLab, maxInks, totalThickness, illum){
+    const all=getCandidateInks();
+    if(all.length===0) throw new Error('No spectral inks found that match your assortment.');
+    const CS=makeCS(illum);
+
+    // Helper: ΔE between ink masstone and target (for hue proximity)
+    function inkDelta(ink){ const XYZ=spectrumToXYZ(ink.R, CS); const Lab=xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS); return {Lab, de: deltaE2000(Lab, targetLab)}; }
+
+    // Identify special inks
+    const has = (re)=> all.find(c=> re.test(c.code) || re.test(c.name||''));
+    const EXT = has(/DC21-001|EXTENDER/i) || null;
+    const WHITE = has(/DC21-901|\bWHITE\b/i) || null; // alias shop white if present
+    const BLACK = has(/DC21-802|\bBLACK\b/i) || null;
+
+    // Candidate subset: nearest-by-hue + (WHITE/EXT) + optionally BLACK if target is dark
+    const chromaSorted = all
+      .filter(c=> !EXT || c.code!==EXT.code)
+      .filter(c=> !WHITE || c.code!==WHITE.code)
+      .filter(c=> !BLACK || c.code!==BLACK.code)
+      .map(c=> ({ink:c, ...inkDelta(c)}))
+      .sort((a,b)=> a.de-b.de)
+      .map(o=>o.ink);
+
+    const baseSet = chromaSorted.slice(0, Math.max(4, maxInks-1));
+    let cand = baseSet.slice(0);
+    if (WHITE) cand.unshift(WHITE);
+    if (EXT && (!WHITE || EXT.code!==WHITE.code)) cand.unshift(EXT);
+
+    const targetIsLight = targetLab.L >= 70;
+    const targetIsDark  = targetLab.L <= 55;
+    if (BLACK && targetIsDark) cand.push(BLACK);
+
+    // Ensure no duplicates and cap length
+    const seen=new Set(); cand = cand.filter(c=> (seen.has(c.code)?false:(seen.add(c.code), true))).slice(0, Math.min(maxInks+2, 12));
+
+    // Optimisation: greedy + coord descent with penalties
+    const active=[]; const w=[]; let rem=totalThickness; let bestLab={L:0,a:0,b:0}, bestDE=Infinity;
+
+    // Seed: WHITE/EXT + nearest chromatic
+    if (WHITE){ active.push(WHITE); w.push(Math.min(rem*0.35, rem)); rem = Math.max(0, rem - w[w.length-1]); }
+    else if (EXT){ active.push(EXT); w.push(Math.min(rem*0.35, rem)); rem = Math.max(0, rem - w[w.length-1]); }
+    if (cand.length){ active.push(cand[0]); w.push(Math.min(rem*0.35, rem)); rem = Math.max(0, rem - w[w.length-1]); }
+
+    const INIT_STEP=0.18, MIN_STEP=0.01, MAX_ITERS=500;
+
+    function predictLabFromActive(){ return predictLabFromWeights(active, w, illum); }
+
+    function penalty(lab){
+      // Lightness penalty: push towards target L*; stronger for very light colours
+      const lErr = lab.L - targetLab.L;
+      const lightPenalty = (targetIsLight? 0.6:0.25) * (lErr*lErr)/100;
+      return lightPenalty; // can add chroma penalty later if needed
+    }
+
+    function score(lab){ return deltaE2000(lab, targetLab) + penalty(lab); }
+
+    // Forward selection over remaining candidates
+    for (const c of cand){ if (active.some(a=>a.code===c.code)) continue; if (active.length>=maxInks) break;
+      const step=Math.min(INIT_STEP, Math.max(0.05, rem)); if (step<=0) break;
+      active.push(c); w.push(step); rem=Math.max(0, rem-step);
+    }
+
+    // Coordinate descent
+    let step=INIT_STEP; let improved=true, iter=0; let bestScore=Infinity;
+    function project(){ let s=w.reduce((a,b)=>a+b,0); if(s>totalThickness){ const k=totalThickness/s; for(let i=0;i<w.length;i++) w[i]*=k; } }
+
+    // Apply caps: limit black if target is light
+    const blackIdx = active.findIndex(a=> BLACK && a.code===BLACK.code);
+    const blackCap = targetIsLight? 0.05*totalThickness : 0.25*totalThickness;
+
+    while(step>=MIN_STEP && iter<MAX_ITERS){
+      improved=false; iter++;
+      for(let i=0;i<w.length;i++){
+        for(const dir of [+1,-1]){
+          const old=w[i];
+          w[i]=clamp(old + dir*step, 0, totalThickness);
+          project();
+          if (i===blackIdx && w[i] > blackCap) { w[i]=old; continue; }
+          const lab=predictLabFromActive();
+          const sc=score(lab);
+          if (sc + 1e-6 < bestScore){ bestScore=sc; bestLab=lab; bestDE=deltaE2000(lab, targetLab); improved=true; }
+          else { w[i]=old; }
+        }
+      }
+      if(!improved) step*=0.5;
+    }
+
+    // Ensure white/extender presence for light colours
+    if (targetIsLight){
+      const idxW = active.findIndex(a=> WHITE && a.code===WHITE.code);
+      const idxE = active.findIndex(a=> EXT && a.code===EXT.code);
+      const needIdx = (idxW>=0? idxW : idxE);
+      if (needIdx>=0){
+        // nudge up scattering base while holding total constant
+        for(let k=0;k<6;k++){
+          const old=w[needIdx];
+          w[needIdx]=clamp(old+0.05, 0, totalThickness);
+          project();
+          const lab=predictLabFromActive();
+          const sc=score(lab);
+          if (sc <= bestScore + 0.02){ bestScore=sc; bestLab=lab; bestDE=deltaE2000(lab, targetLab); }
+          else { w[needIdx]=old; }
+        }
+      }
+    }
+
+    // Prune tiny traces and renormalise
+    for(let i=0;i<w.length;i++){ if(w[i] < 0.01) w[i]=0; }
+    const sum=w.reduce((a,b)=>a+b,0); if(sum>0){ const k=totalThickness/sum; for(let i=0;i<w.length;i++) w[i]*=k; }
+
+    return {active, weights:w, lab:bestLab, dE:bestDE};
+  }, bestDE=Infinity; // seed with extender/white if present
   const preferIdx=cands.findIndex(c=>/DC21-001|DC21-901/i.test(c.code)||/WHITE|EXTENDER/i.test(c.name)); if(preferIdx>=0){ active.push(cands[preferIdx]); w.push(0.25*rem); rem-=0.25*rem; }
   const INIT_STEP=0.2, MIN_STEP=0.01, MAX_ITERS=400; // forward selection
   while(active.length<maxInks){ let pick=-1, pickDose=0, pickLab=null, pickDE=null; for(let i=0;i<cands.length;i++){ if(active.some(a=>a.code===cands[i].code)) continue; const step=Math.min(INIT_STEP, Math.max(0.05, rem)); if(step<=0) break; const lab=predictLabFromWeights(active.concat([cands[i]]), w.concat([step]), illum); const dE=deltaE2000(lab, targetLab); if (dE < (pickDE??Infinity)) { pick=i; pickDose=step; pickLab=lab; pickDE=dE; } } if(pick<0) break; active.push(cands[pick]); w.push(pickDose); rem=Math.max(0, rem-pickDose); bestLab=pickLab; bestDE=pickDE; if(rem<=0.05) break; }
