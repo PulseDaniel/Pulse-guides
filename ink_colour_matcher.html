@@ -394,6 +394,12 @@ function suggestFormula(){
   // Simplex-constrained quadratic fit
   var w = fwSimplex(A, y, 2000, seed);
 
+  // Second pass: among all zero-error mixes, push weight onto Extender while keeping A w = y
+  w = maximizeExtender(A, y, w, function(idx){
+    var ink = String(basis[idx].ink||'').toUpperCase();
+    return (ink.indexOf('EXTENDER')>-1) || (/DC21-00[12]/.test(ink));
+  });
+
   // Predicted mix directly from column weights (no re-averaging)
   var mixXYZ = [0,0,0];
   for(var j2=0;j2<basis.length;j2++){
@@ -424,6 +430,70 @@ function suggestFormula(){
     + '</div>';
   html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
   var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
+}
+
+// ===== Extender maximiser (keep colour, maximise extender) =====
+function maximizeExtender(A, y, w0, isExt){
+  try{
+    // Build candidate index set: top-8 by weight, plus any extender columns
+    var N = w0.length;
+    var idx = Array.from({length:N}, function(_,i){return i;});
+    idx.sort(function(i,j){ return w0[j]-w0[i]; });
+    var cand = idx.slice(0,8);
+    for (var i=0;i<N;i++){ if (isExt(i) && cand.indexOf(i)===-1) cand.push(i); }
+
+    function combos(arr, k){
+      var res=[]; var n=arr.length;
+      function rec(st, path){ if(path.length===k){ res.push(path.slice()); return; } for(var t=st;t<n;t++){ path.push(arr[t]); rec(t+1, path); path.pop(); } }
+      rec(0,[]); return res;
+    }
+    function solve4x4(M, b){ // naive Gaussian elimination (4x4)
+      var A = [M[0].slice(), M[1].slice(), M[2].slice(), M[3].slice()];
+      var x = b.slice();
+      for(var i=0;i<4;i++){
+        // pivot
+        var piv=i, maxv=Math.abs(A[i][i]);
+        for(var r=i+1;r<4;r++){ var v=Math.abs(A[r][i]); if(v>maxv){maxv=v; piv=r;} }
+        if(maxv<1e-12) return null;
+        if(piv!==i){ var tmp=A[i]; A[i]=A[piv]; A[piv]=tmp; var tb=x[i]; x[i]=x[piv]; x[piv]=tb; }
+        // normalize
+        var div=A[i][i]; for(var c=i;c<4;c++) A[i][c]/=div; x[i]/=div;
+        // eliminate
+        for(var r2=0;r2<4;r2++){ if(r2===i) continue; var f=A[r2][i]; if(Math.abs(f)<1e-12) continue; for(var c2=i;c2<4;c2++) A[r2][c2]-=f*A[i][c2]; x[r2]-=f*x[i]; }
+      }
+      return x; // solution
+    }
+    var best = {w:w0, extShare:-1};
+    var target = [y[0], y[1], y[2], 1];
+    var sets = combos(cand, 4);
+    for(var s=0;s<sets.length;s++){
+      var S = sets[s];
+      // must include at least one extender col
+      var okExt=false; for(var q=0;q<S.length;q++){ if(isExt(S[q])) { okExt=true; break; } }
+      if(!okExt) continue;
+      var M = [[],[],[],[]];
+      for(var j=0;j<4;j++){ M[0][j]=A[0][S[j]]; M[1][j]=A[1][S[j]]; M[2][j]=A[2][S[j]]; M[3][j]=1; }
+      var x = solve4x4(M, target);
+      if(!x) continue;
+      // feasibility: nonnegative and close residual
+      var neg=false; for(var j2=0;j2<4;j2++){ if(x[j2]<-1e-9){ neg=true; break; } }
+      if(neg) continue;
+      // compute residual exactly
+      var Ax=[0,0,0];
+      for(var j3=0;j3<4;j3++){ Ax[0]+=A[0][S[j3]]*x[j3]; Ax[1]+=A[1][S[j3]]*x[j3]; Ax[2]+=A[2][S[j3]]*x[j3]; }
+      var r0=Ax[0]-y[0], r1=Ax[1]-y[1], r2=Ax[2]-y[2];
+      if((r0*r0+r1*r1+r2*r2)>1e-8) continue;
+      var sumx = x.reduce(function(a,b){return a+b;},0);
+      if(Math.abs(sumx-1)>1e-6) continue; // preserve convex
+      var ext = 0; for(var j4=0;j4<4;j4++){ if(isExt(S[j4])) ext+=x[j4]; }
+      if(ext > best.extShare){
+        var wNew = new Array(A[0].length).fill(0);
+        for(var j5=0;j5<4;j5++) wNew[S[j5]] = Math.max(0,x[j5]);
+        best = {w:wNew, extShare:ext};
+      }
+    }
+    return (best.extShare>=0)? best.w : w0;
+  }catch(e){ console.warn('maximizeExtender failed', e); return w0; }
 }
 
 // ===== Wire up =====
