@@ -319,7 +319,7 @@ function suggestWeights(targetLab, maxInks, totalThickness, illum){
   return {active, weights:w, lab:bestLab, dE:bestDE}; }
 
 // ===== Suggestion UI hook =====
-async function suggestFormula(){ try{ const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } $('#predictMsg').textContent='Calibrating…'; await loadIFSX(); const maxInks=Math.max(2, Math.min(8, parseInt(($('#maxInks').value)||5,10))); const illum=$('#illuminant').value || 'D50'; const total=1.0; // 6v anilox baseline thickness scale
+async function suggestFormula(){ try{ const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } $('#predictMsg').textContent='Calibrating…'; await loadIFSX(); const maxInks = Math.max(2, Math.min(8, parseInt($('#maxInks').value || 5, 10))); const illum=$('#illuminant').value || 'D50'; const total=1.0; // 6v anilox baseline thickness scale
   const out=suggestWeights(target, maxInks, total, illum);
   const totalW=out.weights.reduce((a,b)=>a+b,0)||1; const merged=out.active.map((ink,i)=>({ code:ink.code, name:ink.name, pct:(out.weights[i]/totalW)*100 })).sort((a,b)=>b.pct-a.pct);
   // swatch from predicted Lab (convert to sRGB via D65 for UI consistency)
