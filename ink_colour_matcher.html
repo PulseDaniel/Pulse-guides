@@ -27,6 +27,7 @@
     .btn:hover { border-color:#3b82f6; }
     .muted { color:#8a94a6; font-size:.85rem; }
   </style>
+  <!-- removed manifest/icon refs to silence 404s -->
 </head>
 <body>
   <div class="app">
@@ -100,68 +101,60 @@
   </div>
 
 <script>
-// ===== Colour math (Lab/XYZ, ΔE00, sRGB) =====
+/* ==== Colour math (Lab/XYZ, ΔE00, sRGB) ==== */
 function labToXyz(L,a,b){var Yn=100,Xn=95.047,Zn=108.883;var fy=(L+16)/116,fx=fy+a/500,fz=fy-b/200;function finv(t){var t3=t*t*t;return t3>0.008856?t3:(t-16/116)/7.787}var xr=finv(fx),yr=finv(fy),zr=finv(fz);return [xr*Xn,yr*Yn,zr*Zn]}
 function xyzToLab(X,Y,Z){var Yn=100,Xn=95.047,Zn=108.883;function f(t){var e=216/24389,k=24389/27;return t>e?Math.cbrt(t):(k*t+16)/116}var xr=X/Xn,yr=Y/Yn,zr=Z/Zn;var fx=f(xr),fy=f(yr),fz=f(zr);return {L:116*fy-16,a:500*(fx-fy),b:200*(fy-fz)}}
 function labToSrgb(L,a,b){var xyz=labToXyz(L,a,b);var x=xyz[0]/100,y=xyz[1]/100,z=xyz[2]/100;var rl=3.2406*x-1.5372*y-0.4986*z;var gl=-0.9689*x+1.8758*y+0.0415*z;var bl=0.0557*x-0.2040*y+1.0570*z;function comp(u){u=Math.max(0,Math.min(1,u));return u<=0.0031308?12.92*u:1.055*Math.pow(u,1/2.4)-0.055}return {r:Math.round(comp(rl)*255),g:Math.round(comp(gl)*255),b:Math.round(comp(bl)*255)}}
-function hp(x,y){var h=Math.atan2(y,x)*180/Math.PI;return (h>=0?h:h+360)}
+function hp(x,y){var h=Math.atan2(y,x)*180/Math.PI;return h>=0?h:h+360}
 function deltaE2000(l1,l2){var L1=l1.L,a1=l1.a,b1=l1.b,L2=l2.L,a2=l2.a,b2=l2.b;var d2r=Math.PI/180;var avgLp=(L1+L2)/2;var C1=Math.hypot(a1,b1),C2=Math.hypot(a2,b2);var avgC=(C1+C2)/2;var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));var a1p=(1+G)*a1,a2p=(1+G)*a2;var C1p=Math.hypot(a1p,b1),C2p=Math.hypot(a2p,b2);var avgCp=(C1p+C2p)/2;var h1p=(Math.abs(a1p)<1e-9&&Math.abs(b1)<1e-9)?0:hp(a1p,b1);var h2p=(Math.abs(a2p)<1e-9&&Math.abs(b2)<1e-9)?0:hp(a2p,b2);var dhp=h2p-h1p;if(dhp>180)dhp-=360;if(dhp<-180)dhp+=360;var dLp=L2-L1,dCp=C2p-C1p,dHp=2*Math.sqrt(C1p*C2p)*Math.sin((dhp*d2r)/2);var avgHp=h1p+h2p;if(Math.abs(h1p-h2p)>180)avgHp+=360;avgHp/=2;var T=1-0.17*Math.cos((avgHp-30)*d2r)+0.24*Math.cos(2*avgHp*d2r)+0.32*Math.cos((3*avgHp+6)*d2r)-0.20*Math.cos((4*avgHp-63)*d2r);var Sl=1+0.015*Math.pow(avgLp-50,2)/Math.sqrt(20+Math.pow(avgLp-50,2));var Sc=1+0.045*avgCp;var Sh=1+0.015*avgCp*T;var Rt=-2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))*Math.sin((60*Math.exp(-Math.pow((avgHp-275)/25,2)))*d2r);return Math.sqrt(Math.pow(dLp/Sl,2)+Math.pow(dCp/Sc,2)+Math.pow(dHp/Sh,2)+Rt*(dCp/Sc)*(dHp/Sh))}
 
-// ===== Fixed press laydown (6 BCM → optical thickness scalar) =====
-const PRESS = { BCM:6.0, eta:0.60, density:1.00, solids:0.35, kappa:1.00 };
-function getPressTheta(){ const Vwet=1.55*PRESS.BCM*PRESS.eta; const Wdry=Vwet*PRESS.density*PRESS.solids; return PRESS.kappa*Wdry; }
+/* ==== Press laydown (fixed 6 BCM) ==== */
+const PRESS={BCM:6.0,eta:0.60,density:1.00,solids:0.35,kappa:1.00};
+function getPressTheta(){const Vwet=1.55*PRESS.BCM*PRESS.eta;const Wdry=Vwet*PRESS.density*PRESS.solids;return PRESS.kappa*Wdry}
 
-// ===== Spectral KM (finite thickness), S(λ)=1, invert K from R over Abs =====
-function R_infty_from_KS(K,S){ const a=(K+S)/S; const b=Math.sqrt(Math.max(0,a*a-1)); return a-b; }
-function L_from_KS(K,S){ return Math.sqrt(Math.max(0, K*(K+2*S))); }
-function KM_R_over_backing(K,S,X,Rg){
-  const Rinf=R_infty_from_KS(K,S); const L=L_from_KS(K,S); const E=Math.exp(2*L*X);
-  const num=(Rg-Rinf)/Rinf - Rinf*(Rg-1/Rinf)*E; const den=(Rg-Rinf) - (Rg-1/Rinf)*E;
-  let R=num/den; if(!isFinite(R)) R=Rinf; return Math.max(0,Math.min(1,R));
-}
-function invertKfromR(R){ const S=1,X=1; let lo=1e-6,hi=100; function f(K){return KM_R_over_backing(K,S,X,1.0)-R;}
-  let flo=f(lo), fhi=f(hi); for(let i=0;i<10 && flo*fhi>0;i++){ hi*=2; fhi=f(hi); }
-  if(flo*fhi>0){ return Math.max(1e-6, Math.min(100, (1-R)*(1-R)/(2*R))); }
-  for(let i=0;i<40;i++){ const m=0.5*(lo+hi), fm=f(m); if(Math.abs(fm)<1e-8) return m; if(flo*fm<=0){ hi=m; fhi=fm; } else { lo=m; flo=fm; } }
-  return 0.5*(lo+hi);
-}
+/* ==== Spectral KM (finite thickness), S(λ)=1) ==== */
+function R_infty_from_KS(K,S){const a=(K+S)/S;const b=Math.sqrt(Math.max(0,a*a-1));return a-b}
+function L_from_KS(K,S){return Math.sqrt(Math.max(0,K*(K+2*S)))}
+function KM_R_over_backing(K,S,X,Rg){const Rinf=R_infty_from_KS(K,S);const L=L_from_KS(K,S);const E=Math.exp(2*L*X);const num=(Rg-Rinf)/Rinf - Rinf*(Rg-1/Rinf)*E;const den=(Rg-Rinf) - (Rg-1/Rinf)*E;let R=num/den;if(!isFinite(R))R=Rinf;return Math.max(0,Math.min(1,R))}
+function invertKfromR(R){const S=1,X=1;let lo=1e-6,hi=100;function f(K){return KM_R_over_backing(K,S,X,1.0)-R}let flo=f(lo),fhi=f(hi);for(let i=0;i<10&&flo*fhi>0;i++){hi*=2;fhi=f(hi)}if(flo*fhi>0){return Math.max(1e-6,Math.min(100,(1-R)*(1-R)/(2*R)))}for(let i=0;i<40;i++){const m=0.5*(lo+hi),fm=f(m);if(Math.abs(fm)<1e-8)return m;if(flo*fm<=0){hi=m;fhi=fm}else{lo=m;flo=fm}}return 0.5*(lo+hi)}
 
-// D65/2° LUT (10 nm 380–730)
+/* ==== D65/2° LUT ==== */
 const CMF={wl:[380,390,400,410,420,430,440,450,460,470,480,490,500,510,520,530,540,550,560,570,580,590,600,610,620,630,640,650,660,670,680,690,700,710,720,730],
 x:[0.0014,0.0042,0.0143,0.0435,0.1344,0.2839,0.3483,0.3362,0.2908,0.1954,0.0956,0.0320,0.0049,0.0093,0.0633,0.1655,0.2904,0.4334,0.5945,0.7621,0.9163,1.0263,1.0622,1.0026,0.8544,0.6424,0.4479,0.2835,0.1649,0.0874,0.0468,0.0227,0.0114,0.0058,0.0029,0.0014],
 y:[0.0000,0.0001,0.0004,0.0012,0.0040,0.0116,0.0230,0.0380,0.0600,0.0909,0.1390,0.2080,0.3230,0.5030,0.7100,0.8620,0.9540,0.9950,0.9950,0.9520,0.8700,0.7570,0.6310,0.5030,0.3810,0.2650,0.1750,0.1070,0.0610,0.0320,0.0170,0.0082,0.0041,0.0021,0.0010,0.0005],
 z:[0.0065,0.0201,0.0679,0.2074,0.6456,1.3856,1.7471,1.7721,1.6692,1.2876,0.8130,0.4652,0.2720,0.1582,0.0782,0.0422,0.0203,0.0088,0.0039,0.0021,0.0017,0.0011,0.0008,0.0003,0.0002,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000]};
 const D65=[49.975,52.311,54.648,56.985,59.322,61.659,63.996,66.333,68.669,71.006,73.343,75.680,78.017,80.354,82.690,85.027,87.364,89.701,92.038,94.374,96.711,99.048,101.385,103.722,106.059,108.395,110.732,113.069,115.406,117.743,120.080,122.416,124.753,127.090,129.427,131.764];
-function spectrumToLab(R){let X=0,Y=0,Z=0,Xw=0,Yw=0,Zw=0;for(let i=0;i<CMF.wl.length;i++){const I=D65[i];X+=R[i]*I*CMF.x[i];Y+=R[i]*I*CMF.y[i];Z+=R[i]*I*CMF.z[i];Xw+=I*CMF.x[i];Yw+=I*CMF.y[i];Zw+=I*CMF.z[i];}const k=100/Yw;return xyzToLab(X*k,Y*k,Z*k)}
+function spectrumToLab(R){let X=0,Y=0,Z=0,Xw=0,Yw=0,Zw=0;for(let i=0;i<CMF.wl.length;i++){const I=D65[i];X+=R[i]*I*CMF.x[i];Y+=R[i]*I*CMF.y[i];Z+=R[i]*I*CMF.z[i];Xw+=I*CMF.x[i];Yw+=I*CMF.y[i];Zw+=I*CMF.z[i]}const k=100/Yw;return xyzToLab(X*k,Y*k,Z*k)}
 
-// ===== Data/state =====
+/* ==== Data/state ==== */
 var COLOURS=[], FORMULAS={}, ASSORTMENT={};
 var FORMULAS_NORM={}, COLOUR_TO_FORMULA={};
 
-function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' ') }
 function buildFormulaIndex(){
   let rows=[];
   if(Array.isArray(FORMULAS)) rows=FORMULAS;
   else if(FORMULAS && typeof FORMULAS==='object'){
-    Object.keys(FORMULAS).forEach(k=>{
-      if(Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
-      else if(FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows.push(...FORMULAS[k].rows);
+    Object.keys(FORMULAS).forEach(function(k){
+      if(Array.isArray(FORMULAS[k])) rows=rows.concat(FORMULAS[k]);
+      else if(FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows=rows.concat(FORMULAS[k].rows);
     });
   }
-  rows.forEach(r=>{
+  rows.forEach(function(r){
     const colour=normaliseName(r.Colour||r.color||r.name||'');
-    const parts=[]; for(let i=1;i<=6;i++){ const ing=r['Ingredient '+i]; const pct=r['%'+(i>1?i:'')]; if(ing && pct>0) parts.push({ink:ing.trim(), pct:Number(pct)}); }
-    const sum=parts.reduce((a,b)=>a+(b.pct||0),0)||1; const norm=parts.map(p=>({ink:p.ink, pct:(p.pct||0)/sum}));
+    const parts=[]; for(let i=1;i<=6;i++){ const ing=r['Ingredient '+i]; const pct=r['%'+(i>1?i:'')]; if(ing && pct>0) parts.push({ink:String(ing).trim(), pct:Number(pct)}) }
+    const sum=parts.reduce(function(a,b){return a+(b.pct||0)},0)||1;
+    const norm=parts.map(function(p){return {ink:p.ink, pct:(p.pct||0)/sum}});
     FORMULAS_NORM[colour]=norm; COLOUR_TO_FORMULA[colour]=norm;
   });
 }
 function showFormulaFor(colourName){
   const el=document.getElementById('known'); const key=normaliseName(colourName||''); const f=COLOUR_TO_FORMULA[key];
   if(!f){ el.textContent='—'; return; }
-  el.innerHTML=f.map(p=>'<span class="chip"><span class="swatch" style="background:#1f2430"></span>'+p.ink+': <b>'+(p.pct*100).toFixed(1)+'%</b></span>').join(' ');
+  el.innerHTML=f.map(function(p){return '<span class="chip"><span class="swatch" style="background:#1f2430"></span>'+p.ink+': <b>'+(p.pct*100).toFixed(1)+'%</b></span>'}).join(' ');
 }
 
-// ===== UI glue (unchanged) =====
+/* ==== UI glue (unchanged) ==== */
 function updateTargetEcho(){
   const L=parseFloat(document.getElementById('L').value||''), a=parseFloat(document.getElementById('a').value||''), b=parseFloat(document.getElementById('b').value||'');
   if(isFinite(L)&&isFinite(a)&&isFinite(b)){ const rgb=labToSrgb(L,a,b); document.getElementById('targetSw').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')'; document.getElementById('targetLabEcho').textContent='L '+L.toFixed(1)+'  a '+a.toFixed(1)+'  b '+b.toFixed(1); }
@@ -170,7 +163,7 @@ function renderMatches(list){
   const box=document.getElementById('matches');
   if(!list||list.length===0){ box.textContent='No matches'; return; }
   const tbody=document.createElement('div');
-  list.slice(0,8).forEach(c=>{
+  list.slice(0,8).forEach(function(c){
     const rgb=labToSrgb(c.L,c.a,c.b);
     const div=document.createElement('div');
     div.style.display='flex'; div.style.justifyContent='space-between'; div.style.alignItems='center'; div.style.padding='6px 0';
@@ -184,115 +177,106 @@ function renderMatches(list){
 function showSuggestion(s){
   const f=document.getElementById('formula');
   if(!s||!s.byInk||s.byInk.length===0){ f.textContent='—'; return; }
-  const rows=s.byInk.map(p=>'<tr><td>'+p.ink+'</td><td style="width:120px"><div style="height:10px; background:#1a1d25; border-radius:999px; overflow:hidden;"><div style="height:10px; width:'+(p.weight*100).toFixed(1)+'%; background:#3b82f6"></div></div></td><td class="mono">'+(p.weight*100).toFixed(1)+'%</td></tr>').join('');
+  const rows=s.byInk.map(function(p){
+    return '<tr><td>'+p.ink+'</td><td style="width:120px"><div style="height:10px; background:#1a1d25; border-radius:999px; overflow:hidden;"><div style="height:10px; width:'+(p.weight*100).toFixed(1)+'%; background:#3b82f6"></div></div></td><td class="mono">'+(p.weight*100).toFixed(1)+'%</td></tr>';
+  }).join('');
   f.innerHTML='<table><thead><tr><th>Ink</th><th>Share</th><th>%</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 
-// ===== Build spectral Ks from JSON =====
+/* ==== Build spectral Ks from JSON ==== */
 function buildSpectralKs(ifs){
   const wl=ifs.wavelengths; const inks={};
-  for(const c of ifs.colorants){
-    const R=c.R.map(v=>Math.max(1e-6,Math.min(0.999999,v)));
-    const K=R.map(invertKfromR); // S=1, X=1
-    inks[c.name]={K};
+  for(let i=0;i<ifs.colorants.length;i++){
+    const c=ifs.colorants[i];
+    const R=c.R.map(function(v){return Math.max(1e-6,Math.min(0.999999, v))});
+    const K=R.map(invertKfromR);
+    inks[c.name]={K:K};
   }
-  return { wl, inks };
+  return { wl:wl, inks:inks };
 }
 
-// ===== Optimiser: seeded search + Nelder–Mead + simplex re-weight =====
+/* ==== Optimiser (no single-ink cheating) ==== */
 function predictMix(targetLab, maxInks, SPEC){
   const wl=SPEC.wl, inks=SPEC.inks;
   const names=Object.keys(inks);
   if(names.length===0) return null;
 
-  // candidate pool: start from top single-ink ΔE, add best-improving inks
   function labFromCombo(sel, w, Xscale){
     const nB=wl.length; const Kmix=new Array(nB).fill(0); let sumW=0;
-    for(let i=0;i<sel.length;i++){ const Ki=inks[sel[i]].K, wi=w[i]; sumW+=wi; for(let b=0;b<nB;b++) Kmix[b]+=wi*Ki[b]; }
+    for(let i=0;i<sel.length;i++){ const Ki=inks[sel[i]].K, wi=w[i]; sumW+=wi; for(let b=0;b<nB;b++){ Kmix[b]+=wi*Ki[b]; } }
     const X=(Xscale!=null?Xscale:getPressTheta()) * Math.max(sumW,1e-9);
-    const R=Kmix.map(K=>KM_R_over_backing(K,1.0,X,1.0)); return spectrumToLab(R);
+    const R=Kmix.map(function(K){return KM_R_over_backing(K,1.0,X,1.0)});
+    return spectrumToLab(R);
   }
-  function deForInk(n){ return deltaE2000(labFromCombo([n],[1.0]), targetLab); }
+  function deForInk(n){ return deltaE2000(labFromCombo([n],[1.0]), targetLab) }
 
-  // choose seeds
-  const sorted = names.map(n=>({n,de:deForInk(n)})).sort((a,b)=>a.de-b.de);
-  let chosen = [sorted[0].n]; // best single
+  const sorted=names.map(function(n){return {n:n,de:deForInk(n)}}).sort(function(a,b){return a.de-b.de});
+  let chosen=[sorted[0].n];
   while(chosen.length<maxInks){
     let best=null;
-    for(const n of names){
-      if(chosen.includes(n)) continue;
-      const trial=[...chosen,n];
-      // coarse grid search weights on trial
+    for(let k=0;k<names.length;k++){
+      const n=names[k];
+      if(chosen.indexOf(n)>=0) continue;
+      const trial=chosen.concat([n]);
       let bestLoc={de:1e9, w:null};
       for(let g=0; g<=10; g++){
         for(let h=0; h<=10-g; h++){
-          const k = Math.max(0,10-g-h);
-          const ws = trial.length===3 ? [g/10,h/10,k/10] : [g/10, (10-g)/10];
-          const lab = labFromCombo(trial, ws);
-          const de = deltaE2000(lab, targetLab);
-          if(de<bestLoc.de) bestLoc={de,w:ws};
+          const k3=Math.max(0,10-g-h);
+          const ws = (trial.length===3)? [g/10,h/10,k3/10] : [g/10,(10-g)/10];
+          const lab=labFromCombo(trial, ws, null);
+          const de=deltaE2000(lab, targetLab);
+          if(de<bestLoc.de) bestLoc={de:de, w:ws};
         }
       }
-      if(!best || bestLoc.de<best.de) best={n, w:bestLoc.w, de:bestLoc.de};
+      if(!best || bestLoc.de<best.de) best={n:n, w:bestLoc.w, de:bestLoc.de};
     }
     if(!best) break;
     chosen.push(best.n);
   }
 
-  // refine weights + thickness scale with Nelder–Mead on simplex (weights>=0, sum=1)
-  function clamp01(x){ return Math.max(0, Math.min(1, x)); }
-  function normalise(v){ const s=v.reduce((a,b)=>a+Math.max(0,b),0)||1; return v.map(x=>Math.max(0,x)/s); }
+  function clamp01(x){ return Math.max(0,Math.min(1,x)) }
+  function normalise(v){ const s=v.reduce(function(a,b){return a+Math.max(0,b)},0)||1; return v.map(function(x){return Math.max(0,x)/s}) }
 
-  let w = new Array(chosen.length).fill(1/chosen.length);
-  let Xscale = getPressTheta(); // start at press scalar
+  let w = new Array(chosen.length).fill(1/Math.max(1,chosen.length));
+  let Xscale = getPressTheta();
 
   function objective(vec){
-    // vec = [w0..wN-1, logX] ; weights auto-normalised; Xscale = exp(logX)
     const N=chosen.length;
-    const rawW = vec.slice(0,N);
-    const logX = vec[N];
-    const ww = normalise(rawW);
-    const lab = labFromCombo(chosen, ww, Math.exp(logX));
-    const de = deltaE2000(lab, targetLab);
-    // small entropy regulariser to avoid 100% single-ink unless truly best
-    let H=0; for(const p of ww){ if(p>1e-9) H -= p*Math.log(p); }
-    const reg = 0.02*(Math.log(N) - H); // 0 when uniform, >0 when peaked
+    const rawW=vec.slice(0,N);
+    const logX=vec[N];
+    const ww=normalise(rawW);
+    const lab=labFromCombo(chosen, ww, Math.exp(logX));
+    const de=deltaE2000(lab, targetLab);
+    let H=0; for(let i=0;i<ww.length;i++){ const p=ww[i]; if(p>1e-9) H-=p*Math.log(p); }
+    const reg=0.02*(Math.log(ww.length) - H);
     return de + reg;
   }
 
   function nelderMead(x0, iters){
     const N=x0.length, alpha=1, gamma=2, rho=0.5, sigma=0.5;
     let simplex=[x0.slice()];
-    for(let i=0;i<N;i++){ const v=x0.slice(); v[i]+= (i===N-1? 0.0 : 0.2); simplex.push(v); } // small perturb
-    function sortSimplex(){
-      simplex.sort((a,b)=>objective(a)-objective(b));
-    }
-    sortSimplex();
+    for(let i=0;i<N;i++){ const v=x0.slice(); v[i]+= (i===N-1? 0.0 : 0.2); simplex.push(v) }
+    simplex.sort(function(a,b){return objective(a)-objective(b)});
     for(let it=0; it<iters; it++){
-      sortSimplex();
+      simplex.sort(function(a,b){return objective(a)-objective(b)});
       const best=simplex[0], worst=simplex[N];
-      // centroid of all but worst
       const centroid=new Array(N).fill(0);
-      for(let i=0;i<N;i++){ for(let j=0;j<N;j++){ centroid[j]+=simplex[i][j]/N; } }
-      // reflect
-      const xr=centroid.map((c,j)=>c+alpha*(centroid[j]-worst[j]));
-      if(objective(xr) < objective(simplex[0])){
-        // expand
-        const xe=centroid.map((c,j)=>c+gamma*(xr[j]-centroid[j]));
+      for(let i=0;i<N;i++){ for(let j=0;j<N;j++){ centroid[j]+=simplex[i][j]/N } }
+      const xr=centroid.map(function(c,j){ return c + alpha*(centroid[j]-worst[j]) });
+      if(objective(xr) < objective(best)){
+        const xe=centroid.map(function(c,j){ return c + gamma*(xr[j]-centroid[j]) });
         simplex[N] = (objective(xe) < objective(xr)) ? xe : xr;
       } else if (objective(xr) < objective(simplex[N-1])) {
         simplex[N] = xr;
       } else {
-        // contract
-        const xc=centroid.map((c,j)=>c+rho*(worst[j]-centroid[j]));
+        const xc=centroid.map(function(c,j){ return c + rho*(worst[j]-centroid[j]) });
         if(objective(xc) < objective(worst)) simplex[N]=xc;
         else {
-          // shrink
-          for(let i=1;i<=N;i++) for(let j=0;j<N;j++) simplex[i][j]=best[j]+sigma*(simplex[i][j]-best[j]);
+          for(let i=1;i<=N;i++){ for(let j=0;j<N;j++){ simplex[i][j]=best[j]+sigma*(simplex[i][j]-best[j]) } }
         }
       }
     }
-    simplex.sort((a,b)=>objective(a)-objective(b));
+    simplex.sort(function(a,b){return objective(a)-objective(b)});
     return simplex[0];
   }
 
@@ -302,7 +286,6 @@ function predictMix(targetLab, maxInks, SPEC){
   const wOpt = normalise(xmin.slice(0,N));
   const Xopt = Math.exp(xmin[N]);
 
-  // final polish: coordinate descent on weights (simplex) with fixed X
   function polish(ws){
     let w=ws.slice(), step=0.2, best=objective(w.concat([Math.log(Xopt)]));
     for(let it=0; it<120; it++){
@@ -310,8 +293,7 @@ function predictMix(targetLab, maxInks, SPEC){
       for(let i=0;i<w.length;i++){
         for(let j=0;j<w.length;j++){
           if(i===j) continue;
-          const move=Math.min(step, w[i]);
-          if(move<=1e-6) continue;
+          const move=Math.min(step,w[i]); if(move<=1e-6) continue;
           const wt=w.slice(); wt[i]-=move; wt[j]+=move;
           const val=objective(wt.concat([Math.log(Xopt)]));
           if(val+1e-9<best){ best=val; w=wt; improved=true; }
@@ -322,38 +304,37 @@ function predictMix(targetLab, maxInks, SPEC){
     return w;
   }
   const wFinal = polish(wOpt);
-
   const labFinal = labFromCombo(chosen, wFinal, Xopt);
   const dE = deltaE2000(labFinal, targetLab);
   const rgb = labToSrgb(labFinal.L, labFinal.a, labFinal.b);
-
-  const out = chosen.map((n,i)=>({ink:n, weight:wFinal[i]})).sort((a,b)=>b.weight-a.weight);
-  const sum=out.reduce((a,b)=>a+b.weight,0)||1; out.forEach(o=>o.weight/=sum);
-
-  return { byInk: out, mixLab: labFinal, dE, rgb };
+  const out = chosen.map(function(n,i){return {ink:n, weight:wFinal[i]}}).sort(function(a,b){return b.weight-a.weight});
+  const sum=out.reduce(function(a,b){return a+b.weight},0)||1; out.forEach(function(o){o.weight/=sum});
+  return { byInk: out, mixLab: labFinal, dE: dE, rgb: rgb };
 }
 
-// ===== Wire-up & data load =====
-const getJSON=(name)=>fetch(name).then(r=>{ if(!r.ok) throw new Error(`${name}: HTTP ${r.status}`); return r.json(); });
+/* ==== Wire-up & data load ==== */
+function getJSON(name){ return fetch(name).then(function(r){ if(!r.ok) throw new Error(name+': HTTP '+r.status); return r.json(); }) }
 
 function wireUp(SPECT){
   document.getElementById('search').addEventListener('input', function(){
     const q=normaliseName(this.value||'');
     if(!q){ document.getElementById('matches').textContent='Type to see matches…'; return; }
-    const hits = COLOURS.filter(c=>normaliseName(c.name||c.Colour||c.color||'').includes(q));
+    const hits=COLOURS.filter(function(c){ return normaliseName(c.name||c.Colour||c.color||'').indexOf(q)>=0 });
     renderMatches(hits.slice(0,12));
   });
-  ['L','a','b'].forEach(id=>document.getElementById(id).addEventListener('input', updateTargetEcho));
+  ['L','a','b'].forEach(function(id){ document.getElementById(id).addEventListener('input', updateTargetEcho) });
   document.getElementById('predict').addEventListener('click', function(){
     const L=parseFloat(document.getElementById('L').value||'');
     const a=parseFloat(document.getElementById('a').value||'');
     const b=parseFloat(document.getElementById('b').value||'');
     if(!isFinite(L)||!isFinite(a)||!isFinite(b)) return;
-    const targetLab={L,a,b}; const maxInks=parseInt(document.getElementById('maxInks').value||'3',10);
-    const res = predictMix(targetLab, maxInks, SPECT);
-    const rgb = res.rgb; document.getElementById('mixSw').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+    const targetLab={L:L,a:a,b:b};
+    const maxInks=parseInt(document.getElementById('maxInks').value||'3',10);
+    const res=predictMix(targetLab, maxInks, SPECT);
+    const rgb=res.rgb;
+    document.getElementById('mixSw').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
     document.getElementById('mixLabEcho').textContent='L '+res.mixLab.L.toFixed(1)+'  a '+res.mixLab.a.toFixed(1)+'  b '+res.mixLab.b.toFixed(1);
-    document.getElementById('dE').textContent = res.dE.toFixed(2);
+    document.getElementById('dE').textContent=res.dE.toFixed(2);
     showSuggestion(res);
   });
 }
@@ -363,7 +344,7 @@ Promise.all([
   getJSON('DC_Formulas.json'),
   getJSON('assortment_colour_data.json'),
   getJSON('ifsx_reflectance_abs.json')
-]).then(all=>{
+]).then(function(all){
   COLOURS=all[0];
   FORMULAS=all[1]; buildFormulaIndex();
   ASSORTMENT=all[2];
@@ -371,15 +352,14 @@ Promise.all([
   const SPECT=buildSpectralKs(IFSMODEL);
   wireUp(SPECT);
 
-  // preload a demo PMS
-  const demo = COLOURS[0];
+  const demo=COLOURS[0];
   if(demo){
-    document.getElementById('search').value = demo.name;
+    document.getElementById('search').value=demo.name;
     document.getElementById('search').dispatchEvent(new Event('input'));
-    document.getElementById('L').value = demo.L; document.getElementById('a').value = demo.a; document.getElementById('b').value = demo.b;
+    document.getElementById('L').value=demo.L; document.getElementById('a').value=demo.a; document.getElementById('b').value=demo.b;
     updateTargetEcho(); showFormulaFor(demo.name);
   }
-}).catch(err=>{
+}).catch(function(err){
   console.error(err);
   const m=document.getElementById('matches'); if(m) m.textContent='Data failed to load: '+err.message;
 });
