@@ -186,7 +186,7 @@ function getCandidateInks(){
       }
     }
     // prefer extender/white first if present
-    pool.sort((a,b)=> (/(^|\\s)DC21-001(\\s|$)/.test(a.code)?-1: /(\\s|^)DC21-001(\\s|$)/.test(b.code)?1: a.code.localeCompare(b.code)));
+    pool.sort((a,b)=> (/(^|\s)DC21-001(\s|$)/.test(a.code)?-1: /(\s|^)DC21-001(\s|$)/.test(b.code)?1: a.code.localeCompare(b.code)));
     return pool;
   }
 
@@ -205,8 +205,8 @@ function suggestWeights(targetLab, maxInks, totalThickness, illum){
     // Identify special inks
     const has = (re)=> all.find(c=> re.test(c.code) || re.test(c.name||''));
     const EXT = has(/DC21-001|EXTENDER/i) || null;
-    const WHITE = has(/DC21-901|\bWHITE\b/i) || null; // alias shop white if present
-    const BLACK = has(/DC21-802|\bBLACK\b/i) || null;
+    const WHITE = has(/DC21-901|WHITE/i) || null; // alias shop white if present
+    const BLACK = has(/DC21-802|BLACK/i) || null;
 
     // Candidate subset: nearest-by-hue + (WHITE/EXT) + optionally BLACK if target is dark
     const chromaSorted = all
@@ -230,7 +230,7 @@ function suggestWeights(targetLab, maxInks, totalThickness, illum){
     const seen=new Set(); cand = cand.filter(c=> (seen.has(c.code)?false:(seen.add(c.code), true))).slice(0, Math.min(maxInks+2, 12));
 
     // Optimisation: greedy + coord descent with penalties
-    const active=[]; const w=[]; let rem=totalThickness; let bestLab={L:0,a:0,b:0}, bestDE=Infinity;
+    const active=[]; const w=[]; let rem=totalThickness; let bestLab = { L: 0, a: 0, b: 0 }; let bestDE = Infinity;
 
     // Seed: WHITE/EXT + nearest chromatic
     if (WHITE){ active.push(WHITE); w.push(Math.min(rem*0.35, rem)); rem = Math.max(0, rem - w[w.length-1]); }
@@ -319,12 +319,13 @@ function suggestWeights(targetLab, maxInks, totalThickness, illum){
   return {active, weights:w, lab:bestLab, dE:bestDE}; }
 
 // ===== Suggestion UI hook =====
-async function suggestFormula(){ try{ const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } $('#predictMsg').textContent='Calibrating…'; await loadIFSX(); const maxInks = Math.max(2, Math.min(8, parseInt($('#maxInks').value || 5, 10))); const illum=$('#illuminant').value || 'D50'; const total=1.0; // 6v anilox baseline thickness scale
+async function suggestFormula(){ try{ const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } $('#predictMsg').textContent='Calibrating…'; await loadIFSX(); const maxInks=Math.max(2, Math.min(8, parseInt(($('#maxInks').value)||5,10))); const illum=$('#illuminant').value || 'D50'; const total=1.0; // 6v anilox baseline thickness scale
   const out=suggestWeights(target, maxInks, total, illum);
   const totalW=out.weights.reduce((a,b)=>a+b,0)||1; const merged=out.active.map((ink,i)=>({ code:ink.code, name:ink.name, pct:(out.weights[i]/totalW)*100 })).sort((a,b)=>b.pct-a.pct);
   // swatch from predicted Lab (convert to sRGB via D65 for UI consistency)
   const rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
-  let html=''<
+  let html=''
+  +
   + '<div class="row2">'
   +   '<div>'
   +     '<div class="pill">Spectral prediction (KM, '+illum+'/2°)</div>'
