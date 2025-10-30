@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher + Spectral Predictor (KM)</title>
+  <title>Ink Colour Matcher — Ladder Mixer (f‑space)</title>
   <style>
     :root { --gap: 12px; --radius: 14px; }
     * { box-sizing: border-box; }
@@ -69,7 +69,7 @@
 
       <!-- Predictor Controls -->
       <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula (Spectral KM)</h2>
+        <h2>Suggest Formula (Ladder mixer)</h2>
         <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="maxInks">Max inks in recipe</label>
@@ -121,18 +121,23 @@
 <script>
 (function(){
 'use strict';
-// ===== Utilities =====
+// =========== Helpers ===========
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
 
-// D65 reference (for UI swatches) — keep Lab I/O as D65 so existing Lab values look consistent visually.
+// Lab <-> f components (CIE Lab internal)
+function labToF(Lab){ var fy=(Lab.L+16)/116; var fx=fy + Lab.a/500; var fz=fy - Lab.b/200; return {fx:fx, fy:fy, fz:fz}; }
+function fToLab(f){ return { L: 116*f.fy - 16, a: 500*(f.fx - f.fy), b: 200*(f.fy - f.fz) }; }
+
+// sRGB swatch (assume D65; it’s fine for UI)
 function labToXyzD65(L,a,b){ var Yn=1, Xn=0.95047, Zn=1.08883; var fy=(L+16)/116; var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; }; return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn }; }
-function labToSrgb(L,a,b){ var xyz = labToXyzD65(L,a,b); var X=xyz.X, Y=xyz.Y, Z=xyz.Z; var r =  3.2406*X -1.5372*Y -0.4986*Z; var g = -0.9689*X +1.8758*Y +0.0415*Z; var b2= 0.0557*X -0.2040*Y +1.0570*Z; var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; }); return {r:clamp(Math.round(lin[0]*255),0,255), g:clamp(Math.round(lin[1]*255),0,255), b:clamp(Math.round(lin[2]*255),0,255)}; }
+function labToSrgb(L,a,b){ var xyz = labToXyzD65(L,a,b); var X=xyz.X, Y=xyz.Y, Z=xyz.Z; var r =  3.2406*X -1.5372*Y -0.4986*Z; var g = -0.9689*X +1.8758*Y +0.0415*Z; var b2= 0.0557*X -0.2040*Y +1.0570*Z; function enc(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; } return {r:clamp(Math.round(enc(r)*255),0,255), g:clamp(Math.round(enc(g)*255),0,255), b:clamp(Math.round(enc(b2)*255),0,255)}; }
 
 // ΔE2000
 function deltaE2000(c1,c2){ var L1=c1.L,a1=c1.a,b1=c1.b, L2=c2.L,a2=c2.a,b2=c2.b; var avgLp=(L1+L2)/2; var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2; var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7)))); var a1p=(1+G)*a1, a2p=(1+G)*a2; var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2); function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return h>=0?h:h+360; } var h1p=(C1p<1e-7?0:hp(a1p,b1)), h2p=(C2p<1e-7?0:hp(a2p,b2)); var dLp=L2-L1; var dCp=C2p-C1p; var dhp=h2p-h1p; if (C1p*C2p===0) dhp=0; else if (dhp>180) dhp-=360; else if (dhp<-180) dhp+=360; var dHp=2*Math.sqrt(C1p*C2p)*Math.sin((dhp*Math.PI/180)/2); var avgLp2=(avgLp-50)*(avgLp-50); var Sl=1+0.015*avgLp2/Math.sqrt(20+avgLp2); var Sc=1+0.045*avgC; var avgHp=(Math.abs(h1p-h2p)>180)? (h1p+h2p+360)/2 : (h1p+h2p)/2; var T=1-0.17*Math.cos((avgHp-30)*Math.PI/180)+0.24*Math.cos(2*avgHp*Math.PI/180)+0.32*Math.cos(3*avgHp*Math.PI/180+6*Math.PI/180)-0.20*Math.cos(4*avgHp*Math.PI/180-63*Math.PI/180); var Sh=1+0.015*avgC*T; var Rc=2*Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))); var Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*Math.PI/180); return Math.sqrt((dLp/Sl)*(dLp/Sl)+(dCp/Sc)*(dCp/Sc)+(dHp/Sh)*(dHp/Sh)+Rt*(dCp/Sc)*(dHp/Sh)); }
 
-// ===== Data =====
+// =========== Data holders ===========
 var COLOURS=[], FORMULAS={}, ASSORTMENT={};
 var FORMULAS_NORM={}, COLOUR_TO_FORMULA={};
 
@@ -141,278 +146,234 @@ function extractPmsNumber(name){ if(!name) return null; var m=String(name).toUpp
 
 function buildFormulaIndex(){ var rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={}; if(Array.isArray(FORMULAS)){ rows.push.apply(rows, FORMULAS); } else if (FORMULAS && typeof FORMULAS==='object'){ Object.keys(FORMULAS).forEach(function(k){ if(Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]); else if (FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows.push.apply(rows, FORMULAS[k].rows); }); } var byColour=new Map(); rows.forEach(function(r){ var cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name; if(!cname) return; var items=[]; for(var i=1;i<=12;i++){ var ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i]; if(!ink) continue; var pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||''; items.push({ink:ink, percent:pct}); } var arr=byColour.get(cname)||[]; arr.push.apply(arr, items); byColour.set(cname, arr); FORMULAS_NORM[normaliseName(cname)]=arr; }); (COLOURS||[]).forEach(function(c){ var name=c.name||c.Colour||c.color||''; var norm=normaliseName(name); if(FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; } var p=extractPmsNumber(name); if(p){ for (var key in FORMULAS_NORM){ if((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; } } } }); }
 
-// ===== UI helpers =====
+// =========== UI helpers ===========
 function updateTargetEcho(){ var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(function(v){return Number.isNaN(v);})){ $('#targetEcho').textContent='Target: –'; $('#targetSwatch').style.background='#0000'; return; } $('#targetEcho').textContent='Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2); var rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')'; }
 function getTargetLab(){ var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(Number.isNaN)) return null; return {L:L,a:a,b:b}; }
 
-// ===== Closest & PMS search =====
+// =========== Closest & PMS search ===========
 function findClosest(){ var target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } var rows=COLOURS.map(function(c){ return { raw:c, name:c.name||c.Colour||c.color||'—', L:c.L,a:c.a,b:c.b, de:deltaE2000({L:c.L,a:c.a,b:c.b}, target) }; }).sort(function(a,b){return a.de-b.de;}).slice(0,8); var tbody=$('#resultsTbody'); tbody.innerHTML=''; rows.forEach(function(r){ var tr=document.createElement('tr'); tr.className='result-row'; var rgb=labToSrgb(r.L,r.a,r.b); tr.innerHTML='<td>'+r.name+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+r.L.toFixed(2)+'</td><td>'+r.a.toFixed(2)+'</td><td>'+r.b.toFixed(2)+'</td><td>'+r.de.toFixed(2)+'</td>'; tr.addEventListener('click', function(){ showFormulaFor(r.name); }); tbody.appendChild(tr); }); }
 function findByPms(){ var qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; } var q=qRaw.replace(/^PANTONE\s*/,''); var hits=COLOURS.filter(function(c){ var p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q);}); var tbody=$('#resultsTbody'); tbody.innerHTML=''; if(!hits.length){ alert('No PMS match found'); return; } hits.slice(0,8).forEach(function(c){ var rgb=labToSrgb(c.L,c.a,c.b); var tr=document.createElement('tr'); tr.className='result-row'; tr.innerHTML='<td>'+(c.name||c.Colour||c.color||'—')+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+(+c.L).toFixed(2)+'</td><td>'+(+c.a).toFixed(2)+'</td><td>'+(+c.b).toFixed(2)+'</td><td>—</td>'; tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); findClosest(); showFormulaFor(c.name||c.Colour||c.color||''); }); tbody.appendChild(tr); }); }
 function showFormulaFor(colourName){ var panel=$('#formulaPanel'); var list=null; var bound=COLOUR_TO_FORMULA[colourName]; if(bound) list=FORMULAS_NORM[bound]; if(!list) list=FORMULAS_NORM[normaliseName(colourName)]; if(!list){ var want=extractPmsNumber(colourName); if(want){ for (var key in FORMULAS_NORM){ if((extractPmsNumber(key)||'')===want){ list=FORMULAS_NORM[key]; break; } } } } if(!list||!list.length){ panel.style.display='none'; return; } var html='<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">'; list.forEach(function(item){ var name=item.ink||item.Ink||'Ink'; var pct=item.percent!==''? (item.percent+'%') : ''; html+='<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>'; }); html+='</div>'; panel.innerHTML=html; panel.style.display='block'; }
 
-// ===== Spectral engine (KM, single-constant) =====
-var nm=[380,390,400,410,420,430,440,450,460,470,480,490,500,510,520,530,540,550,560,570,580,590,600,610,620,630,640,650,660,670,680,690,700,710,720,730];
-var cmf_x=[0.0014,0.0042,0.0143,0.0435,0.1344,0.2839,0.3483,0.3362,0.2908,0.1954,0.0956,0.0320,0.0049,0.0093,0.0633,0.1655,0.2904,0.4334,0.5945,0.7621,0.9163,1.0263,1.0622,1.0026,0.8544,0.6424,0.4479,0.2835,0.1649,0.0874,0.0468,0.0227,0.0114,0.0058,0.0029,0.0014];
-var cmf_y=[0.0000,0.0001,0.0004,0.0012,0.0040,0.0116,0.0230,0.0380,0.0600,0.0910,0.1390,0.2080,0.3230,0.5030,0.7100,0.8620,0.9540,0.9950,0.9950,0.9520,0.8700,0.7570,0.6310,0.5030,0.3810,0.2650,0.1750,0.1070,0.0610,0.0320,0.0170,0.0082,0.0041,0.0021,0.0010,0.0005];
-var cmf_z=[0.0065,0.0201,0.0679,0.2074,0.6456,1.3856,1.7471,1.7721,1.6692,1.2876,0.8130,0.4652,0.2720,0.1582,0.0782,0.0422,0.0203,0.0088,0.0039,0.0021,0.0017,0.0011,0.0008,0.0003,0.0002,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000];
-var D50=[24.32,26.25,28.30,30.45,32.70,35.04,37.38,39.53,41.10,41.82,41.09,39.49,37.35,35.36,33.86,32.59,31.84,31.74,32.27,33.31,34.74,36.42,38.32,40.37,42.53,44.82,47.10,49.31,51.36,53.14,54.66,55.85,56.72,57.30,57.62,57.77];
-var D65=[49.98,52.31,54.65,57.00,59.34,61.67,63.99,66.29,68.55,70.75,72.89,74.94,76.90,78.75,80.51,82.16,83.69,85.09,86.34,87.41,88.29,88.99,89.53,89.91,90.10,90.18,90.06,89.86,89.56,89.19,88.74,88.22,87.64,87.00,86.30,85.56];
+// =========== Ladder-based ink model ===========
+var LADDER = {}; // code -> { white: [ {conc,L,a,b}, ... ] }
 
-function dot(a,b){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
-function scale(a,k){ return a.map(function(v){ return v*k; }); }
-function makeCS(which){ var E=which==='D50'?D50:D65; var k=100/dot(E,cmf_y); var Ex=scale(E,k), Ey=scale(E,k), Ez=scale(E,k); return {Ex:Ex,Ey:Ey,Ez:Ez, whiteXYZ:[dot(Ex,cmf_x),dot(Ey,cmf_y),dot(Ez,cmf_z)]}; }
-function spectrumToXYZ(R, CS){ var X=dot(CS.Ex.map(function(v,i){return v*cmf_x[i];}), R); var Y=dot(CS.Ey.map(function(v,i){return v*cmf_y[i];}), R); var Z=dot(CS.Ez.map(function(v,i){return v*cmf_z[i];}), R); return [X,Y,Z]; }
-function xyzToLabIll(X,Y,Z, CS){ var Xn=CS.whiteXYZ[0]/100, Yn=CS.whiteXYZ[1]/100, Zn=CS.whiteXYZ[2]/100; X/=100; Y/=100; Z/=100; function f(t){ return t>0.008856?Math.cbrt(t):(7.787*t)+(16/116); } var fx=f(X/Xn), fy=f(Y/Yn), fz=f(Z/Zn); return {L:116*fy-16, a:500*(fx-fy), b:200*(fy-fz)}; }
-
-// KM helpers
-function Rinf_to_K_over_S(R){ return ((1-R)*(1-R))/(2*R + 1e-12); }
-function KS_to_Rinf(KS){ var tmp=Math.sqrt(KS*KS+2*KS); var R=1+KS-tmp; return Math.max(0.0001, Math.min(0.9999, R)); }
-
-var IFSX=null; // {wavelengths, colorants:[{name,R[]}], refs, meta}
-var SpectralMap=new Map();
-function loadIFSX(){
-  if (IFSX) return Promise.resolve(IFSX);
-  return fetch('ifsx_reflectance_abs.json')
-    .then(function(res){ if(!res.ok) throw new Error('ifsx_reflectance_abs.json not found'); return res.json(); })
-    .then(function(json){
-      IFSX=json; SpectralMap.clear();
-      for(var i=0;i<IFSX.colorants.length;i++){
-        var c=IFSX.colorants[i];
-        var code=(c.name.split(' ')[0]||'').trim();
-        if(!c.R || c.R.length!==nm.length) continue;
-        SpectralMap.set(code, { name:c.name, R:c.R.slice(), KS:c.R.map(Rinf_to_K_over_S) });
-      }
-      return IFSX;
-    });
-}
-
-// ===== Per-ink thickness model from Lab ladders (white) =====
-// We fit t(conc) = alpha * conc^p per ink by matching the predicted Lab (via spectral base) to ladder Lab (over white)
-var InkModels = {}; // code -> { alpha, p }
-
-function predictLab_singleInk(code, t, illum){
-  var ink=SpectralMap.get(code); if(!ink) return {L:100,a:0,b:0};
-  var KS_scaled = ink.KS.map(function(v){ return t*v; });
-  var R = KS_scaled.map(KS_to_Rinf);
-  var CS=makeCS(illum);
-  var XYZ=spectrumToXYZ(R, CS);
-  return xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS);
-}
-
-function findThicknessForLab(code, targetLab, illum){
-  // 1D line search over t in [0, TMAX]
-  var TMAX=3.0, tLo=0.0, tHi=TMAX, bestT=0, best=1e9;
-  for(var k=0;k<40;k++){
-    var t1=tLo + (tHi-tLo)/3, t2=tHi - (tHi-tLo)/3;
-    var L1=predictLab_singleInk(code, t1, illum), L2=predictLab_singleInk(code, t2, illum);
-    var e1=deltaE2000(L1, targetLab), e2=deltaE2000(L2, targetLab);
-    if(e1<e2){ tHi=t2; if(e1<best){ best=e1; bestT=t1; } }
-    else { tLo=t1; if(e2<best){ best=e2; bestT=t2; } }
-  }
-  return bestT;
-}
-
-function fitInkModelsFromLadders(illum){
-  InkModels={};
-  var missing=[];
+function loadAssortmentIntoLadders(){
+  LADDER = {};
   for (var code in ASSORTMENT){
-    if (!SpectralMap.has(code)) continue;
-    var ladd = ASSORTMENT[code] && ASSORTMENT[code].white; // focus on over-white which matches our R∞ simplifying assumption
-    if (!ladd || !ladd.length){ continue; }
-    // collect (conc, t*) pairs by matching each ladder Lab
-    var xs=[], ys=[]; // log-conc, log-t
-    for (var i=0;i<ladd.length;i++){
-      var step=ladd[i];
-      var conc=parseFloat(step.conc||step.Conc||step.concentration||step.Percent||step.pct);
-      var L=+step.L, a=+step.a, b=+step.b;
-      if(!(conc>0) || [L,a,b].some(function(v){return Number.isNaN(v);})){ continue; }
-      var tBest=findThicknessForLab(code, {L:L,a:a,b:b}, illum);
-      if(tBest>0){ xs.push(Math.log(conc)); ys.push(Math.log(tBest)); }
-    }
-    if (xs.length>=2){
-      // linear regression ys = A + p*xs => alpha = exp(A)
-      var n=xs.length, sx=0, sy=0, sxx=0, sxy=0;
-      for(var j=0;j<n;j++){ sx+=xs[j]; sy+=ys[j]; sxx+=xs[j]*xs[j]; sxy+=xs[j]*ys[j]; }
-      var denom = n*sxx - sx*sx; if (Math.abs(denom) < 1e-9){ continue; }
-      var p = (n*sxy - sx*sy)/denom; var A = (sy - p*sx)/n; var alpha=Math.exp(A);
-      InkModels[code]={ alpha:alpha, p:p };
-    } else {
-      missing.push(code);
-    }
+    var entry = ASSORTMENT[code];
+    if (!entry || !Array.isArray(entry.white) || !entry.white.length) continue;
+    // Sanitize & sort by conc ascending
+    var arr = entry.white.map(function(s){ return { conc: +s.conc || +s.Conc || +s.concentration || +s.Percent || +s.pct || 0, L:+s.L, a:+s.a, b:+s.b }; })
+                         .filter(function(s){ return s.conc>=0 && isFinite(s.L) && isFinite(s.a) && isFinite(s.b); })
+                         .sort(function(a,b){ return a.conc-b.conc; });
+    if (arr.length<2) continue;
+    LADDER[code] = { white: arr };
   }
-  if (missing.length){ console.warn('No ladder fit for', missing.join(', ')); }
 }
 
-function t_from_conc(code, conc){ var m=InkModels[code]; if(!m){ return conc; } return m.alpha * Math.pow(conc, m.p); }
-
-function mixSpectrumKS(cands, weights){
-  var L=nm.length;
-  var KS_mix=new Array(L).fill(0);
-  for(var i=0;i<cands.length;i++){
-    var w=weights[i]; if(!(w>0)) continue;
-    var KS=cands[i].KS; if(!KS || KS.length!==L) continue;
-    for(var j=0;j<L;j++) KS_mix[j]+= w*KS[j];
-  }
-  // Guard: if the mix is all zeros (no effective ink), return flat high reflectance (white)
-  var nonzero=false; for(var k=0;k<L;k++){ if(Math.abs(KS_mix[k])>1e-12){ nonzero=true; break; } }
-  if(!nonzero){ return new Array(L).fill(0.98); }
-  return KS_mix.map(KS_to_Rinf);
-}
-function predictLabFromWeights(cands, weights, illum){
-  // Defensive: if nothing to mix, return white
-  if (!cands || !cands.length || !weights || !weights.length) return {L:100,a:0,b:0};
-  var R=mixSpectrumKS(cands, weights);
-  var CS=makeCS(illum);
-  var XYZ=spectrumToXYZ(R, CS);
-  return xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS);
-}
-
-// ===== Candidate selection and optimiser =====
-function getCandidateInks(){
-  var pool=[]; var seen=new Set();
-  for (var code in (ASSORTMENT||{})){
-    if (SpectralMap.has(code) && !seen.has(code)){
-      var ink=SpectralMap.get(code);
-      // precompute Lab for hue proximity
-      var CS=makeCS('D50'); var XYZ=spectrumToXYZ(ink.R, CS); var Lab=xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS);
-      pool.push({code:code, name:ink.name, KS:ink.KS, R:ink.R, Lab:Lab});
-      seen.add(code);
+function labOnLadder(code, conc){
+  var row = LADDER[code]; if(!row) return {L:100,a:0,b:0};
+  var steps = row.white; if(!steps || steps.length===0) return {L:100,a:0,b:0};
+  if (conc<=steps[0].conc) return {L:steps[0].L, a:steps[0].a, b:steps[0].b};
+  if (conc>=steps[steps.length-1].conc) { var s=steps[steps.length-1]; return {L:s.L,a:s.a,b:s.b}; }
+  // find bracketing
+  for (var i=1;i<steps.length;i++){
+    var lo=steps[i-1], hi=steps[i];
+    if (conc>=lo.conc && conc<=hi.conc){
+      var t = (conc - lo.conc) / Math.max(1e-9, (hi.conc - lo.conc));
+      // interpolate in f-space for smoother perceptual behaviour per ink
+      var flo = labToF(lo), fhi = labToF(hi);
+      var f = { fx: (1-t)*flo.fx + t*fhi.fx, fy:(1-t)*flo.fy + t*fhi.fy, fz:(1-t)*flo.fz + t*fhi.fz };
+      return fToLab(f);
     }
   }
-  pool.sort(function(a,b){ return a.code.localeCompare(b.code); });
-  return pool;
+  // fallback
+  var s2=steps[steps.length-1]; return {L:s2.L,a:s2.a,b:s2.b};
 }
 
-function suggestWeights(targetLab, maxInks, totalThickness, illum){
-  var all=getCandidateInks(); if(all.length===0) throw new Error('No spectral inks found that match your assortment.');
-  // Hue proximity subset + include extender/white if present
-  function has(re){ return all.find(function(c){ return re.test(c.code) || re.test(c.name||''); }) || null; }
-  var EXT   = has(/DC21-001|\bEXTENDER\b/i);
-  var WHITE = has(/DC21-901|\bWHITE\b/i);
-  var BLACK = has(/DC21-802|\bBLACK\b/i);
+// Mix inks: give fractions p_i (sum=1), each ink at conc = p_i * 100
+function mixFromLadders(codes, fracs){
+  var n=codes.length; if(n===0) return {L:100,a:0,b:0};
+  var F={fx:0,fy:0,fz:0};
+  var s=sum(fracs); if (s<=0) return {L:100,a:0,b:0};
+  for (var i=0;i<n;i++){
+    var p = fracs[i]/s; // normalized
+    var lab = labOnLadder(codes[i], p*100);
+    var f = labToF(lab);
+    F.fx += p*f.fx; F.fy += p*f.fy; F.fz += p*f.fz;
+  }
+  return fToLab(F);
+}
 
-  var targetIsLight = targetLab.L >= 70;
-  var targetIsDark  = targetLab.L <= 55;
+// =========== Suggestion engine (ladder-driven) ===========
+function getCandidateCodes(){
+  var list=[]; for (var code in LADDER){ list.push(code); }
+  // simple sort for determinism
+  list.sort();
+  return list;
+}
 
-  var sorted = all.map(function(c){ return { ink:c, de: deltaE2000(c.Lab, targetLab) }; }).sort(function(a,b){ return a.de-b.de; }).map(function(o){ return o.ink; });
-  var cand = sorted.slice(0, Math.max(6, maxInks+2));
-  if (WHITE && cand.every(function(c){return c.code!==WHITE.code;})) cand.unshift(WHITE);
-  if (EXT && cand.every(function(c){return c.code!==EXT.code;})) cand.unshift(EXT);
-  if (BLACK && targetIsDark && cand.every(function(c){return c.code!==BLACK.code;})) cand.push(BLACK);
-  // dedupe
-  var seen=new Set(); cand = cand.filter(function(c){ if(seen.has(c.code)) return false; seen.add(c.code); return true; });
+function codeName(code){ return code; }
 
-  // Variables are thicknesses t_i (not raw conc). Start with white/ext and a nearest chromatic.
-  var active=[]; var t=[]; var rem=totalThickness;
-  function pushInk(ink, share){ if(!ink) return; if(active.some(function(x){return x.code===ink.code;})) return; var dose=Math.min(share, rem); if(dose<=0) return; active.push(ink); t.push(dose); rem=Math.max(0, rem-dose); }
+function masstoneLab(code){ return labOnLadder(code, 100); }
 
-  if (WHITE) pushInk(WHITE, targetIsLight? 0.5*totalThickness : 0.2*totalThickness);
-  else if (EXT) pushInk(EXT, targetIsLight? 0.5*totalThickness : 0.2*totalThickness);
-  if (cand.length) pushInk(cand[0], 0.3*totalThickness);
-  for (var ci=0; ci<cand.length && active.length<maxInks; ci++){ pushInk(cand[ci], 0.15*totalThickness); }
+function suggestLadderRecipe(target, maxInks){
+  var codes = getCandidateCodes(); if (!codes.length) throw new Error('No ladder data available');
 
-  function project(){ var s=t.reduce(function(a,b){return a+b;},0); if(s>totalThickness){ var k=totalThickness/s; for(var i=0;i<t.length;i++) t[i]*=k; } }
+  // Identify white/extender/black
+  function findCode(re){ for(var i=0;i<codes.length;i++){ var c=codes[i]; if(re.test(c)) return c; } return null; }
+  var CODE_EXT = findCode(/\bDC21-001\b|EXTENDER/i);
+  var CODE_WHT = findCode(/\bDC21-901\b|WHITE/i);
+  var CODE_BLK = findCode(/\bDC21-802\b|BLACK/i);
 
-  var INIT_STEP=0.15, MIN_STEP=0.01, MAX_ITERS=500; var bestLab={L:0,a:0,b:0}; var bestScore=1e9; var bestDE=1e9;
-  function scoreFrom(tArr){ var lab=predictLabFromWeights(active, tArr, illum); var lErr=lab.L-targetLab.L; var lPenalty=(targetIsLight?0.5:0.2)*(lErr*lErr)/100; var de=deltaE2000(lab, targetLab); return {score: de + lPenalty, de:de, lab:lab}; }
+  // Rank by hue proximity using masstone Lab
+  var ranked = codes.map(function(c){ return { code:c, de: deltaE2000(masstoneLab(c), target) }; })
+                    .sort(function(a,b){ return a.de-b.de; })
+                    .map(function(o){ return o.code; });
 
-  var S0=scoreFrom(t); bestScore=S0.score; bestDE=S0.de; bestLab=S0.lab;
+  // Build candidate pool
+  var pool = ranked.slice(0, Math.max(8, maxInks+3));
+  if (CODE_WHT && pool.indexOf(CODE_WHT)<0) pool.unshift(CODE_WHT);
+  if (CODE_EXT && pool.indexOf(CODE_EXT)<0) pool.unshift(CODE_EXT);
+  // Black will be handled by rule later
 
-  var step=INIT_STEP, iter=0, improved=true; var blackIdx = active.findIndex(function(a){ return BLACK && a.code===BLACK.code; }); var blackCap = targetIsLight? 0.03*totalThickness : 0.3*totalThickness;
-  while(step>=MIN_STEP && iter<MAX_ITERS){ iter++; improved=false; for(var i=0;i<t.length;i++){
-      for(var d=0; d<2; d++){
-        var dir = d===0 ? +1 : -1; var old=t[i]; t[i]=clamp(old+dir*step, 0, totalThickness); project(); if (i===blackIdx && t[i]>blackCap){ t[i]=old; continue; }
-        var S=scoreFrom(t); if (S.score + 1e-6 < bestScore){ bestScore=S.score; bestDE=S.de; bestLab=S.lab; improved=true; } else { t[i]=old; }
+  // Greedy forward select
+  var active=[]; var fr=[]; // fr are fractions (sum≈1, we’ll normalise)
+  function push(code, share){ if (!code) return; if (active.indexOf(code)>=0) return; if (active.length>=maxInks) return; active.push(code); fr.push(Math.max(0, share)); }
+
+  var light = target.L>=75, dark=target.L<=55;
+  // seed base
+  if (light && CODE_WHT) push(CODE_WHT, 0.55); else if (light && CODE_EXT) push(CODE_EXT, 0.55);
+  // seed nearest chromatic
+  if (pool.length) push(pool[0], light?0.35:0.45);
+  // add more close-by inks
+  for (var i=1;i<pool.length && active.length<maxInks; i++) push(pool[i], 0.15);
+
+  // normalise
+  function normalise(){ var s=sum(fr); if(s<=0){ for(var i=0;i<fr.length;i++) fr[i]=1/Math.max(1,fr.length); } else { for(var i=0;i<fr.length;i++) fr[i]/=s; } }
+  normalise();
+
+  // Coordinate descent in fraction space (keep sum=1)
+  function score(){ var lab=mixFromLadders(active, fr); return {lab:lab, de: deltaE2000(lab, target)}; }
+  var best=score();
+  var step=0.10, MIN_STEP=0.005, MAX_IT=600;
+  var idxBLK = active.indexOf(CODE_BLK);
+
+  function tryAdjust(i, delta){
+    var old=fr[i];
+    // take from others proportionally so sum stays 1
+    var sOthers = 1 - old; if (sOthers<=0) return false;
+    var move = clamp(delta, -old, +sOthers);
+    if (move===0) return false;
+    for (var k=0;k<fr.length;k++) if(k!==i) fr[k] -= move * (fr[k]/sOthers);
+    fr[i] += move;
+    return true;
+  }
+
+  var it=0, improved=true;
+  while(step>=MIN_STEP && it<MAX_IT){
+    it++; improved=false;
+    for (var i=0;i<fr.length;i++){
+      for (var dir=-1; dir<=1; dir+=2){
+        var prev = fr.slice();
+        if (!tryAdjust(i, dir*step)) continue;
+        // Black rule: if target is very light, forbid black unless ΔE improves ≥ 0.4
+        if (target.L>=75 && active[i]===CODE_BLK){ var test=score(); if (test.de < best.de - 0.40){ best=test; improved=true; } else { fr=prev; continue; } }
+        var cur=score();
+        if (cur.de + 1e-6 < best.de){ best=cur; improved=true; }
+        else { fr=prev; }
       }
     }
-    if(!improved) step*=0.5;
+    if (!improved) step*=0.5;
   }
 
-  // prune tiny
-  for(var k2=0;k2<t.length;k2++){ if(t[k2]<0.01) t[k2]=0; }
-  project();
-  return {active:active, weights:t, lab:bestLab, dE:bestDE};
+  // Optionally probe adding a tiny black for light targets (rule allows only if ≥0.4 better)
+  if (target.L>=75 && CODE_BLK){
+    if (active.indexOf(CODE_BLK)<0 && active.length<maxInks){
+      var active2=active.slice(); var fr2=fr.slice();
+      active2.push(CODE_BLK); fr2.push(0.02); // tiny
+      // renormalise
+      var s2=sum(fr2); for (var z=0; z<fr2.length; z++) fr2[z]/=s2;
+      // quick local refine on last index
+      var best2 = {lab:mixFromLadders(active2, fr2), de: deltaE2000(mixFromLadders(active2, fr2), target)};
+      var step2=0.05; var tries=0;
+      while(step2>=0.005 && tries<150){ tries++; var prev=fr2.slice(); fr2[fr2.length-1]=clamp(fr2[fr2.length-1]+0.5*step2,0,1); var s3=sum(fr2); for (var z2=0; z2<fr2.length; z2++) fr2[z2]/=s3; var cur2={lab:mixFromLadders(active2, fr2), de: deltaE2000(mixFromLadders(active2, fr2), target)}; if (cur2.de + 1e-6 < best2.de){ best2=cur2; } else { fr2=prev; step2*=0.5; }
+      }
+      if (best.de - best2.de >= 0.40){ active=active2; fr=fr2; best=best2; }
+    }
+  }
+
+  return { codes: active, fracs: fr, lab: best.lab, dE: best.de };
 }
 
-// ===== Suggestion UI hook (no async keyword) =====
+// =========== UI glue ===========
 function suggestFormula(){
   try{
-    var target=getTargetLab();
-    if(!target){ alert('Enter a valid colour first.'); return; }
-    $('#predictMsg').textContent='Calibrating…';
-    loadIFSX().then(function(){
-      var maxInks=Math.max(2, Math.min(8, parseInt($('#maxInks').value || 5, 10)));
-      var illum=$('#illuminant').value || 'D50';
-      var total=1.0; // 6v anilox baseline thickness scale
-      var out=suggestWeights(target, maxInks, total, illum);
+    var target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+    $('#predictMsg').textContent='Mixing…';
+    var maxInks=Math.max(2, Math.min(8, parseInt($('#maxInks').value || 5, 10)));
+    var out=suggestLadderRecipe(target, maxInks);
 
-      // Authoritative Lab/ΔE from final recipe
-      out.lab = predictLabFromWeights(out.active, out.weights, illum);
-      out.dE  = deltaE2000(out.lab, target);
+    var rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
+    var total= sum(out.fracs) || 1;
+    var merged = out.codes.map(function(code,i){ return { code:code, name:codeName(code), pct: (out.fracs[i]/total)*100 }; }).sort(function(a,b){ return b.pct-a.pct; });
 
-      // Present percentages
-      var totalW = out.weights.reduce(function(a,b){return a+b;},0) || 1;
-      var merged = out.active.map(function(ink,i){ return { code:ink.code, name:ink.name, pct:(out.weights[i]/totalW)*100 }; }).sort(function(a,b){return b.pct-a.pct;});
+    var html=''
+      + '<div class="row2">'
+      +   '<div>'
+      +     '<div class="pill">Ladder mix (f‑space)</div>'
+      +     '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+'); margin:6px 0 8px"></div>'
+      +     '<div class="muted">Predicted: L '+out.lab.L.toFixed(2)+' a '+out.lab.a.toFixed(2)+' b '+out.lab.b.toFixed(2)+' · ΔE00: <strong>'+out.dE.toFixed(2)+'</strong></div>'
+      +   '</div>'
+      +   '<div style="text-align:right">'
+      +     '<button class="btn" onclick="document.querySelector(\'#suggestedFormula\').style.display=\'none\'">Close</button>'
+      +   '</div>'
+      + '</div>';
+    html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.code+' — '+p.name+'</div><div class="fg-pct">'+p.pct.toFixed(1)+'%</div>'; }).join('') + '</div>';
 
-      // Swatch & text
-      var rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
-      var html=''
-        + '<div class="row2">'
-        +   '<div>'
-        +     '<div class="pill">Spectral prediction (KM, '+illum+'/2°)</div>'
-        +     '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+'); margin:6px 0 8px"></div>'
-        +     '<div class="muted">Predicted: L '+out.lab.L.toFixed(2)+' a '+out.lab.a.toFixed(2)+' b '+out.lab.b.toFixed(2)+' · ΔE00: <strong>'+out.dE.toFixed(2)+'</strong></div>'
-        +   '</div>'
-        +   '<div style="text-align:right">'
-        +     '<button class="btn" onclick="document.querySelector(\'#suggestedFormula\').style.display=\'none\'">Close</button>'
-        +   '</div>'
-        + '</div>';
-      html += '<div class="formula-grid">'+ merged.map(function(p){ var pct=p.pct.toFixed(1)+'%'; return '<div class="fg-ink">'+p.code+' — '+p.name+'</div><div class="fg-pct">'+pct+'</div>'; }).join('') + '</div>';
-
-      var box=$('#suggestedFormula'); if(box){ box.innerHTML=html; box.style.display='block'; }
-      $('#predictMsg').textContent='';
-    }).catch(function(err){ console.error(err); $('#predictMsg').textContent='Error: '+err.message; });
-  } catch(err2){ console.error(err2); $('#predictMsg').textContent='Error: '+err2.message; }
+    var box=$('#suggestedFormula'); if(box){ box.innerHTML=html; box.style.display='block'; }
+    $('#predictMsg').textContent='';
+  } catch(err){ console.error(err); $('#predictMsg').textContent='Error: '+err.message; }
 }
 
-// ===== Wire up =====
+// Wire up
 $('#findBtn').addEventListener('click', findClosest);
 $('#clearBtn').addEventListener('click', function(){ $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho(); $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none'; $('#suggestedFormula').style.display='none'; });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
-// ===== Load JSON =====
+// Load JSON
 Promise.all([
   fetch('colours.json').then(function(r){return r.json();}),
   fetch('DC_Formulas.json').then(function(r){return r.json();}),
   fetch('assortment_colour_data.json').then(function(r){return r.json();})
 ]).then(function(tuple){
-  COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2]; buildFormulaIndex(); $('#countLabel').textContent=COLOURS.length;
-  return loadIFSX();
-}).then(function(){
-  // Calibrate per-ink thickness models from white ladders under D50
-  fitInkModelsFromLadders('D50');
-  // Tests
+  COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2]; buildFormulaIndex(); $('#countLabel').textContent=COLOURS.length; loadAssortmentIntoLadders();
+  // tests
   runTests();
-}).catch(function(err){ alert('Error loading assets: '+err); });
+}).catch(function(err){ alert('Error loading JSON: '+err); });
 
 updateTargetEcho();
 
-// ===== Minimal tests (no DOM changes) =====
+// =========== Minimal tests ===========
+function approxEq(a,b,eps){ return Math.abs(a-b) <= (eps||1e-6); }
 function runTests(){
   try{
-    // 1) ΔE2000 identity
-    var zeroDE = deltaE2000({L:50,a:10,b:5},{L:50,a:10,b:5});
-    console.assert(Math.abs(zeroDE) < 1e-9, 'ΔE2000 identity failed');
-    // 2) Regex sanity
-    console.assert(/\bWHITE\b/i.test('MIXING WHITE'), 'WHITE regex fail');
-    console.assert(/\bBLACK\b/i.test('PROCESS BLACK'), 'BLACK regex fail');
-    // 3) IFSX load and map size
-    loadIFSX().then(function(){
-      console.assert(SpectralMap.size>0, 'IFSX spectral map is empty');
-      console.log('[Tests] OK');
-    }).catch(function(e){ console.warn('[Tests] IFSX load failed', e); });
+    // ΔE identity
+    console.assert(approxEq(deltaE2000({L:50,a:0,b:0},{L:50,a:0,b:0}),0),'DE00 identity');
+    // Ladder present for key inks
+    var critical=['DC21-001','DC21-901','DC21-802'];
+    console.log('[Tests] Ladder inks present:', critical.filter(function(c){return !!LADDER[c];}));
+    // Mix sanity — two random inks 50/50 should yield Lab that changes if you tweak shares
+    var codes = getCandidateCodes().slice(0,2);
+    if (codes.length>=2){
+      var lab1 = mixFromLadders([codes[0],codes[1]],[0.5,0.5]);
+      var lab2 = mixFromLadders([codes[0],codes[1]],[0.7,0.3]);
+      console.assert(!(approxEq(lab1.L,lab2.L,1e-4)&&approxEq(lab1.a,lab2.a,1e-4)&&approxEq(lab1.b,lab2.b,1e-4)), 'Mix responds to weights');
+    }
+    console.log('[Tests] OK');
   } catch(e){ console.warn('[Tests] exception', e); }
 }
 
