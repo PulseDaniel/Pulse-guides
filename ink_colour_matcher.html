@@ -127,17 +127,24 @@ function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
 
 // Friendly code→name map (display purposes only)
+const CODE_NAME = {
+  "DC21-001": "Extender",
+  "DC21-002": "Extender",
+  "DC21-101": "Bright Red",
+  "DC21-102": "Rubine",
+  "DC21-114": "Rhodamine",
+  "DC21-201": "Orange",
+  "DC21-304": "Yellow",
+  "DC21-402": "Green",
+  "DC21-501": "Process Blue",
+  "DC21-604": "Violet",
+  "DC21-802": "Black",
+  "DC21-901": "White"
+};
 function codeName(code){
-  var map={
-    'DC21-001':'Extender',
-    'DC21-002':'Extender',
-    'DC21-304':'Yellow',
-    'DC21-201':'Orange',
-    'DC21-402':'Green',
-    'DC21-604':'Violet',
-    'DC21-901':'White',
-    'DC21-802':'Black'
-  };
+  var c=String(code).toUpperCase();
+  return CODE_NAME[c] || c;
+};
   return map[String(code).toUpperCase()]||String(code);
 }
 
