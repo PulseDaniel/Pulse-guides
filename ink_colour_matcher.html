@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher — Ladder Mixer (f‑space)</title>
+  <title>Ink Colour Matcher</title>
   <style>
     :root { --gap: 12px; --radius: 14px; }
     * { box-sizing: border-box; }
@@ -76,10 +76,10 @@
             <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
           </div>
           <div>
-            <label for="illuminant">Illuminant</label>
-            <select id="illuminant">
-              <option value="D50" selected>D50 / 2°</option>
-              <option value="D65">D65 / 2°</option>
+            <label for="mode">Mode</label>
+            <select id="mode">
+              <option value="fast">Production (fast)</option>
+              <option value="full" selected>Full (thorough)</option>
             </select>
           </div>
         </div>
@@ -218,14 +218,14 @@ function codeName(code){ return code; }
 
 function masstoneLab(code){ return labOnLadder(code, 100); }
 
-function suggestLadderRecipe(target, maxInks){
+function suggestLadderRecipe(target, maxInks, mode){
   var codes = getCandidateCodes(); if (!codes.length) throw new Error('No ladder data available');
 
   // Identify white/extender/black
   function findCode(re){ for(var i=0;i<codes.length;i++){ var c=codes[i]; if(re.test(c)) return c; } return null; }
-  var CODE_EXT = findCode(/DC21-001|EXTENDER/i);
-  var CODE_WHT = findCode(/DC21-901|WHITE/i);
-  var CODE_BLK = findCode(/DC21-802|BLACK/i);
+  var CODE_EXT = findCode(/DC21-001|EXTENDER/i);
+  var CODE_WHT = findCode(/DC21-901|WHITE/i);
+  var CODE_BLK = findCode(/DC21-802|BLACK/i);
 
   // Rank by hue proximity using masstone Lab
   var ranked = codes.map(function(c){ return { code:c, de: deltaE2000(masstoneLab(c), target) }; })
@@ -233,7 +233,7 @@ function suggestLadderRecipe(target, maxInks){
                     .map(function(o){ return o.code; });
 
   // Build broader candidate pool for full-send
-  var pool = ranked.slice(0, Math.max(12, maxInks+6));
+  var pool = ranked.slice(0, mode==='full' ? Math.max(40, maxInks+20) : Math.max(12, maxInks+6));
   if (CODE_WHT && pool.indexOf(CODE_WHT)<0) pool.unshift(CODE_WHT);
   if (CODE_EXT && pool.indexOf(CODE_EXT)<0) pool.unshift(CODE_EXT);
 
@@ -244,7 +244,7 @@ function suggestLadderRecipe(target, maxInks){
   function localRefine(active, fr){
     normalise(fr);
     var best=score(active, fr);
-    var step=0.20, MIN_STEP=0.0005, MAX_IT=5000;
+    var step=0.25, MIN_STEP=0.0002, MAX_IT=(mode==='full'?20000:5000);
     var it=0, improved=true;
     var BLK_IDX = active.indexOf(CODE_BLK);
     var light = target.L>=75;
@@ -294,20 +294,19 @@ function suggestLadderRecipe(target, maxInks){
     normalise(fr);
     var best = score(active, fr), bestFr=fr.slice();
     var cur = best, curFr=fr.slice();
-    var T0=0.08, Tend=0.002, steps=150; // modest SA
+    var T0 = (mode==='full'? 0.25 : 0.10), Tend=(mode==='full'? 0.0005 : 0.002), steps=(mode==='full'? 5000 : 200);
     for (var s=0;s<steps;s++){
       var T = T0 * Math.pow(Tend/T0, s/(steps-1));
       // propose a small random transfer
       var i=Math.floor(Math.random()*fr.length); var j=Math.floor(Math.random()*fr.length); if(i===j) j=(j+1)%fr.length;
       var prev=curFr.slice();
-      var amt=(Math.random()*2-1)*0.06; // +-6%
-      // take from j, give to i
+      var amt=(Math.random()*2-1)*(mode==='full'? 0.12:0.06);
       var take = clamp(amt, -curFr[i], curFr[j]);
       curFr[i]+=take; curFr[j]-=take; normalise(curFr);
       var prop=score(active, curFr);
       var d=prop.de - cur.de;
       if (d<0 || Math.exp(-d/Math.max(1e-9,T))>Math.random()){
-        cur=prop; if (cur.de<best.de){ best=cur; bestFr=curFr.slice(); }
+        cur=prop; if (cur.de<best.de){ best=prop; bestFr=curFr.slice(); }
       } else { curFr=prev; }
     }
     return {codes:active.slice(), fracs:bestFr.slice(), lab:best.lab, dE:best.de};
@@ -326,24 +325,68 @@ function suggestLadderRecipe(target, maxInks){
 
   // Choose a small active set from pool
   function pickActive(){
-    var base=[pool[0]]; // nearest chromatic
     var light = target.L>=75;
-    if (light && CODE_WHT) base.unshift(CODE_WHT); else if (light && CODE_EXT) base.unshift(CODE_EXT);
-    // fill up to maxInks from the pool
-    for (var i=1;i<pool.length && base.length<maxInks; i++) if (base.indexOf(pool[i])<0) base.push(pool[i]);
+    var base=[];
+    if (light && CODE_WHT) base.push(CODE_WHT); else if (light && CODE_EXT) base.push(CODE_EXT);
+    base.push(pool[0]); // nearest chromatic
+    // For full-send, diversify with spread across pool by hue rank
+    var limit = maxInks;
+    if (mode==='full'){
+      for (var i=1;i<pool.length && base.length<limit; i++) if (base.indexOf(pool[i])<0) base.push(pool[i]);
+    } else {
+      for (var i2=1;i2<pool.length && base.length<limit; i2++) if (base.indexOf(pool[i2])<0) base.push(pool[i2]);
+    }
     return base;
   }
 
   var globalBest=null;
-  var NUM_SEEDS=16; // full-send
-  for (var s=0; s<NUM_SEEDS; s++){
-    var active = pickActive();
+  var NUM_SEEDS = (mode==='full' ? 320 : 16);
+  // optional combo exploration in full-send
+  var comboSets = [];
+  function pushCombo(arr){ var seenSet=new Set(); var ded=arr.filter(function(c){ if(seenSet.has(c)) return false; seenSet.add(c); return true; }); if (ded.length>=2) comboSets.push(ded); }
+  function sampleCombos(){
     var light = target.L>=75;
-    // one special seed allows tiny black for light targets
-    if (light && s===NUM_SEEDS-1 && active.indexOf(CODE_BLK)<0 && active.length<maxInks) active.push(CODE_BLK);
-    var fr = randomSeed(active.length, light);
-    // if special seed with black, cap it tiny
-    if (light && active.indexOf(CODE_BLK)>=0){ var bi=active.indexOf(CODE_BLK); fr[bi]=Math.min(fr[bi], 0.02); normalise(fr); }
+    // always try the baseline pick
+    pushCombo(pickActive());
+    if (mode==='full'){
+      var tries = (mode==='full'? 500 : 200); // sample combos
+      for (var t=0;t<tries;t++){
+        var want = Math.min(maxInks, 2 + Math.floor(Math.random()*Math.min(5, maxInks-1)));
+        var combo=[];
+        if (light && (CODE_WHT||CODE_EXT)) combo.push(CODE_WHT || CODE_EXT);
+        while(combo.length<want){ var c = pool[Math.floor(Math.random()*pool.length)]; if (combo.indexOf(c)<0) combo.push(c); }
+        pushCombo(combo);
+      }
+    }
+  }
+  sampleCombos();
+
+  var globalBest=null;
+  for (var cs=0; cs<comboSets.length; cs++){
+    var active = comboSets[cs];
+    var light = target.L>=75; var hasBlack = active.indexOf(CODE_BLK)>=0;
+    var seeds = (mode==='full'? Math.max(NUM_SEEDS/Math.max(1,comboSets.length/3), 12)|0 : NUM_SEEDS);
+    for (var s=0; s<seeds; s++){
+      var fr = (function(){ var fr=new Array(active.length); for(var i=0;i<fr.length;i++) fr[i]=Math.random()+1e-6; // random
+        // bias white/ext in light targets
+        if (light){ var wi = active.indexOf(CODE_WHT)>=0 ? active.indexOf(CODE_WHT) : active.indexOf(CODE_EXT); if (wi>=0){ fr[wi]=Math.max(fr[wi], 0.5); } }
+        var sumv=sum(fr); for(var j=0;j<fr.length;j++) fr[j]/=sumv; return fr; })();
+      if (light && hasBlack){ var bi=active.indexOf(CODE_BLK); fr[bi]=Math.min(fr[bi], 0.02); var s2=sum(fr); for(var j2=0;j2<fr.length;j2++) fr[j2]/=s2; }
+      var A = anneal(active, fr);
+      var L = localRefine(A.codes, A.fracs);
+      // prune <1% and refine again
+      var keptCodes=[], keptFr=[]; for (var i=0;i<L.codes.length;i++){ if (L.fracs[i] >= 0.01) { keptCodes.push(L.codes[i]); keptFr.push(L.fracs[i]); } }
+      if (keptCodes.length>0){ var s3=sum(keptFr); for(var j3=0;j3<keptFr.length;j3++) keptFr[j3]/=s3; L = localRefine(keptCodes, keptFr); }
+      // Light-target black admission rule
+      if (light && L.codes.indexOf(CODE_BLK)>=0 && globalBest && !(L.dE < globalBest.dE - 0.20)){
+        // reject
+      } else {
+        if (!globalBest || L.dE + 1e-6 < globalBest.dE) globalBest = L;
+      }
+    }
+  }
+  if (!globalBest) throw new Error('Optimisation failed to find a recipe');
+  return globalBest;
 
     // anneal then local refine
     var A = anneal(active, fr);
@@ -369,9 +412,10 @@ function suggestLadderRecipe(target, maxInks){
 function suggestFormula(){
   try{
     var target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-    $('#predictMsg').textContent='Mixing…';
+    var mode = ($('#mode').value||'fast');
+    $('#predictMsg').textContent= mode==='full' ? 'Full Send… this might take a bit' : 'Mixing…';
     var maxInks=Math.max(2, Math.min(8, parseInt($('#maxInks').value || 5, 10)));
-    var out=suggestLadderRecipe(target, maxInks);
+    var out=suggestLadderRecipe(target, maxInks, mode);
 
     var rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
     var total= sum(out.fracs) || 1;
@@ -380,7 +424,7 @@ function suggestFormula(){
     var html=''
       + '<div class="row2">'
       +   '<div>'
-      +     '<div class="pill">Ladder mix (f‑space)</div>'
+      +     '<div class="pill">Ladder mix ('+(mode==='full'?'Full Send':'Production')+')</div>'
       +     '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+'); margin:6px 0 8px"></div>'
       +     '<div class="muted">Predicted: L '+out.lab.L.toFixed(2)+' a '+out.lab.a.toFixed(2)+' b '+out.lab.b.toFixed(2)+' · ΔE00: <strong>'+out.dE.toFixed(2)+'</strong></div>'
       +   '</div>'
