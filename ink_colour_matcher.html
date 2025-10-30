@@ -250,14 +250,15 @@ function mixSpectrumKS(cands, weights){
   var KS_mix=new Array(L).fill(0);
   for(var i=0;i<cands.length;i++){
     var w=weights[i]; if(!(w>0)) continue;
-    var KS=cands[i].KS; if(!KS || KS.length!==L) continue;
+    var KS=cands[i].KS;
+    if(!KS || KS.length!==L) continue;
     for(var j=0;j<L;j++) KS_mix[j]+= w*KS[j];
   }
   // Guard: if the mix is all zeros (no effective ink), return flat high reflectance (white)
   var nonzero=false; for(var k=0;k<L;k++){ if(Math.abs(KS_mix[k])>1e-12){ nonzero=true; break; } }
   if(!nonzero){ return new Array(L).fill(0.98); }
   return KS_mix.map(KS_to_Rinf);
-}
+} return KS_mix.map(KS_to_Rinf); }
 function predictLabFromWeights(cands, weights, illum){
   // Defensive: if nothing to mix, return white
   if (!cands || !cands.length || !weights || !weights.length) return {L:100,a:0,b:0};
@@ -287,9 +288,9 @@ function suggestWeights(targetLab, maxInks, totalThickness, illum){
   var all=getCandidateInks(); if(all.length===0) throw new Error('No spectral inks found that match your assortment.');
   // Hue proximity subset + include extender/white if present
   function has(re){ return all.find(function(c){ return re.test(c.code) || re.test(c.name||''); }) || null; }
-  var EXT   = has(/DC21-001|\bEXTENDER\b/i);
-  var WHITE = has(/DC21-901|\bWHITE\b/i);
-  var BLACK = has(/DC21-802|\bBLACK\b/i);
+  var EXT   = has(/DC21-001|EXTENDER/i);
+  var WHITE = has(/DC21-901|WHITE/i);
+  var BLACK = has(/DC21-802|BLACK/i);
 
   var targetIsLight = targetLab.L >= 70;
   var targetIsDark  = targetLab.L <= 55;
@@ -345,16 +346,10 @@ function suggestFormula(){
       var illum=$('#illuminant').value || 'D50';
       var total=1.0; // 6v anilox baseline thickness scale
       var out=suggestWeights(target, maxInks, total, illum);
-
-      // Authoritative Lab/ΔE from final recipe
-      out.lab = predictLabFromWeights(out.active, out.weights, illum);
-      out.dE  = deltaE2000(out.lab, target);
-
-      // Present percentages
-      var totalW = out.weights.reduce(function(a,b){return a+b;},0) || 1;
-      var merged = out.active.map(function(ink,i){ return { code:ink.code, name:ink.name, pct:(out.weights[i]/totalW)*100 }; }).sort(function(a,b){return b.pct-a.pct;});
-
-      // Swatch & text
+      // Recompute predicted Lab from the final recipe to avoid any stale/bad state
+      var finalLab = predictLabFromWeights(out.active, out.weights, illum);
+      out.lab = finalLab; // authoritative
+      // swatch from predicted Lab (convert to sRGB via D65 for UI consistency)
       var rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
       var html=''
         + '<div class="row2">'
@@ -368,7 +363,6 @@ function suggestFormula(){
         +   '</div>'
         + '</div>';
       html += '<div class="formula-grid">'+ merged.map(function(p){ var pct=p.pct.toFixed(1)+'%'; return '<div class="fg-ink">'+p.code+' — '+p.name+'</div><div class="fg-pct">'+pct+'</div>'; }).join('') + '</div>';
-
       var box=$('#suggestedFormula'); if(box){ box.innerHTML=html; box.style.display='block'; }
       $('#predictMsg').textContent='';
     }).catch(function(err){ console.error(err); $('#predictMsg').textContent='Error: '+err.message; });
