@@ -223,88 +223,146 @@ function suggestLadderRecipe(target, maxInks){
 
   // Identify white/extender/black
   function findCode(re){ for(var i=0;i<codes.length;i++){ var c=codes[i]; if(re.test(c)) return c; } return null; }
-  var CODE_EXT = findCode(/\bDC21-001\b|EXTENDER/i);
-  var CODE_WHT = findCode(/\bDC21-901\b|WHITE/i);
-  var CODE_BLK = findCode(/\bDC21-802\b|BLACK/i);
+  var CODE_EXT = findCode(/DC21-001|EXTENDER/i);
+  var CODE_WHT = findCode(/DC21-901|WHITE/i);
+  var CODE_BLK = findCode(/DC21-802|BLACK/i);
 
   // Rank by hue proximity using masstone Lab
   var ranked = codes.map(function(c){ return { code:c, de: deltaE2000(masstoneLab(c), target) }; })
                     .sort(function(a,b){ return a.de-b.de; })
                     .map(function(o){ return o.code; });
 
-  // Build candidate pool
-  var pool = ranked.slice(0, Math.max(8, maxInks+3));
+  // Build broader candidate pool for full-send
+  var pool = ranked.slice(0, Math.max(12, maxInks+6));
   if (CODE_WHT && pool.indexOf(CODE_WHT)<0) pool.unshift(CODE_WHT);
   if (CODE_EXT && pool.indexOf(CODE_EXT)<0) pool.unshift(CODE_EXT);
-  // Black will be handled by rule later
 
-  // Greedy forward select
-  var active=[]; var fr=[]; // fr are fractions (sum≈1, we’ll normalise)
-  function push(code, share){ if (!code) return; if (active.indexOf(code)>=0) return; if (active.length>=maxInks) return; active.push(code); fr.push(Math.max(0, share)); }
+  function normalise(fr){ var s=sum(fr); if(s<=0){ var v=1/Math.max(1,fr.length); for(var i=0;i<fr.length;i++) fr[i]=v; } else { for(var i=0;i<fr.length;i++) fr[i]/=s; } }
+  function score(active, fr){ var lab=mixFromLadders(active, fr); return {lab:lab, de: deltaE2000(lab, target)}; }
 
-  var light = target.L>=75, dark=target.L<=55;
-  // seed base
-  if (light && CODE_WHT) push(CODE_WHT, 0.55); else if (light && CODE_EXT) push(CODE_EXT, 0.55);
-  // seed nearest chromatic
-  if (pool.length) push(pool[0], light?0.35:0.45);
-  // add more close-by inks
-  for (var i=1;i<pool.length && active.length<maxInks; i++) push(pool[i], 0.15);
-
-  // normalise
-  function normalise(){ var s=sum(fr); if(s<=0){ for(var i=0;i<fr.length;i++) fr[i]=1/Math.max(1,fr.length); } else { for(var i=0;i<fr.length;i++) fr[i]/=s; } }
-  normalise();
-
-  // Coordinate descent in fraction space (keep sum=1)
-  function score(){ var lab=mixFromLadders(active, fr); return {lab:lab, de: deltaE2000(lab, target)}; }
-  var best=score();
-  var step=0.10, MIN_STEP=0.005, MAX_IT=600;
-  var idxBLK = active.indexOf(CODE_BLK);
-
-  function tryAdjust(i, delta){
-    var old=fr[i];
-    // take from others proportionally so sum stays 1
-    var sOthers = 1 - old; if (sOthers<=0) return false;
-    var move = clamp(delta, -old, +sOthers);
-    if (move===0) return false;
-    for (var k=0;k<fr.length;k++) if(k!==i) fr[k] -= move * (fr[k]/sOthers);
-    fr[i] += move;
-    return true;
-  }
-
-  var it=0, improved=true;
-  while(step>=MIN_STEP && it<MAX_IT){
-    it++; improved=false;
-    for (var i=0;i<fr.length;i++){
-      for (var dir=-1; dir<=1; dir+=2){
-        var prev = fr.slice();
-        if (!tryAdjust(i, dir*step)) continue;
-        // Black rule: if target is very light, forbid black unless ΔE improves ≥ 0.4
-        if (target.L>=75 && active[i]===CODE_BLK){ var test=score(); if (test.de < best.de - 0.40){ best=test; improved=true; } else { fr=prev; continue; } }
-        var cur=score();
-        if (cur.de + 1e-6 < best.de){ best=cur; improved=true; }
-        else { fr=prev; }
+  // === Local optimiser (coordinate descent + pairwise transfers) ===
+  function localRefine(active, fr){
+    normalise(fr);
+    var best=score(active, fr);
+    var step=0.20, MIN_STEP=0.0005, MAX_IT=5000;
+    var it=0, improved=true;
+    var BLK_IDX = active.indexOf(CODE_BLK);
+    var light = target.L>=75;
+    function tryAdjust(fr, i, delta){
+      var sOthers = 1 - fr[i]; if (sOthers<=0) return false;
+      var move = clamp(delta, -fr[i], +sOthers);
+      if (move===0) return false;
+      for (var k=0;k<fr.length;k++) if(k!==i) fr[k] -= move * (fr[k]/sOthers);
+      fr[i] += move; return true;
+    }
+    while(step>=MIN_STEP && it<MAX_IT){ it++; improved=false;
+      // single-variable moves
+      for (var i=0;i<fr.length;i++){
+        for (var dir=-1; dir<=1; dir+=2){
+          var prev = fr.slice();
+          if (!tryAdjust(fr, i, dir*step)) continue;
+          // light-target black rule inside local refine
+          if (light && i===BLK_IDX){
+            var tmp=score(active, fr);
+            if (tmp.de < best.de - 0.40){ best=tmp; improved=true; } else { fr=prev; continue; }
+          } else {
+            var cur=score(active, fr);
+            if (cur.de + 1e-6 < best.de){ best=cur; improved=true; } else { fr=prev; }
+          }
+        }
+      }
+      // pairwise transfers
+      for (var i2=0;i2<fr.length;i2++) for (var j2=i2+1;j2<fr.length;j2++){
+        var prev2=fr.slice();
+        var eps = step*0.7;
+        fr[i2]=clamp(fr[i2]+eps,0,1); fr[j2]=clamp(fr[j2]-eps,0,1); normalise(fr);
+        var cur2=score(active, fr);
+        if (cur2.de + 1e-6 < best.de){ best=cur2; improved=true; } else { fr=prev2; }
+      }
+      if(!improved){
+        // jitter to escape flat spots
+        var r = Math.floor(Math.random()*fr.length);
+        tryAdjust(fr, r, (Math.random()*2-1)*step*0.1);
+        step*=0.5;
       }
     }
-    if (!improved) step*=0.5;
+    return {codes:active.slice(), fracs:fr.slice(), lab:best.lab, dE:best.de};
   }
 
-  // Optionally probe adding a tiny black for light targets (rule allows only if ≥0.4 better)
-  if (target.L>=75 && CODE_BLK){
-    if (active.indexOf(CODE_BLK)<0 && active.length<maxInks){
-      var active2=active.slice(); var fr2=fr.slice();
-      active2.push(CODE_BLK); fr2.push(0.02); // tiny
-      // renormalise
-      var s2=sum(fr2); for (var z=0; z<fr2.length; z++) fr2[z]/=s2;
-      // quick local refine on last index
-      var best2 = {lab:mixFromLadders(active2, fr2), de: deltaE2000(mixFromLadders(active2, fr2), target)};
-      var step2=0.05; var tries=0;
-      while(step2>=0.005 && tries<150){ tries++; var prev=fr2.slice(); fr2[fr2.length-1]=clamp(fr2[fr2.length-1]+0.5*step2,0,1); var s3=sum(fr2); for (var z2=0; z2<fr2.length; z2++) fr2[z2]/=s3; var cur2={lab:mixFromLadders(active2, fr2), de: deltaE2000(mixFromLadders(active2, fr2), target)}; if (cur2.de + 1e-6 < best2.de){ best2=cur2; } else { fr2=prev; step2*=0.5; }
-      }
-      if (best.de - best2.de >= 0.40){ active=active2; fr=fr2; best=best2; }
+  // === Simulated annealing over fractions (projected) ===
+  function anneal(active, fr){
+    normalise(fr);
+    var best = score(active, fr), bestFr=fr.slice();
+    var cur = best, curFr=fr.slice();
+    var T0=0.08, Tend=0.002, steps=150; // modest SA
+    for (var s=0;s<steps;s++){
+      var T = T0 * Math.pow(Tend/T0, s/(steps-1));
+      // propose a small random transfer
+      var i=Math.floor(Math.random()*fr.length); var j=Math.floor(Math.random()*fr.length); if(i===j) j=(j+1)%fr.length;
+      var prev=curFr.slice();
+      var amt=(Math.random()*2-1)*0.06; // +-6%
+      // take from j, give to i
+      var take = clamp(amt, -curFr[i], curFr[j]);
+      curFr[i]+=take; curFr[j]-=take; normalise(curFr);
+      var prop=score(active, curFr);
+      var d=prop.de - cur.de;
+      if (d<0 || Math.exp(-d/Math.max(1e-9,T))>Math.random()){
+        cur=prop; if (cur.de<best.de){ best=cur; bestFr=curFr.slice(); }
+      } else { curFr=prev; }
+    }
+    return {codes:active.slice(), fracs:bestFr.slice(), lab:best.lab, dE:best.de};
+  }
+
+  // === Multi-start seeds ===
+  function randomSeed(k, light){
+    var fr=new Array(k); for(var i=0;i<k;i++) fr[i]=Math.random()+1e-6; normalise(fr);
+    if (light){
+      // bias white/ext if present
+      var wi = active.indexOf(CODE_WHT)>=0 ? active.indexOf(CODE_WHT) : active.indexOf(CODE_EXT);
+      if (wi>=0){ fr[wi]=Math.max(fr[wi], 0.5); normalise(fr); }
+    }
+    return fr;
+  }
+
+  // Choose a small active set from pool
+  function pickActive(){
+    var base=[pool[0]]; // nearest chromatic
+    var light = target.L>=75;
+    if (light && CODE_WHT) base.unshift(CODE_WHT); else if (light && CODE_EXT) base.unshift(CODE_EXT);
+    // fill up to maxInks from the pool
+    for (var i=1;i<pool.length && base.length<maxInks; i++) if (base.indexOf(pool[i])<0) base.push(pool[i]);
+    return base;
+  }
+
+  var globalBest=null;
+  var NUM_SEEDS=16; // full-send
+  for (var s=0; s<NUM_SEEDS; s++){
+    var active = pickActive();
+    var light = target.L>=75;
+    // one special seed allows tiny black for light targets
+    if (light && s===NUM_SEEDS-1 && active.indexOf(CODE_BLK)<0 && active.length<maxInks) active.push(CODE_BLK);
+    var fr = randomSeed(active.length, light);
+    // if special seed with black, cap it tiny
+    if (light && active.indexOf(CODE_BLK)>=0){ var bi=active.indexOf(CODE_BLK); fr[bi]=Math.min(fr[bi], 0.02); normalise(fr); }
+
+    // anneal then local refine
+    var A = anneal(active, fr);
+    var L = localRefine(A.codes, A.fracs);
+
+    // prune <1% and refine again
+    var keptCodes=[], keptFr=[]; for (var i=0;i<L.codes.length;i++){ if (L.fracs[i] >= 0.01) { keptCodes.push(L.codes[i]); keptFr.push(L.fracs[i]); } }
+    if (keptCodes.length>0){ normalise(keptFr); L = localRefine(keptCodes, keptFr); }
+
+    // Light-target black admission rule: only keep black result if it beats best by >=0.20
+    if (light && L.codes.indexOf(CODE_BLK)>=0 && globalBest && !(L.dE < globalBest.dE - 0.20)){
+      // reject this seed's result
+    } else {
+      if (!globalBest || L.dE + 1e-6 < globalBest.dE) globalBest = L;
     }
   }
 
-  return { codes: active, fracs: fr, lab: best.lab, dE: best.de };
+  if (!globalBest) throw new Error('Optimisation failed to find a recipe');
+  return globalBest;
 }
 
 // =========== UI glue ===========
