@@ -79,7 +79,7 @@
             <label for="mode">Mode</label>
             <select id="mode">
               <option value="fast">Production (fast)</option>
-              <option value="full" selected>Full (thorough)</option>
+              <option value="full" selected>Full Send (thorough)</option>
             </select>
           </div>
         </div>
@@ -192,18 +192,49 @@ function labOnLadder(code, conc){
   var s2=steps[steps.length-1]; return {L:s2.L,a:s2.a,b:s2.b};
 }
 
-// Mix inks: give fractions p_i (sum=1), each ink at conc = p_i * 100
+// Mix inks with extender-aware model
+// Fractions p_i sum to 1. Extender is treated as a *neutral diluent* (does not contribute its own hue),
+// it reduces pigment concentrations and increases lightness / reduces chroma along the same hue line.
+function labToLch(Lab){ var C=Math.hypot(Lab.a, Lab.b); var h=Math.atan2(Lab.b, Lab.a); var hdeg=h*180/Math.PI; if(hdeg<0) hdeg+=360; return {L:Lab.L, C:C, h:hdeg}; }
+function lchToLab(Lch){ var hr=Lch.h*Math.PI/180; return {L:Lch.L, a:Lch.C*Math.cos(hr), b:Lch.C*Math.sin(hr)}; }
+
 function mixFromLadders(codes, fracs){
   var n=codes.length; if(n===0) return {L:100,a:0,b:0};
-  var F={fx:0,fy:0,fz:0};
   var s=sum(fracs); if (s<=0) return {L:100,a:0,b:0};
+
+  // Identify extender share (sum over any code that looks like extender)
+  var e=0; var pigmentIdx=[]; var pigmentFr=[];
   for (var i=0;i<n;i++){
-    var p = fracs[i]/s; // normalized
-    var lab = labOnLadder(codes[i], p*100);
-    var f = labToF(lab);
-    F.fx += p*f.fx; F.fy += p*f.fy; F.fz += p*f.fz;
+    var code=codes[i]; var f=fracs[i];
+    if (/DC21-001|EXTENDER/i.test(code)) e+=f; else { pigmentIdx.push(i); pigmentFr.push(f); }
   }
-  return fToLab(F);
+  // If all extender (edge case), return near-white-ish neutral (take the lightest ladder point from any available ink)
+  if (pigmentIdx.length===0){ return {L:95,a:0,b:0}; }
+
+  // Re-normalise pigment fractions to exclude extender
+  var sp=sum(pigmentFr); var weights=pigmentFr.map(function(f){ return f/(sp||1); });
+
+  // Compute base pigment mix in f-space (no extender contribution)
+  var F={fx:0,fy:0,fz:0};
+  for (var k=0;k<pigmentIdx.length;k++){
+    var idx=pigmentIdx[k]; var w=weights[k];
+    var lab = labOnLadder(codes[idx], w*100); // ladder conc proportional to pigment share
+    var f = labToF(lab);
+    F.fx += w*f.fx; F.fy += w*f.fy; F.fz += w*f.fz;
+  }
+  var base = fToLab(F);
+
+  // Extender optical effect: lift L and reduce C along same hue, without shifting hue much
+  // Tunable coefficients (empirical):
+  var kL = 0.55;   // how strongly extender raises L toward 100
+  var kC = 0.70;   // how strongly extender reduces chroma per unit extender
+  var ext = clamp(e, 0, 0.95);
+
+  var Lch = labToLch(base);
+  var L2  = Lch.L + kL*ext*(100 - Lch.L);
+  var C2  = Math.max(0, Lch.C * (1 - kC*ext));
+  var out = lchToLab({L:L2, C:C2, h:Lch.h});
+  return out;
 }
 
 // =========== Suggestion engine (ladder-driven) ===========
