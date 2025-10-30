@@ -178,6 +178,31 @@ function buildFormulaIndex(){ var rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={
 var INK_RINF = {}; // code -> R∞[λ]
 var PAPER_R = null; // spectrum of paper (if present), not strictly required for R∞ mixer
 
+// Robust loader for IFSX structure ({colorants:[{name,R}]}, {refs:{name:{R}}})
+function loadIfsx2(data){
+  IFSX = data || {};
+  INK_RINF = {};
+  PAPER_R = null;
+  if (IFSX && IFSX.refs){
+    var keys = Object.keys(IFSX.refs);
+    if (keys.length){
+      var ref = IFSX.refs[keys[0]];
+      if (ref && Array.isArray(ref.R)) PAPER_R = ref.R.slice();
+    }
+  }
+  if (IFSX && Array.isArray(IFSX.colorants)){
+    IFSX.colorants.forEach(function(c){
+      if (!c || !Array.isArray(c.R)) return;
+      var nm = String(c.name || '');
+      var codeGuess = nm.toUpperCase().split(' ')[0];
+      var code = (codeGuess.indexOf('DC')===0 && codeGuess.indexOf('-')>0) ? codeGuess : nm.toUpperCase();
+      INK_RINF[code] = c.R.slice();
+      var friendly = nm.substring(code.length).trim();
+      if (friendly && !CODE_NAME[code]) CODE_NAME[code] = friendly;
+    });
+  }
+}
+
 function loadIfsx(data){
   IFSX = data || {};
   // refs: pick the first as paper (your file labelled PP60 Top Black acts like white)
@@ -195,7 +220,7 @@ function loadIfsx(data){
 function RinfToQ(R){ var q=new Array(R.length); for (var i=0;i<R.length;i++){ var Ri=clamp(R[i], 1e-6, 0.999999); q[i] = ((1-Ri)*(1-Ri))/(2*Ri); } return q; }
 
 var INK_Q = {}; // code -> q[λ]
-function buildInkQ(){ INK_Q={}; Object.keys(INK_RINF).forEach(function(code){ INK_Q[code] = RinfToQ(INK_RINF[code]); }); }
+function buildInkQ(){ INK_Q={}; Object.keys(INK_RINF).forEach(function(code){ var R=INK_RINF[code]; if(Array.isArray(R)&&R.length===WL.length){ INK_Q[code]=RinfToQ(R); } }); }; Object.keys(INK_RINF).forEach(function(code){ INK_Q[code] = RinfToQ(INK_RINF[code]); }); }
 
 // We parameterise each ink i by a scalar strength s_i so that its contribution to S is s_i, to K is s_i*q_i.
 // Extender (clear) has q≈0 and its own scattering scalar s_ext. We will fit s_i and s_ext to ladder data.
@@ -410,7 +435,7 @@ Promise.all([
   fetch('ifsx_reflectance_abs.json').then(function(r){return r.json();})
 ]).then(function(tuple){
   COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2]; loadAssortmentIntoLadders();
-  IFSX=tuple[3]; loadIfsx(IFSX); buildInkQ(); $('#countLabel').textContent=COLOURS.length; buildFormulaIndex();
+  IFSX=tuple[3]; loadIfsx2(IFSX); buildInkQ(); console.log('[IFSX] inks:', Object.keys(INK_RINF).length, 'q-curves:', Object.keys(INK_Q).length); $('#countLabel').textContent=COLOURS.length; buildFormulaIndex();
   var fitErr = fitStrengths(); console.log('Fitted strengths avg ΔE to ladders:', fitErr.toFixed(3));
   runTests();
 }).catch(function(err){ alert('Error loading JSON: '+err); });
