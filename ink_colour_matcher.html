@@ -220,7 +220,7 @@ function loadIfsx(data){
 function RinfToQ(R){ var q=new Array(R.length); for (var i=0;i<R.length;i++){ var Ri=clamp(R[i], 1e-6, 0.999999); q[i] = ((1-Ri)*(1-Ri))/(2*Ri); } return q; }
 
 var INK_Q = {}; // code -> q[λ]
-function buildInkQ(){ INK_Q={}; Object.keys(INK_RINF).forEach(function(code){ var R=INK_RINF[code]; if(Array.isArray(R)&&R.length===WL.length){ INK_Q[code]=RinfToQ(R); } }); }; Object.keys(INK_RINF).forEach(function(code){ INK_Q[code] = RinfToQ(INK_RINF[code]); }); }
+function buildInkQ(){ INK_Q={}; Object.keys(INK_RINF).forEach(function(code){ var R=INK_RINF[code]; if(Array.isArray(R)&&R.length===WL.length){ INK_Q[code]=RinfToQ(R); } }); }; Object.keys(INK_RINF).forEach(function(code){ INK_Q[code] = RinfToQ(INK_RINF[code]); }); };
 
 // We parameterise each ink i by a scalar strength s_i so that its contribution to S is s_i, to K is s_i*q_i.
 // Extender (clear) has q≈0 and its own scattering scalar s_ext. We will fit s_i and s_ext to ladder data.
