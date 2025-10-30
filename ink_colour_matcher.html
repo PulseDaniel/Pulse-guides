@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher</title>
+  <title>Ink Colour Matcher — Ladder Mixer (Full Send)</title>
   <style>
     :root { --gap: 12px; --radius: 14px; }
     * { box-sizing: border-box; }
@@ -130,7 +130,7 @@ function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
 function labToF(Lab){ var fy=(Lab.L+16)/116; var fx=fy + Lab.a/500; var fz=fy - Lab.b/200; return {fx:fx, fy:fy, fz:fz}; }
 function fToLab(f){ return { L: 116*f.fy - 16, a: 500*(f.fx - f.fy), b: 200*(f.fy - f.fz) }; }
 
-// sRGB swatch (assume D65; it’s fine for UI)
+// sRGB swatch (assume D65; UI only)
 function labToXyzD65(L,a,b){ var Yn=1, Xn=0.95047, Zn=1.08883; var fy=(L+16)/116; var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; }; return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn }; }
 function labToSrgb(L,a,b){ var xyz = labToXyzD65(L,a,b); var X=xyz.X, Y=xyz.Y, Z=xyz.Z; var r =  3.2406*X -1.5372*Y -0.4986*Z; var g = -0.9689*X +1.8758*Y +0.0415*Z; var b2= 0.0557*X -0.2040*Y +1.0570*Z; function enc(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; } return {r:clamp(Math.round(enc(r)*255),0,255), g:clamp(Math.round(enc(g)*255),0,255), b:clamp(Math.round(enc(b2)*255),0,255)}; }
 
@@ -209,13 +209,11 @@ function mixFromLadders(codes, fracs){
 // =========== Suggestion engine (ladder-driven) ===========
 function getCandidateCodes(){
   var list=[]; for (var code in LADDER){ list.push(code); }
-  // simple sort for determinism
   list.sort();
   return list;
 }
 
 function codeName(code){ return code; }
-
 function masstoneLab(code){ return labOnLadder(code, 100); }
 
 function suggestLadderRecipe(target, maxInks, mode){
@@ -223,9 +221,9 @@ function suggestLadderRecipe(target, maxInks, mode){
 
   // Identify white/extender/black
   function findCode(re){ for(var i=0;i<codes.length;i++){ var c=codes[i]; if(re.test(c)) return c; } return null; }
-  var CODE_EXT = findCode(/DC21-001|EXTENDER/i);
-  var CODE_WHT = findCode(/DC21-901|WHITE/i);
-  var CODE_BLK = findCode(/DC21-802|BLACK/i);
+  var CODE_EXT = findCode(/\bDC21-001\b|\bEXTENDER\b/i);
+  var CODE_WHT = findCode(/\bDC21-901\b|\bWHITE\b/i);
+  var CODE_BLK = findCode(/\bDC21-802\b|\bBLACK\b/i);
 
   // Rank by hue proximity using masstone Lab
   var ranked = codes.map(function(c){ return { code:c, de: deltaE2000(masstoneLab(c), target) }; })
@@ -312,44 +310,30 @@ function suggestLadderRecipe(target, maxInks, mode){
     return {codes:active.slice(), fracs:bestFr.slice(), lab:best.lab, dE:best.de};
   }
 
-  // === Multi-start seeds ===
-  function randomSeed(k, light){
-    var fr=new Array(k); for(var i=0;i<k;i++) fr[i]=Math.random()+1e-6; normalise(fr);
-    if (light){
-      // bias white/ext if present
-      var wi = active.indexOf(CODE_WHT)>=0 ? active.indexOf(CODE_WHT) : active.indexOf(CODE_EXT);
-      if (wi>=0){ fr[wi]=Math.max(fr[wi], 0.5); normalise(fr); }
-    }
-    return fr;
-  }
+  // === Multi-start + combo sampling ===
+  var globalBest=null;
+  var NUM_SEEDS = (mode==='full' ? 320 : 16);
 
-  // Choose a small active set from pool
+  // Create combo sets (diverse subsets of the candidate pool)
+  var comboSets = [];
+  function pushCombo(arr){
+    var seenSet=new Set();
+    var ded=arr.filter(function(c){ if(seenSet.has(c)) return false; seenSet.add(c); return true; });
+    if (ded.length>=2) comboSets.push(ded);
+  }
   function pickActive(){
     var light = target.L>=75;
     var base=[];
     if (light && CODE_WHT) base.push(CODE_WHT); else if (light && CODE_EXT) base.push(CODE_EXT);
-    base.push(pool[0]); // nearest chromatic
-    // For full-send, diversify with spread across pool by hue rank
-    var limit = maxInks;
-    if (mode==='full'){
-      for (var i=1;i<pool.length && base.length<limit; i++) if (base.indexOf(pool[i])<0) base.push(pool[i]);
-    } else {
-      for (var i2=1;i2<pool.length && base.length<limit; i2++) if (base.indexOf(pool[i2])<0) base.push(pool[i2]);
-    }
+    base.push(pool[0]);
+    for (var i=1;i<pool.length && base.length<maxInks; i++) if (base.indexOf(pool[i])<0) base.push(pool[i]);
     return base;
   }
-
-  var globalBest=null;
-  var NUM_SEEDS = (mode==='full' ? 320 : 16);
-  // optional combo exploration in full-send
-  var comboSets = [];
-  function pushCombo(arr){ var seenSet=new Set(); var ded=arr.filter(function(c){ if(seenSet.has(c)) return false; seenSet.add(c); return true; }); if (ded.length>=2) comboSets.push(ded); }
   function sampleCombos(){
     var light = target.L>=75;
-    // always try the baseline pick
     pushCombo(pickActive());
     if (mode==='full'){
-      var tries = (mode==='full'? 500 : 200); // sample combos
+      var tries = 500; // heavy
       for (var t=0;t<tries;t++){
         var want = Math.min(maxInks, 2 + Math.floor(Math.random()*Math.min(5, maxInks-1)));
         var combo=[];
@@ -361,49 +345,32 @@ function suggestLadderRecipe(target, maxInks, mode){
   }
   sampleCombos();
 
-  var globalBest=null;
   for (var cs=0; cs<comboSets.length; cs++){
     var active = comboSets[cs];
     var light = target.L>=75; var hasBlack = active.indexOf(CODE_BLK)>=0;
-    var seeds = (mode==='full'? Math.max(NUM_SEEDS/Math.max(1,comboSets.length/3), 12)|0 : NUM_SEEDS);
+    var seeds = (mode==='full'? Math.max((NUM_SEEDS/Math.max(1,comboSets.length/3))|0, 24) : NUM_SEEDS);
     for (var s=0; s<seeds; s++){
-      var fr = (function(){ var fr=new Array(active.length); for(var i=0;i<fr.length;i++) fr[i]=Math.random()+1e-6; // random
-        // bias white/ext in light targets
-        if (light){ var wi = active.indexOf(CODE_WHT)>=0 ? active.indexOf(CODE_WHT) : active.indexOf(CODE_EXT); if (wi>=0){ fr[wi]=Math.max(fr[wi], 0.5); } }
-        var sumv=sum(fr); for(var j=0;j<fr.length;j++) fr[j]/=sumv; return fr; })();
-      if (light && hasBlack){ var bi=active.indexOf(CODE_BLK); fr[bi]=Math.min(fr[bi], 0.02); var s2=sum(fr); for(var j2=0;j2<fr.length;j2++) fr[j2]/=s2; }
+      // seed fractions
+      var fr = new Array(active.length); for(var i0=0;i0<fr.length;i0++) fr[i0]=Math.random()+1e-6; var s0=sum(fr); for(var i1=0;i1<fr.length;i1++) fr[i1]/=s0;
+      if (light){ var wi = active.indexOf(CODE_WHT)>=0 ? active.indexOf(CODE_WHT) : active.indexOf(CODE_EXT); if (wi>=0){ fr[wi]=Math.max(fr[wi], 0.5); var s1=sum(fr); for(var i2=0;i2<fr.length;i2++) fr[i2]/=s1; } }
+      if (light && hasBlack){ var bi=active.indexOf(CODE_BLK); fr[bi]=Math.min(fr[bi], 0.02); var s2=sum(fr); for(var i3=0;i3<fr.length;i3++) fr[i3]/=s2; }
+
+      // anneal -> local refine
       var A = anneal(active, fr);
       var L = localRefine(A.codes, A.fracs);
+
       // prune <1% and refine again
       var keptCodes=[], keptFr=[]; for (var i=0;i<L.codes.length;i++){ if (L.fracs[i] >= 0.01) { keptCodes.push(L.codes[i]); keptFr.push(L.fracs[i]); } }
       if (keptCodes.length>0){ var s3=sum(keptFr); for(var j3=0;j3<keptFr.length;j3++) keptFr[j3]/=s3; L = localRefine(keptCodes, keptFr); }
+
       // Light-target black admission rule
       if (light && L.codes.indexOf(CODE_BLK)>=0 && globalBest && !(L.dE < globalBest.dE - 0.20)){
-        // reject
+        // reject black-heavy wins on pale targets unless clearly better
       } else {
         if (!globalBest || L.dE + 1e-6 < globalBest.dE) globalBest = L;
       }
     }
   }
-  if (!globalBest) throw new Error('Optimisation failed to find a recipe');
-  return globalBest;
-
-    // anneal then local refine
-    var A = anneal(active, fr);
-    var L = localRefine(A.codes, A.fracs);
-
-    // prune <1% and refine again
-    var keptCodes=[], keptFr=[]; for (var i=0;i<L.codes.length;i++){ if (L.fracs[i] >= 0.01) { keptCodes.push(L.codes[i]); keptFr.push(L.fracs[i]); } }
-    if (keptCodes.length>0){ normalise(keptFr); L = localRefine(keptCodes, keptFr); }
-
-    // Light-target black admission rule: only keep black result if it beats best by >=0.20
-    if (light && L.codes.indexOf(CODE_BLK)>=0 && globalBest && !(L.dE < globalBest.dE - 0.20)){
-      // reject this seed's result
-    } else {
-      if (!globalBest || L.dE + 1e-6 < globalBest.dE) globalBest = L;
-    }
-  }
-
   if (!globalBest) throw new Error('Optimisation failed to find a recipe');
   return globalBest;
 }
@@ -453,13 +420,12 @@ Promise.all([
   fetch('assortment_colour_data.json').then(function(r){return r.json();})
 ]).then(function(tuple){
   COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2]; buildFormulaIndex(); $('#countLabel').textContent=COLOURS.length; loadAssortmentIntoLadders();
-  // tests
   runTests();
 }).catch(function(err){ alert('Error loading JSON: '+err); });
 
 updateTargetEcho();
 
-// =========== Minimal tests ===========
+// =========== Minimal tests ==========='
 function approxEq(a,b,eps){ return Math.abs(a-b) <= (eps||1e-6); }
 function runTests(){
   try{
@@ -475,6 +441,9 @@ function runTests(){
       var lab2 = mixFromLadders([codes[0],codes[1]],[0.7,0.3]);
       console.assert(!(approxEq(lab1.L,lab2.L,1e-4)&&approxEq(lab1.a,lab2.a,1e-4)&&approxEq(lab1.b,lab2.b,1e-4)), 'Mix responds to weights');
     }
+    // NEW: Seed reproducibility sanity (determinism not guaranteed, but should produce an object)
+    var demo = suggestLadderRecipe({L:70,a:5,b:10}, 4, 'fast');
+    console.assert(demo && demo.codes && demo.fracs && demo.lab, 'Demo suggestion returns structure');
     console.log('[Tests] OK');
   } catch(e){ console.warn('[Tests] exception', e); }
 }
