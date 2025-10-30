@@ -245,8 +245,28 @@ function fitInkModelsFromLadders(illum){
 
 function t_from_conc(code, conc){ var m=InkModels[code]; if(!m){ return conc; } return m.alpha * Math.pow(conc, m.p); }
 
-function mixSpectrumKS(cands, weights){ var L=nm.length; var KS_mix=new Array(L).fill(0); for(var i=0;i<cands.length;i++){ var w=weights[i]; if(w<=0) continue; var KS=cands[i].KS; for(var j=0;j<L;j++) KS_mix[j]+= w*KS[j]; } return KS_mix.map(KS_to_Rinf); }
-function predictLabFromWeights(cands, weights, illum){ var R=mixSpectrumKS(cands, weights); var CS=makeCS(illum); var XYZ=spectrumToXYZ(R, CS); return xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS); }
+function mixSpectrumKS(cands, weights){
+  var L=nm.length;
+  var KS_mix=new Array(L).fill(0);
+  for(var i=0;i<cands.length;i++){
+    var w=weights[i]; if(!(w>0)) continue;
+    var KS=cands[i].KS;
+    if(!KS || KS.length!==L) continue;
+    for(var j=0;j<L;j++) KS_mix[j]+= w*KS[j];
+  }
+  // Guard: if the mix is all zeros (no effective ink), return flat high reflectance (white)
+  var nonzero=false; for(var k=0;k<L;k++){ if(Math.abs(KS_mix[k])>1e-12){ nonzero=true; break; } }
+  if(!nonzero){ return new Array(L).fill(0.98); }
+  return KS_mix.map(KS_to_Rinf);
+} return KS_mix.map(KS_to_Rinf); }
+function predictLabFromWeights(cands, weights, illum){
+  // Defensive: if nothing to mix, return white
+  if (!cands || !cands.length || !weights || !weights.length) return {L:100,a:0,b:0};
+  var R=mixSpectrumKS(cands, weights);
+  var CS=makeCS(illum);
+  var XYZ=spectrumToXYZ(R, CS);
+  return xyzToLabIll(XYZ[0],XYZ[1],XYZ[2], CS);
+}
 
 // ===== Candidate selection and optimiser =====
 function getCandidateInks(){
@@ -326,8 +346,9 @@ function suggestFormula(){
       var illum=$('#illuminant').value || 'D50';
       var total=1.0; // 6v anilox baseline thickness scale
       var out=suggestWeights(target, maxInks, total, illum);
-      var totalW=out.weights.reduce(function(a,b){return a+b;},0)||1;
-      var merged=out.active.map(function(ink,i){ return { code:ink.code, name:ink.name, pct:(out.weights[i]/totalW)*100 }; }).sort(function(a,b){return b.pct-a.pct;});
+      // Recompute predicted Lab from the final recipe to avoid any stale/bad state
+      var finalLab = predictLabFromWeights(out.active, out.weights, illum);
+      out.lab = finalLab; // authoritative
       // swatch from predicted Lab (convert to sRGB via D65 for UI consistency)
       var rgb=labToSrgb(out.lab.L, out.lab.a, out.lab.b);
       var html=''
