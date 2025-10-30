@@ -114,7 +114,6 @@
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
-function linspace(a,b,n){ var out=[], step=(b-a)/(n-1); for(var i=0;i<n;i++) out.push(a+i*step); return out; }
 
 // ====== CIE constants (D50/2°) ======
 // Wavelengths 380-730nm (10nm)
@@ -123,11 +122,10 @@ var WL = []; for (var w=380; w<=730; w+=10) WL.push(w);
 // Values from CIE tables (condensed). These arrays must be same length as WL.
 var CMF = {
   x:[0.0014,0.0022,0.0042,0.0076,0.0143,0.0232,0.0435,0.0776,0.1344,0.2148,0.2839,0.3285,0.3483,0.3481,0.3362,0.3187,0.2908,0.2511,0.1954,0.1421,0.0956,0.05795,0.032,0.0147,0.0049,0.0024,0.0093,0.0291,0.06327,0.1096,0.1655,0.2257,0.2904,0.3597,0.43345,0.51205,0.5945],
-  y:[0.0000,0.0001,0.0001,0.0002,0.0004,0.0006,0.0012,0.0022,0.0040,0.0073,0.0116,0.01684,0.023,0.0298,0.038,0.048,0.06,0.0739,0.09098,0.1126,0.13902,0.1693,0.20802,0.2586,0.323,0.4073,0.503,0.6082,0.71,0.7932,0.862,0.91485,0.954,0.9803,0.99495,1.0,0.995]
-  ,z:[0.0065,0.0105,0.0201,0.0362,0.0679,0.1102,0.2074,0.3713,0.6456,1.0391,1.3856,1.62296,1.74706,1.7826,1.77211,1.7441,1.6692,1.5281,1.28764,1.0419,0.81295,0.6162,0.46518,0.3533,0.272,0.2123,0.1582,0.1117,0.07825,0.05725,0.04216,0.02984,0.0203,0.0134,0.00875,0.00575,0.0039]
+  y:[0.0000,0.0001,0.0001,0.0002,0.0004,0.0006,0.0012,0.0022,0.0040,0.0073,0.0116,0.01684,0.023,0.0298,0.038,0.048,0.06,0.0739,0.09098,0.1126,0.13902,0.1693,0.20802,0.2586,0.323,0.4073,0.503,0.6082,0.71,0.7932,0.862,0.91485,0.954,0.9803,0.99495,1.0,0.995],
+  z:[0.0065,0.0105,0.0201,0.0362,0.0679,0.1102,0.2074,0.3713,0.6456,1.0391,1.3856,1.62296,1.74706,1.7826,1.77211,1.7441,1.6692,1.5281,1.28764,1.0419,0.81295,0.6162,0.46518,0.3533,0.272,0.2123,0.1582,0.1117,0.07825,0.05725,0.04216,0.02984,0.0203,0.0134,0.00875,0.00575,0.0039]
 };
 var SPD_D50 = [0.0341,0.3601,0.6862,1.012,1.338,1.664,1.99,2.316,2.642,2.968,3.294,3.62,3.946,4.272,4.598,4.924,5.25,5.576,5.902,6.228,6.554,6.88,7.206,7.532,7.858,8.184,8.51,8.836,9.162,9.488,9.814,10.14,10.466,10.792,11.118,11.444];
-// normalise SPD to unity Y when used
 
 function dot(a,b){ var s=0; for(var i=0;i<a.length;i++) s += a[i]*b[i]; return s; }
 
@@ -203,28 +201,23 @@ function loadIfsx2(data){
   }
 }
 
-function loadIfsx(data){
-  IFSX = data || {};
-  // refs: pick the first as paper (your file labelled PP60 Top Black acts like white)
-  if (IFSX && IFSX.refs){ var keys=Object.keys(IFSX.refs); if (keys.length){ PAPER_R = IFSX.refs[keys[0]]; } }
-  // inks:
-  if (IFSX && IFSX.inks){
-    Object.keys(IFSX.inks).forEach(function(k){
-      var entry = IFSX.inks[k];
-      if (entry && Array.isArray(entry.R) && entry.R.length===WL.length){ INK_RINF[k] = entry.R.slice(); }
-    });
-  }
-}
-
 // Convert R∞ to q = K/S via KM infinite-layer formula: q = (1-R)^2 / (2R)
 function RinfToQ(R){ var q=new Array(R.length); for (var i=0;i<R.length;i++){ var Ri=clamp(R[i], 1e-6, 0.999999); q[i] = ((1-Ri)*(1-Ri))/(2*Ri); } return q; }
 
 var INK_Q = {}; // code -> q[λ]
-function buildInkQ(){ INK_Q={}; Object.keys(INK_RINF).forEach(function(code){ var R=INK_RINF[code]; if(Array.isArray(R)&&R.length===WL.length){ INK_Q[code]=RinfToQ(R); } }); }; Object.keys(INK_RINF).forEach(function(code){ INK_Q[code] = RinfToQ(INK_RINF[code]); }); }
+function buildInkQ(){
+  INK_Q = {};
+  Object.keys(INK_RINF).forEach(function(code){
+    var R = INK_RINF[code];
+    if (Array.isArray(R) && R.length === WL.length){
+      INK_Q[code] = RinfToQ(R);
+    }
+  });
+}
 
 // We parameterise each ink i by a scalar strength s_i so that its contribution to S is s_i, to K is s_i*q_i.
 // Extender (clear) has q≈0 and its own scattering scalar s_ext. We will fit s_i and s_ext to ladder data.
-var STRENGTH; // code -> s_i
+var STRENGTH = {}; // code -> s_i
 var S_EXT = 1;     // global extender scattering scalar (DC21-002)
 
 // Predict R∞ of a mix given fractions (including extender) — infinite-thickness approximation
