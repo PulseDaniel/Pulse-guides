@@ -165,6 +165,22 @@ function numOr(v, alt){
   const m = (alt === null || alt === undefined || alt === '') ? NaN : Number(alt);
   return Number.isFinite(m) ? m : NaN;
 }
+async function fetchJSON(path){
+  const r = await fetch(path);
+  if(!r.ok) throw new Error('Failed to fetch '+path+': '+r.status+' '+r.statusText);
+  return r.json();
+}
+// Normalise “could be array, object, or wrapper with .records/.data”
+function asArray(maybe){
+  if (Array.isArray(maybe)) return maybe;
+  if (maybe && typeof maybe === 'object'){
+    if (Array.isArray(maybe.records)) return maybe.records;
+    if (Array.isArray(maybe.data)) return maybe.data;
+    // object of keyed entries -> values
+    return Object.values(maybe);
+  }
+  return [];
+}
 
 /* ===========================
    Colour Math
@@ -258,7 +274,7 @@ function mixReflectance(colorantSet, fractions, t0, substrateR){
     const a = 1 + K[j]/S[j];
     const b = Math.sqrt(Math.max(a*a - 1, 1e-12));
     const r_inf = a - b;
-    const tau = Math.exp(-2*b*S[j]); // thickness 1 here; t0 carried in f
+    const tau = Math.exp(-2*b*S[j]); // thickness 1 here; t0 applied in f
     const Rg = substrateR[j];
     const denom = 1 - Rg*r_inf*tau;
     R[j] = denom===0 ? r_inf : (r_inf + (Rg - r_inf)*tau/denom);
@@ -302,7 +318,8 @@ function defaultInkSet(){ return state.colorants.slice(); }
 =========================== */
 async function loadAll(){
   // colours.json
-  const colours = await fetch('colours.json').then(r=>r.json());
+  const coloursRaw = await fetchJSON('colours.json');
+  const colours = asArray(coloursRaw);
   state.pantones = colours.map(o=>{
     const L = numOr(o.L, o.l);
     const a = numOr(o.a, o.A);
@@ -314,29 +331,49 @@ async function loadAll(){
     };
   }).filter(x => Number.isFinite(x.L) && Number.isFinite(x.a) && Number.isFinite(x.b));
 
-  // DC_Formulas.json
-  const dc = await fetch('DC_Formulas.json').then(r=>r.json());
-  for(const rec of dc){
+  // DC_Formulas.json — robust to array/object/wrapper
+  const formRaw = await fetchJSON('DC_Formulas.json');
+  const formArr = asArray(formRaw);
+  // If still empty and it's a plain object map (Pantone -> record), turn into array:
+  const maybeMapKeys = (!formArr.length && formRaw && typeof formRaw==='object') ? Object.keys(formRaw) : [];
+  const records = formArr.length ? formArr : maybeMapKeys.map(k => ({ Pantone: k, ...(formRaw[k]||{}) }));
+
+  for(const rec of records){
     const name = (rec.Pantone || rec.Pantone_Name || rec.Name || rec.name || '').toString().trim();
     if(!name) continue;
     const entries = [];
-    const keys = Object.keys(rec);
-    for(const k of keys){
-      const mInk = k.match(/^Ink\s*(\d+)/i);
-      if(mInk){
-        const idx = mInk[1];
-        const inkName = (rec[k]||'').toString().trim();
-        const pct1 = rec['%'+(idx=== '1'?'': idx)];
-        const pct2 = rec[(idx==='1')? '%': (idx+'%')];
-        const pct = Number.isFinite(Number(pct1)) ? Number(pct1) : Number(pct2);
-        if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
+
+    // Try generic “InkX / PercentX”-style keys first
+    for(let i=1;i<=8;i++){
+      const inkKeyCandidates = [`Ink ${i}`, `Ink${i}`, `Colour ${i}`, `Color ${i}`, `Colorant ${i}`];
+      let inkName = '';
+      for(const key of inkKeyCandidates){ if(rec[key]!==undefined){ inkName = (rec[key]||'').toString().trim(); break; } }
+      // percent/amount keys
+      const pctKeys = [ (i===1?'%':'%'+i), (i===1?'1%':i+'%'), `Percent${i}`, `P${i}`, `Amount${i}` ];
+      let pct = NaN;
+      for(const pk of pctKeys){ if(rec[pk]!==undefined){ const v = Number(rec[pk]); if(Number.isFinite(v)){ pct = v; break; } } }
+      if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
+    }
+
+    // Fallback: scan arbitrary keys for “Ink” and a matching % key nearby
+    if(entries.length===0){
+      const keys = Object.keys(rec);
+      for(const k of keys){
+        const m = k.match(/ink\s*([0-9]+)/i);
+        if(m){
+          const idx = m[1];
+          const inkName = (rec[k]||'').toString().trim();
+          const pct = Number(rec['%'+(idx==='1'?'':idx)] ?? rec[idx+'%'] ?? rec['Percent'+idx] ?? rec['P'+idx]);
+          if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
+        }
       }
     }
+
     if(entries.length) state.formulas.set(name, entries);
   }
 
   // DC21_jan25.json
-  const dc21 = await fetch('DC21_jan25.json').then(r=>r.json());
+  const dc21 = await fetchJSON('DC21_jan25.json');
   if(dc21 && dc21.substrate && dc21.substrate.reflectance){
     const r = [];
     for(const wl of WL){
@@ -346,8 +383,9 @@ async function loadAll(){
     }
     state.substrateR = r;
   }
-  if(dc21 && Array.isArray(dc21.colorants)){
-    state.colorants = dc21.colorants.map(c=>{
+  const cArr = asArray(dc21 && dc21.colorants);
+  if(cArr && cArr.length){
+    state.colorants = cArr.map(c=>{
       const kc = c.km_constants || {};
       const arr = (a)=> WL.map((_,i)=> Number((a && a[i]) || 0));
       return {
@@ -359,7 +397,7 @@ async function loadAll(){
   }
 
   // assortment_colour_data.json (optional)
-  try{ state.assort = await fetch('assortment_colour_data.json').then(r=>r.json()); }catch(e){ state.assort=null; }
+  try{ const assortRaw = await fetchJSON('assortment_colour_data.json'); state.assort = assortRaw; }catch(e){ state.assort=null; }
 
   document.getElementById('pantoneCount').textContent = String(state.pantones.length) + ' total';
 
@@ -373,11 +411,9 @@ async function loadAll(){
 function fitThicknessFromLadders(){
   if(!state.assort || state.colorants.length===0) return NaN;
 
-  // Build name index (lowercased)
   const idxByName = {};
   for(const c of state.colorants){ idxByName[c.name.toLowerCase()] = c; }
 
-  // Heuristic scan for ladder items: fields containing concentration + L/a/b
   const samples = [];
   (function scan(obj){
     if(!obj) return;
@@ -406,7 +442,6 @@ function fitThicknessFromLadders(){
 
   if(samples.length < 12) return NaN;
 
-  // Optional extender index
   const extIdx = indexOfExtender();
 
   function rmsDE(t0){
@@ -424,8 +459,9 @@ function fitThicknessFromLadders(){
 
   let bestT = 1.0, bestE = Infinity;
   for(let t=0.6; t<=1.6; t += 0.02){
-    const e = rmsDE(Number(t.toFixed(2)));
-    if(e < bestE){ bestE = e; bestT = Number(t.toFixed(2)); }
+    const tt = Number(t.toFixed(2));
+    const e = rmsDE(tt);
+    if(e < bestE){ bestE = e; bestT = tt; }
   }
   return bestT;
 }
@@ -588,7 +624,12 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   const maxBlack=el('maxBlack'), maxBlackVal=el('maxBlackVal');
   maxBlack.addEventListener('input', ()=> maxBlackVal.textContent = String(maxBlack.value)+'%');
 
-  await loadAll();
+  try{
+    await loadAll();
+  }catch(e){
+    console.error(e);
+    alert('Failed to load one or more JSON files. See console for details.\n'+e.message);
+  }
 
   el('pantoneSearch').addEventListener('input', (e)=>{
     const q=(e.target.value||'').toLowerCase().trim(); if(!q) return;
@@ -605,13 +646,13 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   el('predictBtn').addEventListener('click', ()=>{
     const L = Number(el('L').value), a = Number(el('a').value), b = Number(el('b').value);
     const seed = el('predictBtn').dataset.seed || null;
-    status.textContent = 'Optimising…';
     const opts = { maxInks: Number(el('maxInks').value), maxBlackPct: Number(el('maxBlack').value), preferExt: el('preferExt').value, seedPantone: seed };
+    el('predictStatus').textContent = 'Optimising…';
     setTimeout(()=>{ try{
       const result = predictMixForLab({L,a,b}, opts);
       renderPrediction(result);
-      status.textContent = '';
-    }catch(err){ status.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); } }, 10);
+      el('predictStatus').textContent = '';
+    }catch(err){ el('predictStatus').textContent = 'Error: ' + (err && err.message ? err.message : String(err)); } }, 10);
   });
 });
 </script>
