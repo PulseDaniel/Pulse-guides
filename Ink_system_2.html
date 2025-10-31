@@ -5,13 +5,12 @@
 <title>Ink Mix Predictor — 6v Anilox (Pantone ΔE + KM)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
-  :root{
-    --bg:#0f1115; --panel:#151923; --muted:#8a90a5; --text:#e9edf3; --accent:#7bd389; --warn:#f6d36b; --bad:#ff7a7a; --chipBorder:#272b34;
-  }
+  :root{ --bg:#0f1115; --panel:#151923; --muted:#8a90a5; --text:#e9edf3; --accent:#7bd389; --warn:#f6d36b; --bad:#ff7a7a; --chipBorder:#272b34; }
   *{box-sizing:border-box}
   body{margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text)}
-  header{padding:18px 22px; border-bottom:1px solid #232737; background:linear-gradient(180deg,#141824,#11141d)}
+  header{padding:18px 22px; border-bottom:1px solid #232737; background:linear-gradient(180deg,#141824,#11141d); display:flex; justify-content:space-between; align-items:center}
   h1{margin:0; font-size:18px; letter-spacing:.3px}
+  #counts{font-size:12px; color:var(--muted)}
   main{display:grid; gap:16px; grid-template-columns: 360px 1fr; padding:18px}
   .card{background:var(--panel); border:1px solid #232737; border-radius:14px; padding:14px}
   .row{display:flex; gap:10px; align-items:center}
@@ -27,7 +26,7 @@
   .grid.cols-3{grid-template-columns:1fr 1fr 1fr}
   .muted{color:var(--muted)}
   .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2a2f3f; color:var(--muted); font-size:12px}
-  .chip{width:36px; height:24px; border-radius:6px; border:1px solid var(--chipBorder)}
+  .chip{width:36px; height:24px; border-radius:6px; border:1px solid var(--chipBorder); background:#777}
   .list{display:grid; gap:8px; margin-top:6px}
   .swatchRow{display:grid; grid-template-columns: 48px 1fr auto; gap:12px; align-items:center; padding:8px; border-radius:10px; border:1px solid #222738; background:#111521}
   .swatchRow:hover{border-color:#2e3448}
@@ -52,6 +51,7 @@
 <body>
 <header>
   <h1>🎯 Ink Mix Predictor — Kubelka–Munk (Calibrated: 6-volume anilox)</h1>
+  <div id="counts" class="pill">Pantones: 0 · Formulas: 0 · Colorants: 0</div>
 </header>
 
 <main>
@@ -154,9 +154,7 @@
 </div>
 
 <script>
-/* ===========================
-   Helpers
-=========================== */
+/* =============== helpers =============== */
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 function round2(x){ return Math.round(x*100)/100; }
 function numOr(v, alt){
@@ -170,21 +168,27 @@ async function fetchJSON(path){
   if(!r.ok) throw new Error('Failed to fetch '+path+': '+r.status+' '+r.statusText);
   return r.json();
 }
-// Normalise “could be array, object, or wrapper with .records/.data”
 function asArray(maybe){
   if (Array.isArray(maybe)) return maybe;
   if (maybe && typeof maybe === 'object'){
     if (Array.isArray(maybe.records)) return maybe.records;
     if (Array.isArray(maybe.data)) return maybe.data;
-    // object of keyed entries -> values
+    // object-map -> values
     return Object.values(maybe);
   }
   return [];
 }
+function canonicalPantoneName(s){
+  if(!s) return '';
+  s = String(s).toUpperCase().trim();
+  // Collapse whitespace, ensure single space before suffix (C/U/M/etc)
+  s = s.replace(/\s+/g,' ').replace(/PANTONE\s*/,'PANTONE ');
+  // Insert space before trailing letter if missing: 186C -> 186 C
+  s = s.replace(/(\d)([A-Z])$/, '$1 $2');
+  return s;
+}
 
-/* ===========================
-   Colour Math
-=========================== */
+/* =============== colour math =============== */
 const WL = Array.from({length:36},(_,i)=>380+10*i);
 const CMF = {
   x:[0.001368,0.002236,0.004243,0.007650,0.014310,0.023190,0.043510,0.077630,0.134380,0.214770,0.283900,0.328500,0.348280,0.348060,0.336200,0.318700,0.290800,0.251100,0.195360,0.142100,0.095640,0.057950,0.032010,0.014700,0.004900,0.002400,0.009300,0.029100,0.063270,0.109600,0.165500,0.225750,0.290400,0.359700,0.433450,0.512050],
@@ -195,7 +199,6 @@ const D50 = [0.0341,0.3601,0.6861,1.0120,1.3382,1.6643,1.9903,2.3164,2.6424,2.96
 function trapz(y, step){ let s=0; for(let i=1;i<y.length;i++) s += (y[i-1]+y[i]); return s * step/2; }
 const k_norm = 100 / trapz(WL.map((_,i)=>D50[i]*CMF.y[i]),10);
 const whiteD50 = (()=>({ X: k_norm*trapz(WL.map((_,i)=>D50[i]*CMF.x[i]),10), Y:100, Z: k_norm*trapz(WL.map((_,i)=>D50[i]*CMF.z[i]),10) }))();
-
 function xyzFromSpectrum(R){
   const X = k_norm*trapz(WL.map((_,i)=>D50[i]*R[i]*CMF.x[i]),10);
   const Y = k_norm*trapz(WL.map((_,i)=>D50[i]*R[i]*CMF.y[i]),10);
@@ -230,6 +233,7 @@ function deltaE00(l1,l2){
   return Math.sqrt(Math.pow(dLp/(kL*Sl),2)+Math.pow(dCp/(kC*Sc),2)+Math.pow(dHp/(kH*Sh),2)+Rt*(dCp/(kC*Sc))*(dHp/(kH*Sh)));
 }
 function hexFromLab(L,a,b){
+  if(!Number.isFinite(L)||!Number.isFinite(a)||!Number.isFinite(b)) return '#777';
   const fy=(L+16)/116, fx=a/500+fy, fz=fy-b/200;
   const xr=fx**3>0.008856?fx**3:(116*fx-16)/903.3;
   const yr=L>8?fy**3:L/903.3;
@@ -251,21 +255,18 @@ function hexFromLab(L,a,b){
   return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
 }
 
-/* ===========================
-   KM Engine — Two-Constant
-   Filmweight locked via t0 (6v)
-=========================== */
+/* =============== KM engine (two-constant; 6v thickness locked) =============== */
 function mixReflectance(colorantSet, fractions, t0, substrateR){
   const n = WL.length;
   const K = new Array(n).fill(0), S = new Array(n).fill(0);
   for(let i=0;i<colorantSet.length;i++){
-    const f = fractions[i]*t0;
-    if(f<=0) continue;
+    const f = fractions[i]*t0; if(f<=0) continue;
     const cst = colorantSet[i].consts;
-    const k1=cst.k1, k2=cst.k2, s1=cst.s1, s2=cst.s2;
+    const k1=cst.k1||[], k2=cst.k2||[], s1=cst.s1||[], s2=cst.s2||[];
     for(let j=0;j<n;j++){
-      K[j] += k1[j]*f + k2[j]*f*f;
-      S[j] += s1[j]*f + s2[j]*f*f;
+      const K1=k1[j]||0, K2=k2[j]||0, S1=s1[j]||0, S2=s2[j]||0;
+      K[j] += K1*f + K2*f*f;
+      S[j] += S1*f + S2*f*f;
     }
   }
   for(let j=0;j<n;j++){ if(S[j]<=1e-12) S[j]=1e-12; }
@@ -274,8 +275,8 @@ function mixReflectance(colorantSet, fractions, t0, substrateR){
     const a = 1 + K[j]/S[j];
     const b = Math.sqrt(Math.max(a*a - 1, 1e-12));
     const r_inf = a - b;
-    const tau = Math.exp(-2*b*S[j]); // thickness 1 here; t0 applied in f
-    const Rg = substrateR[j];
+    const tau = Math.exp(-2*b*S[j]);
+    const Rg = substrateR[j] ?? 0.9;
     const denom = 1 - Rg*r_inf*tau;
     R[j] = denom===0 ? r_inf : (r_inf + (Rg - r_inf)*tau/denom);
     R[j] = clamp(R[j], 0.0001, 0.9999);
@@ -283,13 +284,11 @@ function mixReflectance(colorantSet, fractions, t0, substrateR){
   return R;
 }
 
-/* ===========================
-   App State
-=========================== */
+/* =============== state =============== */
 const state = {
   pantones: [],
-  formulas: new Map(),
-  colorants: [],
+  formulas: new Map(),       // key: canonical Pantone
+  colorants: [],             // {name,consts:{k1,k2,s1,s2}}
   substrateR: new Array(WL.length).fill(0.9),
   t0: 1.0,
   blackNames: ['black','pp60 top black','k'],
@@ -313,49 +312,42 @@ function indexOfExtender(){
 }
 function defaultInkSet(){ return state.colorants.slice(); }
 
-/* ===========================
-   Load JSON & Fit t0 (6v)
-=========================== */
+/* =============== robust JSON loaders =============== */
 async function loadAll(){
-  // colours.json
+  /* colours.json */
   const coloursRaw = await fetchJSON('colours.json');
   const colours = asArray(coloursRaw);
   state.pantones = colours.map(o=>{
     const L = numOr(o.L, o.l);
     const a = numOr(o.a, o.A);
     const b = numOr(o.b, o.B);
-    return {
-      name: (o.Name||o.name||o.Pantone||o.pantone||o.title||'').toString(),
-      L, a, b,
-      hex: o.Hex || o.hex || hexFromLab(L, a, b)
-    };
+    const name = (o.Name||o.name||o.Pantone||o.pantone||o.title||'').toString();
+    const hex = (o.Hex || o.hex);
+    return { name, L, a, b, hex: hex || hexFromLab(L,a,b) };
   }).filter(x => Number.isFinite(x.L) && Number.isFinite(x.a) && Number.isFinite(x.b));
+  document.getElementById('pantoneCount').textContent = String(state.pantones.length) + ' total';
 
-  // DC_Formulas.json — robust to array/object/wrapper
+  /* DC_Formulas.json */
   const formRaw = await fetchJSON('DC_Formulas.json');
   const formArr = asArray(formRaw);
-  // If still empty and it's a plain object map (Pantone -> record), turn into array:
-  const maybeMapKeys = (!formArr.length && formRaw && typeof formRaw==='object') ? Object.keys(formRaw) : [];
-  const records = formArr.length ? formArr : maybeMapKeys.map(k => ({ Pantone: k, ...(formRaw[k]||{}) }));
-
-  for(const rec of records){
-    const name = (rec.Pantone || rec.Pantone_Name || rec.Name || rec.name || '').toString().trim();
-    if(!name) continue;
+  const asRecords = formArr.length ? formArr
+                   : (formRaw && typeof formRaw==='object'
+                      ? Object.keys(formRaw).map(k => ({ Pantone:k, ...(formRaw[k]||{}) }))
+                      : []);
+  const byCanon = new Map();
+  for(const rec of asRecords){
+    const name0 = (rec.Pantone || rec.Pantone_Name || rec.Name || rec.name || '').toString().trim();
+    const key = canonicalPantoneName(name0);
+    if(!key) continue;
     const entries = [];
-
-    // Try generic “InkX / PercentX”-style keys first
-    for(let i=1;i<=8;i++){
-      const inkKeyCandidates = [`Ink ${i}`, `Ink${i}`, `Colour ${i}`, `Color ${i}`, `Colorant ${i}`];
-      let inkName = '';
-      for(const key of inkKeyCandidates){ if(rec[key]!==undefined){ inkName = (rec[key]||'').toString().trim(); break; } }
-      // percent/amount keys
-      const pctKeys = [ (i===1?'%':'%'+i), (i===1?'1%':i+'%'), `Percent${i}`, `P${i}`, `Amount${i}` ];
-      let pct = NaN;
-      for(const pk of pctKeys){ if(rec[pk]!==undefined){ const v = Number(rec[pk]); if(Number.isFinite(v)){ pct = v; break; } } }
+    for(let i=1;i<=10;i++){
+      const inkKeys = [`Ink ${i}`, `Ink${i}`, `Colour ${i}`, `Color ${i}`, `Colorant ${i}`, `Ingredient ${i}`];
+      const pctKeys = [(i===1?'%':'%'+i), (i+'%'), `Percent${i}`, `P${i}`, `Amount${i}`];
+      let inkName = ''; for(const k of inkKeys){ if(rec[k]!==undefined){ inkName = String(rec[k]).trim(); if(inkName) break; } }
+      let pct = NaN; for(const pk of pctKeys){ if(rec[pk]!==undefined){ const v=Number(rec[pk]); if(Number.isFinite(v)){ pct=v; break; } } }
       if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
     }
-
-    // Fallback: scan arbitrary keys for “Ink” and a matching % key nearby
+    // fallback: scan arbitrary "Ink N" with "%N"
     if(entries.length===0){
       const keys = Object.keys(rec);
       for(const k of keys){
@@ -368,64 +360,153 @@ async function loadAll(){
         }
       }
     }
-
-    if(entries.length) state.formulas.set(name, entries);
-  }
-
-  // DC21_jan25.json
-  const dc21 = await fetchJSON('DC21_jan25.json');
-  if(dc21 && dc21.substrate && dc21.substrate.reflectance){
-    const r = [];
-    for(const wl of WL){
-      const val = (dc21.substrate.reflectance[wl] !== undefined) ? dc21.substrate.reflectance[wl]
-                : dc21.substrate.reflectance[String(wl)];
-      r.push( Number(val) || 0.9 );
+    if(entries.length){
+      byCanon.set(key, entries);
     }
-    state.substrateR = r;
   }
-  const cArr = asArray(dc21 && dc21.colorants);
-  if(cArr && cArr.length){
-    state.colorants = cArr.map(c=>{
-      const kc = c.km_constants || {};
-      const arr = (a)=> WL.map((_,i)=> Number((a && a[i]) || 0));
-      return {
-        id: (c.id || c.code || c.name || '').toString(),
-        name: (c.name || c.code || c.id || 'Ink').toString(),
-        consts: { k1:arr(kc.k1), k2:arr(kc.k2), s1:arr(kc.s1), s2:arr(kc.s2) }
-      };
-    }).filter(c => c.consts.k1.some(v=>v!==0) && c.consts.s1.some(v=>v!==0));
-  }
+  state.formulas = byCanon;
 
-  // assortment_colour_data.json (optional)
-  try{ const assortRaw = await fetchJSON('assortment_colour_data.json'); state.assort = assortRaw; }catch(e){ state.assort=null; }
+  /* DC21_jan25.json (calibration) */
+  const dc21 = await fetchJSON('DC21_jan25.json');
+  // substrate reflectance: accept {reflectance:{380:..}} OR array length ~36 OR nested
+  const subR = findSubstrateReflectance(dc21);
+  if(subR && subR.length===WL.length) state.substrateR = subR;
 
-  document.getElementById('pantoneCount').textContent = String(state.pantones.length) + ' total';
+  // colorants: recursively find array of objects with K/S constants
+  const cands = findColorants(dc21);
+  state.colorants = cands;
 
-  // Fit thickness scalar t0 from ladders if present
-  const tFit = fitThicknessFromLadders();
-  state.t0 = Number.isFinite(tFit) ? tFit : 1.0;
+  /* assortment (optional) */
+  try{ state.assort = await fetchJSON('assortment_colour_data.json'); }catch(e){ state.assort=null; }
+
+  // fit t0 from ladders
+  state.t0 = Number.isFinite(fitThicknessFromLadders()) ? fitThicknessFromLadders() : 1.0;
+
+  // diagnostics
+  document.getElementById('counts').textContent =
+    `Pantones: ${state.pantones.length} · Formulas: ${state.formulas.size} · Colorants: ${state.colorants.length}`;
   const hint = document.getElementById('calibHint');
   if(hint) hint.textContent = 'Calibrated for 6v: thickness scalar t₀ = ' + state.t0.toFixed(3) + ' (auto-fit)';
 }
 
+// substrate finder
+function findSubstrateReflectance(root){
+  let best=null;
+  (function walk(obj){
+    if(!obj || typeof obj!=='object') return;
+    // Direct map by wavelength
+    if(obj.reflectance && typeof obj.reflectance==='object'){
+      const arr = WL.map(wl=>{
+        const v = obj.reflectance[wl] ?? obj.reflectance[String(wl)];
+        return (v!=null)? Number(v) : NaN;
+      });
+      if(arr.every(x=>Number.isFinite(x))) best=arr;
+    }
+    // Array style
+    if(Array.isArray(obj.reflectance) && obj.reflectance.length>=31){
+      const a = obj.reflectance.map(Number);
+      if(a.length>=WL.length) best=a.slice(0,WL.length);
+    }
+    // Keys like Substrate/Backing etc.
+    const keys = Object.keys(obj);
+    for(const k of keys){
+      const low = k.toLowerCase();
+      if(/substrate|backing|white/.test(low) && typeof obj[k]==='object') walk(obj[k]);
+      else if(typeof obj[k]==='object') walk(obj[k]);
+    }
+  })(root);
+  return best;
+}
+
+// colorant finder
+function findColorants(root){
+  const out=[];
+  (function walk(node){
+    if(!node) return;
+    if(Array.isArray(node)){
+      // If elements look like colorants (have name & km-like block) -> process
+      if(node.length && typeof node[0]==='object'){
+        const looksLike = node.some(el=>{
+          const keys=Object.keys(el||{});
+          return keys.some(k=>/km|constants|k1|s1/i.test(k));
+        });
+        if(looksLike){
+          node.forEach(el=>{
+            const c = normaliseColorant(el);
+            if(c) out.push(c);
+          });
+        }else{
+          node.forEach(walk);
+        }
+      }
+      return;
+    }
+    if(typeof node==='object'){
+      const keys = Object.keys(node);
+      // Direct known key
+      if(node.colorants && Array.isArray(node.colorants)){
+        node.colorants.forEach(el=>{ const c=normaliseColorant(el); if(c) out.push(c); });
+      }
+      // Otherwise keep walking
+      for(const v of Object.values(node)) walk(v);
+    }
+  })(root);
+  // dedupe by name
+  const seen=new Set(); const uniq=[];
+  for(const c of out){
+    const key=(c.name||c.id||'').toLowerCase();
+    if(!key || seen.has(key)) continue;
+    seen.add(key); uniq.push(c);
+  }
+  return uniq;
+}
+function arrFromMaybe36(v){
+  if(!v) return null;
+  if(Array.isArray(v) && v.length>=WL.length) return WL.map((_,i)=> Number(v[i])||0);
+  if(typeof v==='object'){
+    const a=WL.map(wl=> Number(v[wl] ?? v[String(wl)] ?? 0));
+    return a;
+  }
+  return null;
+}
+function normaliseColorant(el){
+  if(!el || typeof el!=='object') return null;
+  const name = String(el.name || el.code || el.id || el.Title || el.Ink || '').trim();
+  const km = el.km_constants || el.KM || el.KMConstants || el.km || {};
+  // accept k1/K1 etc.
+  const k1 = arrFromMaybe36(km.k1 || km.K1 || el.k1 || el.K1);
+  const k2 = arrFromMaybe36(km.k2 || km.K2 || el.k2 || el.K2);
+  const s1 = arrFromMaybe36(km.s1 || km.S1 || el.s1 || el.S1);
+  const s2 = arrFromMaybe36(km.s2 || km.S2 || el.s2 || el.S2);
+  if(!(k1||s1)) return null;
+  return {
+    id: String(el.id || el.code || name),
+    name: name || ('Ink '+Math.random().toString(36).slice(2,6)),
+    consts: {
+      k1: k1 || new Array(WL.length).fill(0),
+      k2: k2 || new Array(WL.length).fill(0),
+      s1: s1 || new Array(WL.length).fill(0),
+      s2: s2 || new Array(WL.length).fill(0)
+    }
+  };
+}
+
+/* =============== thickness fit (6v) =============== */
 function fitThicknessFromLadders(){
   if(!state.assort || state.colorants.length===0) return NaN;
-
-  const idxByName = {};
-  for(const c of state.colorants){ idxByName[c.name.toLowerCase()] = c; }
-
+  const idxByName = {}; for(const c of state.colorants){ idxByName[c.name.toLowerCase()] = c; }
   const samples = [];
   (function scan(obj){
     if(!obj) return;
-    if(Array.isArray(obj)){ for(const v of obj) scan(v); return; }
+    if(Array.isArray(obj)){ obj.forEach(scan); return; }
     if(typeof obj==='object'){
       const keys = Object.keys(obj);
       const hasConc = keys.some(k=>/concentration|percent|strength|load/i.test(k));
       const L = numOr(obj.L, obj.l), A = numOr(obj.A, obj.a), B = numOr(obj.B, obj.b);
       const hasLab = Number.isFinite(L)&&Number.isFinite(A)&&Number.isFinite(B);
       if(hasConc && hasLab){
-        const name = (obj.name || obj.colorant || obj.Colorant || obj.ink || '').toString().trim().toLowerCase();
-        const cobj = idxByName[name];
+        const nm = (obj.name || obj.colorant || obj.Colorant || obj.ink || '').toString().trim().toLowerCase();
+        const cobj = idxByName[nm];
         if(cobj){
           let conc = obj.concentration; if(!Number.isFinite(Number(conc))) conc = obj.percent || obj.strength || obj.load;
           conc = Number(conc);
@@ -440,10 +521,8 @@ function fitThicknessFromLadders(){
     }
   })(state.assort);
 
-  if(samples.length < 12) return NaN;
-
+  if(samples.length < 10) return NaN;
   const extIdx = indexOfExtender();
-
   function rmsDE(t0){
     let se=0, n=0;
     for(const s of samples){
@@ -456,7 +535,6 @@ function fitThicknessFromLadders(){
     }
     return Math.sqrt(se/Math.max(1,n));
   }
-
   let bestT = 1.0, bestE = Infinity;
   for(let t=0.6; t<=1.6; t += 0.02){
     const tt = Number(t.toFixed(2));
@@ -466,21 +544,20 @@ function fitThicknessFromLadders(){
   return bestT;
 }
 
-/* ===========================
-   Nearest Pantone + Existing Formula
-=========================== */
-function findNearestPantones(L,a,b, k){
+/* =============== nearest Pantone + existing formula =============== */
+function findNearestPantones(L,a,b,k){
   const target = {L:Number(L), a:Number(a), b:Number(b)};
   const scored = state.pantones.map(p=>{
     const dE = deltaE00(target, {L:p.L,a:p.a,b:p.b});
-    return {name:p.name, L:p.L, a:p.a, b:p.b, hex:p.hex, dE:dE};
+    const hex = p.hex || hexFromLab(p.L,p.a,p.b) || '#777';
+    return {name:p.name, L:p.L, a:p.a, b:p.b, hex, dE};
   }).sort((x,y)=>x.dE - y.dE);
   return scored.slice(0,k);
 }
-
 function showExistingFormula(name){
   const wrap = document.getElementById('existingFormula');
-  const rec = state.formulas.get(name);
+  const key = canonicalPantoneName(name);
+  const rec = state.formulas.get(key);
   if(!rec){ wrap.innerHTML = '<span class="muted">No stored formula for <b>'+name+'</b>.</span>'; return; }
   const rows = rec.map(r=>(
     '<tr><td class="mono">'+r.ink+'</td><td class="mono" style="text-align:right">'+round2(r.percent)+'%</td></tr>'
@@ -490,9 +567,8 @@ function showExistingFormula(name){
     '<table class="table">'+rows+'</table>';
 }
 
-/* ===========================
-   Predictor (Constraints + Optimiser)
-=========================== */
+/* =============== predictor (constraints + optimiser) =============== */
+function defaultInkSet(){ return state.colorants.slice(); }
 function predictMixForLab(targetLab, options){
   const maxInks = Number(options.maxInks)||4;
   const maxBlackPct = Number(options.maxBlackPct)||10;
@@ -502,22 +578,26 @@ function predictMixForLab(targetLab, options){
   const inks = defaultInkSet();
   if(inks.length===0) throw new Error('No colorants loaded');
   const n = inks.length;
-
   let fractions = new Array(n).fill(0);
 
-  // Seed
-  if(seedPantone && state.formulas.has(seedPantone)){
-    const rec = state.formulas.get(seedPantone); let sum=0;
-    for(const r of rec){
-      const idx = inks.findIndex(c=> c.name.toLowerCase() === r.ink.toLowerCase());
-      if(idx>=0){ fractions[idx] = Math.max(0, r.percent/100); sum += r.percent/100; }
+  // Seed from existing formula if available
+  if(seedPantone && state.formulas.size){
+    const rec = state.formulas.get(canonicalPantoneName(seedPantone));
+    if(rec){
+      let sum=0;
+      for(const r of rec){
+        const idx = inks.findIndex(c=> c.name.toLowerCase() === r.ink.toLowerCase());
+        if(idx>=0){ fractions[idx] = Math.max(0, r.percent/100); sum += r.percent/100; }
+      }
+      if(sum>0){ for(let i=0;i<n;i++) fractions[i]/=sum; }
     }
-    if(sum>0){ for(let i=0;i<n;i++) fractions[i]/=sum; }
-  } else {
+  }
+  // Otherwise greedy start
+  if(fractions.every(v=>v===0)){
     const ext = indexOfExtender(); if(ext>=0 && preferExt!=='never') fractions[ext]=0.3;
     function score(i){
       const test = fractions.slice(); test[i] += 0.35;
-      let s = 0; for(const v of test) s+=v; if(s>1){ for(let j=0;j<n;j++) test[j]/=s; }
+      let s = test.reduce((a,b)=>a+b,0); if(s>1){ for(let j=0;j<n;j++) test[j]/=s; }
       const R = mixReflectance(inks, test, state.t0, state.substrateR);
       const lab = labFromSpectrum(R);
       return -deltaE00(targetLab, lab);
@@ -529,11 +609,10 @@ function predictMixForLab(targetLab, options){
       if(i===extIdx) continue;
       fractions[i] += (chromaSlots>0? (0.7/chromaSlots) : 0.7);
     }
-    let s=0; for(const v of fractions) s+=v; if(s>0){ for(let j=0;j<n;j++) fractions[j]/=s; }
+    let s=fractions.reduce((a,b)=>a+b,0); if(s>0){ for(let j=0;j<n;j++) fractions[j]/=s; }
   }
 
   const blackIdx = indexOfBlack(), extIdx = indexOfExtender(), kMaxBlack = maxBlackPct/100;
-
   function project(vec){
     for(let i=0;i<n;i++) vec[i] = Math.max(0, vec[i]);
     if(blackIdx>=0) vec[blackIdx] = Math.min(vec[blackIdx], kMaxBlack);
@@ -541,16 +620,16 @@ function predictMixForLab(targetLab, options){
       if(preferExt==='never') vec[extIdx]=0;
       if(preferExt==='always') vec[extIdx]=Math.max(vec[extIdx], 0.1);
     }
-    const ranked = []; for(let i=0;i<n;i++) ranked.push({i,v:vec[i]});
-    ranked.sort((a,b)=>b.v-a.v);
+    // sparsify
+    const ranked = vec.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
     const keep = new Set(ranked.slice(0,maxInks).map(x=>x.i));
     for(let i=0;i<n;i++) if(!keep.has(i)) vec[i]=0;
-    let sum = 0; for(const v of vec) sum+=v;
+    // renorm
+    let sum = vec.reduce((a,b)=>a+b,0);
     if(sum<=0){ if(extIdx>=0) vec[extIdx]=1; else vec[0]=1; sum=1; }
     for(let i=0;i<n;i++) vec[i]/=sum;
     return vec;
   }
-
   function objective(vec){
     const R = mixReflectance(inks, vec, state.t0, state.substrateR);
     const lab = labFromSpectrum(R);
@@ -579,16 +658,13 @@ function predictMixForLab(targetLab, options){
   return {components: comp, predictedLab: best.lab, dE: best.dE};
 }
 
-/* ===========================
-   UI
-=========================== */
+/* =============== UI =============== */
 function el(id){ return document.getElementById(id); }
-
 function renderNearest(list){
   const wrap=el('nearestList'); wrap.innerHTML='';
   for(const p of list){
     const row=document.createElement('a'); row.className='swatchRow linkish';
-    row.innerHTML = '<div class="chip" style="background:'+p.hex+'"></div>'+
+    row.innerHTML = '<div class="chip" style="background:'+ (p.hex||'#777') +'"></div>'+
       '<div><div><b>'+p.name+'</b></div>'+
       '<div class="muted small">ΔE00 '+round2(p.dE)+' · L*a*b* '+round2(p.L)+', '+round2(p.a)+', '+round2(p.b)+'</div></div>'+
       '<div><span class="tag">Select</span></div>';
@@ -602,7 +678,6 @@ function renderNearest(list){
     wrap.appendChild(row);
   }
 }
-
 function renderPrediction(result){
   const out=el('predictionOutput'), table=el('mixTable'), labPill=el('predLab'), dEPill=el('predDe'), warn=el('predWarn');
   const rows = result.components.map(c=>'<tr><td class="mono">'+c.name+'</td><td class="mono" style="text-align:right">'+round2(c.pct)+'%</td></tr>').join('');
@@ -614,9 +689,7 @@ function renderPrediction(result){
   out.style.display='block';
 }
 
-/* ===========================
-   Bootstrap
-=========================== */
+/* =============== bootstrap =============== */
 window.addEventListener('DOMContentLoaded', async ()=>{
   const status=el('predictStatus');
   const maxInks=el('maxInks'), maxInksVal=el('maxInksVal');
