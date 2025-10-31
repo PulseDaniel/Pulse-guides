@@ -38,6 +38,7 @@
 </head>
 <body>
   <div class="app">
+    <!-- Left -->
     <div class="card">
       <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
         <h1>Ink Colour Matcher — Spectral KM</h1>
@@ -89,6 +90,7 @@
       </div>
     </div>
 
+    <!-- Right -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
         <h1>Closest Matches</h1>
@@ -110,16 +112,16 @@
 <script>
 (function(){
 'use strict';
-// ====== Small utils ======
+
+/* ===== Utils ===== */
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 function sum(a){ var s=0; for(var i=0;i<a.length;i++) s+=a[i]; return s; }
 
-// ====== CIE constants (D50/2°) ======
-// Wavelengths 380-730nm (10nm)
+/* ===== CIE / Spectral (D50/2°) ===== */
+// Wavelength 380..730nm step 10
 var WL = []; for (var w=380; w<=730; w+=10) WL.push(w);
-// 1931 2° CMFs (xbar, ybar, zbar) @ 10nm (trimmed/rounded). D50 SPD @ 10nm (relative).
-// Values from CIE tables (condensed). These arrays must be same length as WL.
+// CMFs (2°, 10nm) & D50 SPD (relative)
 var CMF = {
   x:[0.0014,0.0022,0.0042,0.0076,0.0143,0.0232,0.0435,0.0776,0.1344,0.2148,0.2839,0.3285,0.3483,0.3481,0.3362,0.3187,0.2908,0.2511,0.1954,0.1421,0.0956,0.05795,0.032,0.0147,0.0049,0.0024,0.0093,0.0291,0.06327,0.1096,0.1655,0.2257,0.2904,0.3597,0.43345,0.51205,0.5945],
   y:[0.0000,0.0001,0.0001,0.0002,0.0004,0.0006,0.0012,0.0022,0.0040,0.0073,0.0116,0.01684,0.023,0.0298,0.038,0.048,0.06,0.0739,0.09098,0.1126,0.13902,0.1693,0.20802,0.2586,0.323,0.4073,0.503,0.6082,0.71,0.7932,0.862,0.91485,0.954,0.9803,0.99495,1.0,0.995],
@@ -130,35 +132,36 @@ var SPD_D50 = [0.0341,0.3601,0.6862,1.012,1.338,1.664,1.99,2.316,2.642,2.968,3.2
 function dot(a,b){ var s=0; for(var i=0;i<a.length;i++) s += a[i]*b[i]; return s; }
 
 function spectrumToXyz(R){
-  // Compute XYZ under D50/2°. Assume R sampled at WL, multiply by illuminant.
   var k = 100 / dot(CMF.y, SPD_D50);
-  var RX = 0, RY = 0, RZ = 0;
+  var RX=0, RY=0, RZ=0;
   for (var i=0;i<WL.length;i++){
-    var Ii = SPD_D50[i]; var Ri = clamp(R[i], 0, 1);
-    RX += CMF.x[i]*Ii*Ri; RY += CMF.y[i]*Ii*Ri; RZ += CMF.z[i]*Ii*Ri;
+    var Ii = SPD_D50[i];
+    var Ri = (R && i < R.length && isFinite(R[i])) ? R[i] : 1; // default to white
+    Ri = clamp(Ri, 0, 1);
+    RX += CMF.x[i]*Ii*Ri;
+    RY += CMF.y[i]*Ii*Ri;
+    RZ += CMF.z[i]*Ii*Ri;
   }
   return {X:k*RX, Y:k*RY, Z:k*RZ};
 }
-
 function xyzToLabD50(X,Y,Z){
-  // D50 white (from 2° CIE standard):
   var Xn=96.4212, Yn=100.0, Zn=82.5188;
   function f(t){ var d=6/29; return t>(d*d*d)? Math.cbrt(t) : (t/(3*d*d)+4/29); }
   var fx=f(X/Xn), fy=f(Y/Yn), fz=f(Z/Zn);
   return { L:116*fy-16, a:500*(fx-fy), b:200*(fy-fz) };
 }
-
 function spectrumToLab(R){ var xyz=spectrumToXyz(R); return xyzToLabD50(xyz.X, xyz.Y, xyz.Z); }
 
-// sRGB preview (approx from Lab)
+// sRGB swatch (approx D65)
 function labToXyzD65(L,a,b){ var Yn=1, Xn=0.95047, Zn=1.08883; var fy=(L+16)/116; var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; }; return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn }; }
 function labToSrgb(L,a,b){ var xyz = labToXyzD65(L,a,b); var X=xyz.X, Y=xyz.Y, Z=xyz.Z; var r =  3.2406*X -1.5372*Y -0.4986*Z; var g = -0.9689*X +1.8758*Y +0.0415*Z; var b2= 0.0557*X -0.2040*Y +1.0570*Z; function enc(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; } return {r:clamp(Math.round(enc(r)*255),0,255), g:clamp(Math.round(enc(g)*255),0,255), b:clamp(Math.round(enc(b2)*255),0,255)}; }
 
 // ΔE2000
 function deltaE2000(c1,c2){ var L1=c1.L,a1=c1.a,b1=c1.b, L2=c2.L,a2=c2.a,b2=c2.b; var avgLp=(L1+L2)/2; var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2; var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7)))); var a1p=(1+G)*a1, a2p=(1+G)*a2; var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2); function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return h>=0?h:h+360; } var h1p=(C1p<1e-7?0:hp(a1p,b1)), h2p=(C2p<1e-7?0:hp(a2p,b2)); var dLp=L2-L1; var dCp=C2p-C1p; var dhp=h2p-h1p; if (C1p*C2p===0) dhp=0; else if (dhp>180) dhp-=360; else if (dhp<-180) dhp+=360; var dHp=2*Math.sqrt(C1p*C2p)*Math.sin((dhp*Math.PI/180)/2); var avgLp2=(avgLp-50)*(avgLp-50); var Sl=1+0.015*avgLp2/Math.sqrt(20+avgLp2); var Sc=1+0.045*avgC; var avgHp=(Math.abs(h1p-h2p)>180)? (h1p+h2p+360)/2 : (h1p+h2p)/2; var T=1-0.17*Math.cos((avgHp-30)*Math.PI/180)+0.24*Math.cos(2*avgHp*Math.PI/180)+0.32*Math.cos(3*avgHp*Math.PI/180+6*Math.PI/180)-0.20*Math.cos(4*avgHp*Math.PI/180-63*Math.PI/180); var Sh=1+0.015*avgC*T; var Rc=2*Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))); var Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*Math.PI/180); return Math.sqrt((dLp/Sl)*(dLp/Sl)+(dCp/Sc)*(dCp/Sc)+(dHp/Sh)*(dHp/Sh)+Rt*(dCp/Sc)*(dHp/Sh)); }
 
-// ====== Data ======
+/* ===== Data ===== */
 var COLOURS=[], FORMULAS={}, ASSORTMENT={}, IFSX={};
+var DC21_DATA={};
 var FORMULAS_NORM={}, COLOUR_TO_FORMULA={};
 var CODE_NAME={
   "DC21-001":"Extender","DC21-002":"Extender","DC21-901":"White","DC21-802":"Black",
@@ -169,159 +172,168 @@ var CODE_NAME={
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){ if(!name) return null; var m=String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/); return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null; }
 
-function buildFormulaIndex(){ var rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={}; if(Array.isArray(FORMULAS)){ rows.push.apply(rows, FORMULAS); } else if (FORMULAS && typeof FORMULAS==='object'){ Object.keys(FORMULAS).forEach(function(k){ if(Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]); else if (FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows.push.apply(rows, FORMULAS[k].rows); }); } var byColour=new Map(); rows.forEach(function(r){ var cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name; if(!cname) return; var items=[]; for(var i=1;i<=12;i++){ var ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i]; if(!ink) continue; var pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||''; items.push({ink:ink, percent:pct}); } var arr=byColour.get(cname)||[]; arr.push.apply(arr, items); byColour.set(cname, arr); FORMULAS_NORM[normaliseName(cname)]=arr; }); (COLOURS||[]).forEach(function(c){ var name=c.name||c.Colour||c.color||''; var norm=normaliseName(name); if(FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; } var p=extractPmsNumber(name); if(p){ for (var key in FORMULAS_NORM){ if((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; } } } }); }
-
-// ===== Spectral KM core =====
-// From IFSX: per-ink reflectance R∞(λ) at full strength (approx), and maybe a paper ref spectrum.
-var INK_RINF = {}; // code -> R∞[λ]
-var PAPER_R = null; // spectrum of paper (if present), not strictly required for R∞ mixer
-
-// Robust loader for IFSX structure ({colorants:[{name,R}]}, {refs:{name:{R}}})
-function loadIfsx2(data){
-  IFSX = data || {};
-  INK_RINF = {};
-  PAPER_R = null;
-  if (IFSX && IFSX.refs){
-    var keys = Object.keys(IFSX.refs);
-    if (keys.length){
-      var ref = IFSX.refs[keys[0]];
-      if (ref && Array.isArray(ref.R)) PAPER_R = ref.R.slice();
-    }
-  }
-  if (IFSX && Array.isArray(IFSX.colorants)){
-    IFSX.colorants.forEach(function(c){
-      if (!c || !Array.isArray(c.R)) return;
-      var nm = String(c.name || '');
-      var codeGuess = nm.toUpperCase().split(' ')[0];
-      var code = (codeGuess.indexOf('DC')===0 && codeGuess.indexOf('-')>0) ? codeGuess : nm.toUpperCase();
-      INK_RINF[code] = c.R.slice();
-      var friendly = nm.substring(code.length).trim();
-      if (friendly && !CODE_NAME[code]) CODE_NAME[code] = friendly;
+function buildFormulaIndex(){
+  var rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={};
+  if(Array.isArray(FORMULAS)){ rows.push.apply(rows, FORMULAS); }
+  else if (FORMULAS && typeof FORMULAS==='object'){
+    Object.keys(FORMULAS).forEach(function(k){
+      if(Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
+      else if (FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows.push.apply(rows, FORMULAS[k].rows);
     });
   }
-}
-
-// Convert R∞ to q = K/S via KM infinite-layer formula: q = (1-R)^2 / (2R)
-function RinfToQ(R){ var q=new Array(R.length); for (var i=0;i<R.length;i++){ var Ri=clamp(R[i], 1e-6, 0.999999); q[i] = ((1-Ri)*(1-Ri))/(2*Ri); } return q; }
-
-var INK_Q = {}; // code -> q[λ]
-function buildInkQ(){
-  INK_Q = {};
-  Object.keys(INK_RINF).forEach(function(code){
-    var R = INK_RINF[code];
-    if (Array.isArray(R) && R.length === WL.length){
-      INK_Q[code] = RinfToQ(R);
+  var byColour=new Map();
+  rows.forEach(function(r){
+    var cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name; if(!cname) return;
+    var items=[];
+    for(var i=1;i<=12;i++){
+      var ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i]; if(!ink) continue;
+      var pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||'';
+      items.push({ink:ink, percent:pct});
     }
+    var arr=byColour.get(cname)||[]; arr.push.apply(arr, items); byColour.set(cname, arr);
+    FORMULAS_NORM[normaliseName(cname)]=arr;
   });
-}
-
-// We parameterise each ink i by a scalar strength s_i so that its contribution to S is s_i, to K is s_i*q_i.
-// Extender (clear) has q≈0 and its own scattering scalar s_ext. We will fit s_i and s_ext to ladder data.
-var STRENGTH = {}; // code -> s_i
-var S_EXT = 1;     // global extender scattering scalar (DC21-002)
-
-// Predict R∞ of a mix given fractions (including extender) — infinite-thickness approximation
-function mixRinfFromFractions(codes, fracs){
-  var s = sum(fracs); if (!s) return new Array(WL.length).fill(1);
-  // normalise
-  var f = fracs.map(function(x){ return x/s; });
-  // Build K and S
-  var K = new Array(WL.length).fill(0), S = new Array(WL.length).fill(0);
-  for (var i=0;i<codes.length;i++){
-    var code=codes[i], fi=f[i];
-    if (!INK_Q[code]) continue;
-    var si = STRENGTH[code] || 1;
-    var qi = INK_Q[code];
-    for (var j=0;j<WL.length;j++){ K[j] += fi * si * qi[j]; S[j] += fi * si; }
-  }
-  // Add extender scattering from any extender fraction
-  var extFrac=0; for (var k=0;k<codes.length;k++){ if (/\bDC21-002\b|\bDC21-001\b|\bEXTENDER\b/i.test(codes[k])) extFrac += f[k]; }
-  if (extFrac>0){ for (var j2=0;j2<WL.length;j2++){ S[j2] += extFrac * S_EXT; } }
-  // Compute q_mix = K/S and R∞_mix
-  var R = new Array(WL.length);
-  for (var j3=0;j3<WL.length;j3++){
-    var q = (S[j3]>1e-12)? K[j3]/S[j3] : 0;
-    var A = 1 + q; var B = Math.sqrt(Math.max(0, A*A - 1));
-    R[j3] = clamp(A - B, 0, 1);
-  }
-  return R;
-}
-
-// ===== Use ladder (assortment) to fit strengths =====
-var LADDER = {}; // code -> [{conc,L,a,b}, ...] (white ladder)
-
-function loadAssortmentIntoLadders(){
-  LADDER = {};
-  for (var code in ASSORTMENT){
-    var entry = ASSORTMENT[code]; if (!entry) continue;
-    var arr = (entry.white||[]).map(function(s){ return { conc: +s.conc || +s.Conc || +s.concentration || +s.Percent || +s.pct || 0, L:+s.L, a:+s.a, b:+s.b }; })
-      .filter(function(s){ return s.conc>=0 && isFinite(s.L) && isFinite(s.a) && isFinite(s.b); })
-      .sort(function(a,b){ return a.conc-b.conc; });
-    if (arr.length>=2) LADDER[code] = arr;
-  }
-}
-
-function labDeltaE(a,b){ return deltaE2000(a,b); }
-
-function fitStrengths(){
-  // Initial guesses
-  S_EXT = 1.0;
-  Object.keys(INK_Q).forEach(function(code){ STRENGTH[code] = 1.0; });
-  var exCode = findExtenderCode(); if (exCode && !INK_Q[exCode]){ // extender may not have its own spectrum; ok
-    STRENGTH[exCode] = 0.1; // unused
-  }
-
-  // Collect training samples from ladders: for each (code, conc c) build a synthetic mix [code:c, extender:1-c] and compare Lab
-  var samples=[]; var EX = findExtenderCode();
-  Object.keys(LADDER).forEach(function(code){
-    var arr=LADDER[code];
-    arr.forEach(function(s){
-      var c = clamp((+s.conc||0)/100, 0, 1);
-      var mixCodes=[code]; var mixFr=[c];
-      if (EX){ mixCodes.push(EX); mixFr.push(1-c); }
-      var targetLab = {L:+s.L, a:+s.a, b:+s.b};
-      samples.push({codes:mixCodes, fracs:mixFr, lab:targetLab});
-    });
-  });
-
-  // Coordinate descent on strengths to minimise total ΔE
-  function totalErr(){ var e=0; for (var i=0;i<samples.length;i++){ var R=mixRinfFromFractions(samples[i].codes, samples[i].fracs); var Lab=spectrumToLab(R); e += labDeltaE(Lab, samples[i].lab); } return e / Math.max(1, samples.length); }
-
-  var bestErr = totalErr();
-  var keys = Object.keys(INK_Q);
-  var MAX_IT=200; var step=0.25;
-  for (var it=0; it<MAX_IT; it++){
-    var improved=false;
-    // tweak S_EXT
-    for (var sgn=-1; sgn<=1; sgn+=2){
-      var old=S_EXT; S_EXT = Math.max(0.01, S_EXT * (1 + sgn*step));
-      var err=totalErr(); if (err < bestErr){ bestErr=err; improved=true; } else { S_EXT=old; }
-    }
-    // tweak each ink strength
-    for (var k=0;k<keys.length;k++){
-      var code=keys[k];
-      for (var sgn2=-1; sgn2<=1; sgn2+=2){
-        var prev=STRENGTH[code]; STRENGTH[code] = Math.max(0.01, prev * (1 + sgn2*step));
-        var err2=totalErr(); if (err2 < bestErr){ bestErr=err2; improved=true; } else { STRENGTH[code]=prev; }
+  (COLOURS||[]).forEach(function(c){
+    var name=c.name||c.Colour||c.color||'';
+    var norm=normaliseName(name);
+    if(FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; }
+    var p=extractPmsNumber(name);
+    if(p){
+      for (var key in FORMULAS_NORM){
+        if((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; }
       }
     }
-    if (!improved){ step*=0.6; if (step<0.01) break; }
-  }
-  return bestErr;
+  });
 }
 
-function findExtenderCode(){ var ex=null; Object.keys(INK_Q).some(function(code){ if (/\bDC21-002\b|\bDC21-001\b|\bEXTENDER\b/i.test(code)){ ex=code; return true; } return false; }); return ex; }
+/* ===== DC21 InkFormulation parser + KM mixer ===== */
+var INK_COEF = {}; // code -> {k1[],k2[],s1[],s2[]}
+var PAPER_WHITE = null, PAPER_BLACK = null;
 
-// ===== Suggestion engine (uses spectral KM model) =====
-function getCandidateCodes(){ return Object.keys(INK_Q).sort(); }
+function loadDC21(data){
+  try{
+    var root = data && data.InkFormulation && data.InkFormulation.Assortment;
+    if(!root) return;
+    var AD = root.AssortmentData || {};
+    function pickSpectrum(node){
+      try { var v=node.MeasValuePaper.MeasurementValue.Spectrum.Value;
+            if(Array.isArray(v) && v.length===WL.length) return v.map(Number);}catch(e){}
+      try { var v2=node.MeasurementValue.Spectrum.Value;
+            if(Array.isArray(v2) && v2.length===WL.length) return v2.map(Number);}catch(e){}
+      return null;
+    }
+    PAPER_WHITE = pickSpectrum(AD.First || {}) || (AD.First && AD.First.MeasurementValue && AD.First.MeasurementValue.Spectrum && AD.First.MeasurementValue.Spectrum.Value);
+    PAPER_BLACK = pickSpectrum(AD.Second || {}) || (AD.Second && AD.Second.MeasurementValue && AD.Second.MeasurementValue.Spectrum && AD.Second.MeasurementValue.Spectrum.Value);
+    if (Array.isArray(PAPER_WHITE)) PAPER_WHITE = PAPER_WHITE.map(Number);
+    if (Array.isArray(PAPER_BLACK)) PAPER_BLACK = PAPER_BLACK.map(Number);
 
+    var cols = root.Colorants && root.Colorants.Colorant || [];
+    cols.forEach(function(c){
+      var nm = c && c.Header && c.Header.Name || '';
+      var m = String(nm).match(/(DC\d{2}-\d{3})/i);
+      var code = m ? m[1].toUpperCase() : String(nm).toUpperCase();
+      function arr(key){ try{ var v=c[key] && c[key].Value; if(Array.isArray(v) && v.length===WL.length) return v.map(Number);}catch(e){} return null; }
+      var k1=arr('k1'), k2=arr('k2'), s1=arr('s1'), s2=arr('s2');
+      if(k1 && k2 && s1 && s2) INK_COEF[code] = {k1:k1,k2:k2,s1:s1,s2:s2};
+      var friendly = nm.replace(code,'').replace(/^\s*[-—]\s*/, '').trim();
+      if (friendly && !CODE_NAME[code]) CODE_NAME[code] = friendly;
+    });
+    if(INK_COEF['DC21-001'] && !CODE_NAME['DC21-002']) CODE_NAME['DC21-002'] = CODE_NAME['DC21-001'] || 'Extender';
+  }catch(e){ console.warn('loadDC21 parse error', e); }
+}
+
+function getCandidateCodes(){ return Object.keys(INK_COEF).sort(); }
+function findExtenderCode(){ var ex=null; Object.keys(INK_COEF).some(function(code){ if(/\bDC21-002\b|\bDC21-001\b|EXTENDER/i.test(code)){ ex=code; return true; } return false; }); return ex; }
+
+// Build mix K,S by quadratic in share c (relative film share)
+function mixRinfFromFractions(codes, fracs){
+  var s = sum(fracs); if (s<=0) return new Array(WL.length).fill(1);
+  var f = fracs.map(function(x){ return x/s; });
+  var K=new Array(WL.length).fill(0), S=new Array(WL.length).fill(0);
+  for (var i=0;i<codes.length;i++){
+    var c = clamp(f[i], 0, 1);
+    var cf = INK_COEF[codes[i]]; if(!cf) continue;
+    var c2=c*c;
+    for (var j=0;j<WL.length;j++){
+      K[j] += cf.k1[j]*c + cf.k2[j]*c2;
+      S[j] += cf.s1[j]*c + cf.s2[j]*c2;
+    }
+  }
+  var R=new Array(WL.length);
+  for (var j2=0;j2<WL.length;j2++){
+    var Sj=S[j2]; var Kj=K[j2]; var q=(Sj>1e-12)?Kj/Sj:0; var A=1+q; var B=Math.sqrt(Math.max(0,A*A-1)); R[j2]=clamp(A-B,0,1);
+  }
+  return R; // R∞ approximation for recipe; substrate step can be added if needed
+}
 function predictLabForMix(codes, fracs){ var R=mixRinfFromFractions(codes, fracs); return spectrumToLab(R); }
 
+/* ===== UI helpers ===== */
+function codeName(code){
+  return CODE_NAME[String(code).toUpperCase()] || String(code);
+}
+function updateTargetEcho(){
+  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(function(v){return Number.isNaN(v);})){
+    $('#targetEcho').textContent='Target: –'; $('#targetSwatch').style.background='#0000'; return;
+  }
+  $('#targetEcho').textContent='Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
+  var rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+}
+function getTargetLab(){ var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(Number.isNaN)) return null; return {L:L,a:a,b:b}; }
+
+function findClosest(){
+  var target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+  var rows=COLOURS.map(function(c){ return { raw:c, name:c.name||c.Colour||c.color||'—', L:c.L,a:c.a,b:c.b, de:deltaE2000({L:c.L,a:c.a,b:c.b}, target) }; })
+                  .sort(function(a,b){return a.de-b.de;}).slice(0,8);
+  var tbody=$('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(function(r){
+    var tr=document.createElement('tr'); tr.className='result-row';
+    var rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML='<td>'+r.name+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+r.L.toFixed(2)+'</td><td>'+r.a.toFixed(2)+'</td><td>'+r.b.toFixed(2)+'</td><td>'+r.de.toFixed(2)+'</td>';
+    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
+    tbody.appendChild(tr);
+  });
+}
+function findByPms(){
+  var qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
+  var q=qRaw.replace(/^PANTONE\s*/,'');
+  var hits=COLOURS.filter(function(c){ var p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q);});
+  var tbody=$('#resultsTbody'); tbody.innerHTML='';
+  if(!hits.length){ alert('No PMS match found'); return; }
+  hits.slice(0,8).forEach(function(c){
+    var rgb=labToSrgb(c.L,c.a,c.b); var tr=document.createElement('tr'); tr.className='result-row';
+    tr.innerHTML='<td>'+(c.name||c.Colour||c.color||'—')+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+(+c.L).toFixed(2)+'</td><td>'+(+c.a).toFixed(2)+'</td><td>'+(+c.b).toFixed(2)+'</td><td>—</td>';
+    tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); findClosest(); showFormulaFor(c.name||c.Colour||c.color||''); });
+    tbody.appendChild(tr);
+  });
+}
+function showFormulaFor(colourName){
+  var panel=$('#formulaPanel'); var list=null; var bound=COLOUR_TO_FORMULA[colourName];
+  if(bound) list=FORMULAS_NORM[bound];
+  if(!list) list=FORMULAS_NORM[normaliseName(colourName)];
+  if(!list){
+    var want=extractPmsNumber(colourName);
+    if(want){ for (var key in FORMULAS_NORM){ if((extractPmsNumber(key)||'')===want){ list=FORMULAS_NORM[key]; break; } } }
+  }
+  if(!list||!list.length){ panel.style.display='none'; return; }
+  var html='<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
+  list.forEach(function(item){ var name=item.ink||item.Ink||'Ink'; var pct=item.percent!==''? (item.percent+'%') : ''; html+='<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>'; });
+  html+='</div>'; panel.innerHTML=html; panel.style.display='block';
+}
+
+/* ===== Recipe Suggestion (spectral) ===== */
 function suggestRecipeSpectral(target, maxInks, mode){
+  // deterministic RNG seeded by target
+  function mulberry32(seed){ return function(){ var t=seed+=0x6D2B79F5; t=Math.imul(t^(t>>>15), t|1); t^=t+Math.imul(t^(t>>>7), t|61); return ((t^(t>>>14))>>>0)/4294967296; }; }
+  function hash3(L,a,b){ var h=2166136261|0; function mix(x){ h^=(Math.fround(x*1e5)|0); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); } mix(L||0); mix(a||0); mix(b||0); return h>>>0; }
+  var rand = mulberry32(hash3(target.L,target.a,target.b));
+  function randf(){ return rand(); }
+
   var codes=getCandidateCodes(); if(!codes.length) throw new Error('No spectral ink data');
   var EX=findExtenderCode();
-  // Rank by hue proximity (use full-strength R∞ -> Lab to compare)
-  var ranked = codes.map(function(c){ var Lab=spectrumToLab(INK_RINF[c]); return {code:c, de:deltaE2000(Lab,target)}; })
+
+  // rank by full-strength proximity
+  var ranked = codes.map(function(c){ var Lab=predictLabForMix([c],[1]); return {code:c, de:deltaE2000(Lab,target)}; })
                     .sort(function(a,b){return a.de-b.de;}).map(function(o){return o.code;});
   var pool = ranked.slice(0, mode==='full'? Math.max(40, maxInks+20): Math.max(12, maxInks+6));
   if (EX && pool.indexOf(EX)<0) pool.unshift(EX);
@@ -342,7 +354,7 @@ function suggestRecipeSpectral(target, maxInks, mode){
           if (cur.de + 1e-6 < best.de){ best=cur; improved=true; } else { fr=prev; }
         }
       }
-      if(!improved){ var r=Math.floor(Math.random()*fr.length); tryAdjust(fr,r,(Math.random()*2-1)*step*0.1); step*=0.5; }
+      if(!improved){ var r=Math.floor(randf()*fr.length); tryAdjust(fr,r,(randf()*2-1)*step*0.1); step*=0.5; }
     }
     return {codes:active.slice(), fracs:fr.slice(), lab:best.lab, dE:best.de};
   }
@@ -353,11 +365,11 @@ function suggestRecipeSpectral(target, maxInks, mode){
     var T0=(mode==='full'?0.25:0.1), Tend=(mode==='full'?0.0005:0.002), steps=(mode==='full'?5000:200);
     for (var s=0;s<steps;s++){
       var T=T0*Math.pow(Tend/T0, s/(steps-1));
-      var i=Math.floor(Math.random()*fr.length); var j=Math.floor(Math.random()*fr.length); if(i===j) j=(j+1)%fr.length;
-      var prev=curFr.slice(); var amt=(Math.random()*2-1)*(mode==='full'?0.12:0.06);
+      var i=Math.floor(randf()*fr.length); var j=Math.floor(randf()*fr.length); if(i===j) j=(j+1)%fr.length;
+      var prev=curFr.slice(); var amt=(randf()*2-1)*(mode==='full'?0.12:0.06);
       var take=clamp(amt, -curFr[i], curFr[j]); curFr[i]+=take; curFr[j]-=take; normalise(curFr);
       var prop=score(active, curFr); var d=prop.de-cur.de;
-      if (d<0 || Math.exp(-d/Math.max(1e-9,T))>Math.random()){ cur=prop; if(prop.de<best.de){ best=prop; bestFr=curFr.slice(); } }
+      if (d<0 || Math.exp(-d/Math.max(1e-9,T))>randf()){ cur=prop; if(prop.de<best.de){ best=prop; bestFr=curFr.slice(); } }
       else { curFr=prev; }
     }
     return {codes:active.slice(), fracs:bestFr.slice(), lab:best.lab, dE:best.de};
@@ -366,7 +378,18 @@ function suggestRecipeSpectral(target, maxInks, mode){
   var globalBest=null; var comboSets=[];
   function pushCombo(arr){ var set=new Set(), ded=arr.filter(function(c){ if(set.has(c)) return false; set.add(c); return true; }); if(ded.length>=2) comboSets.push(ded); }
   function pickActive(){ var base=[pool[0]]; if(EX) base.unshift(EX); for (var i=1;i<pool.length && base.length<maxInks;i++) if(base.indexOf(pool[i])<0) base.push(pool[i]); return base; }
-  function sampleCombos(){ pushCombo(pickActive()); if(mode==='full'){ var tries=500; for (var t=0;t<tries;t++){ var want=Math.min(maxInks, 2+Math.floor(Math.random()*Math.min(5,maxInks-1))); var combo=[]; if(EX) combo.push(EX); while(combo.length<want){ var c=pool[Math.floor(Math.random()*pool.length)]; if(combo.indexOf(c)<0) combo.push(c); } pushCombo(combo); } } }
+  function sampleCombos(){
+    pushCombo(pickActive());
+    if(mode==='full'){
+      var tries=500;
+      for (var t=0;t<tries;t++){
+        var want=Math.min(maxInks, 2+Math.floor(randf()*Math.min(5,maxInks-1)));
+        var combo=[]; if(EX) combo.push(EX);
+        while(combo.length<want){ var c=pool[Math.floor(randf()*pool.length)]; if(combo.indexOf(c)<0) combo.push(c); }
+        pushCombo(combo);
+      }
+    }
+  }
   sampleCombos();
 
   var NUM_SEEDS=(mode==='full'?320:16);
@@ -374,8 +397,7 @@ function suggestRecipeSpectral(target, maxInks, mode){
     var active=comboSets[cs];
     var seeds=(mode==='full'? Math.max((NUM_SEEDS/Math.max(1,comboSets.length/3))|0,24):NUM_SEEDS);
     for (var s2=0; s2<seeds; s2++){
-      var fr=new Array(active.length); for (var i0=0;i0<fr.length;i0++) fr[i0]=Math.random()+1e-6; var S0=sum(fr); for (var i1=0;i1<fr.length;i1++) fr[i1]/=S0;
-      // encourage extender for light targets
+      var fr=new Array(active.length); for (var i0=0;i0<fr.length;i0++) fr[i0]=randf()+1e-6; var S0=sum(fr); for (var i1=0;i1<fr.length;i1++) fr[i1]/=S0;
       if (EX){ var ti=active.indexOf(EX); if(ti>=0){ fr[ti]=Math.max(fr[ti],0.3); var S1=sum(fr); for (var j=0;j<fr.length;j++) fr[j]/=S1; } }
       var A=anneal(active, fr); var L=localRefine(A.codes, A.fracs);
       var keptC=[], keptF=[]; for (var k=0;k<L.codes.length;k++){ if(L.fracs[k]>=0.01){ keptC.push(L.codes[k]); keptF.push(L.fracs[k]); } }
@@ -386,14 +408,6 @@ function suggestRecipeSpectral(target, maxInks, mode){
   if(!globalBest) throw new Error('Optimisation failed');
   return globalBest;
 }
-
-// ===== UI helpers =====
-function updateTargetEcho(){ var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(function(v){return Number.isNaN(v);})){ $('#targetEcho').textContent='Target: –'; $('#targetSwatch').style.background='#0000'; return; } $('#targetEcho').textContent='Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2); var rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background='rgb('+rgb.r+','+rgb.g+','+rgb.b+')'; }
-function getTargetLab(){ var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(Number.isNaN)) return null; return {L:L,a:a,b:b}; }
-
-function findClosest(){ var target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; } var rows=COLOURS.map(function(c){ return { raw:c, name:c.name||c.Colour||c.color||'—', L:c.L,a:c.a,b:c.b, de:deltaE2000({L:c.L,a:c.a,b:c.b}, target) }; }).sort(function(a,b){return a.de-b.de;}).slice(0,8); var tbody=$('#resultsTbody'); tbody.innerHTML=''; rows.forEach(function(r){ var tr=document.createElement('tr'); tr.className='result-row'; var rgb=labToSrgb(r.L,r.a,r.b); tr.innerHTML='<td>'+r.name+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+r.L.toFixed(2)+'</td><td>'+r.a.toFixed(2)+'</td><td>'+r.b.toFixed(2)+'</td><td>'+r.de.toFixed(2)+'</td>'; tr.addEventListener('click', function(){ showFormulaFor(r.name); }); tbody.appendChild(tr); }); }
-function findByPms(){ var qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; } var q=qRaw.replace(/^PANTONE\s*/,''); var hits=COLOURS.filter(function(c){ var p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q);}); var tbody=$('#resultsTbody'); tbody.innerHTML=''; if(!hits.length){ alert('No PMS match found'); return; } hits.slice(0,8).forEach(function(c){ var rgb=labToSrgb(c.L,c.a,c.b); var tr=document.createElement('tr'); tr.className='result-row'; tr.innerHTML='<td>'+(c.name||c.Colour||c.color||'—')+'</td><td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td><td>'+(+c.L).toFixed(2)+'</td><td>'+(+c.a).toFixed(2)+'</td><td>'+(+c.b).toFixed(2)+'</td><td>—</td>'; tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); findClosest(); showFormulaFor(c.name||c.Colour||c.color||''); }); tbody.appendChild(tr); }); }
-function showFormulaFor(colourName){ var panel=$('#formulaPanel'); var list=null; var bound=COLOUR_TO_FORMULA[colourName]; if(bound) list=FORMULAS_NORM[bound]; if(!list) list=FORMULAS_NORM[normaliseName(colourName)]; if(!list){ var want=extractPmsNumber(colourName); if(want){ for (var key in FORMULAS_NORM){ if((extractPmsNumber(key)||'')===want){ list=FORMULAS_NORM[key]; break; } } } } if(!list||!list.length){ panel.style.display='none'; return; } var html='<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">'; list.forEach(function(item){ var name=item.ink||item.Ink||'Ink'; var pct=item.percent!==''? (item.percent+'%') : ''; html+='<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>'; }); html+='</div>'; panel.innerHTML=html; panel.style.display='block'; }
 
 function suggestFormula(){
   try{
@@ -414,45 +428,47 @@ function suggestFormula(){
       +     '<button class="btn" onclick="document.querySelector(\'#suggestedFormula\').style.display=\'none\'">Close</button>'
       +   '</div>'
       + '</div>';
-    html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.code+' — '+(CODE_NAME[p.code]||p.code)+'</div><div class="fg-pct">'+p.pct.toFixed(1)+'%</div>'; }).join('') + '</div>';
+    html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.code+' — '+codeName(p.code)+'</div><div class="fg-pct">'+p.pct.toFixed(1)+'%</div>'; }).join('') + '</div>';
     var box=$('#suggestedFormula'); if(box){ box.innerHTML=html; box.style.display='block'; }
     $('#predictMsg').textContent='';
   }catch(err){ console.error(err); $('#predictMsg').textContent='Error: '+err.message; }
 }
 
-// ===== Load JSON and boot =====
-Promise.all([
-  fetch('colours.json').then(function(r){return r.json();}),
-  fetch('DC_Formulas.json').then(function(r){return r.json();}),
-  fetch('assortment_colour_data.json').then(function(r){return r.json();}),
-  fetch('ifsx_reflectance_abs.json').then(function(r){return r.json();})
-]).then(function(tuple){
-  COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2]; loadAssortmentIntoLadders();
-  IFSX=tuple[3]; loadIfsx2(IFSX); buildInkQ(); console.log('[IFSX] inks:', Object.keys(INK_RINF).length, 'q-curves:', Object.keys(INK_Q).length); $('#countLabel').textContent=COLOURS.length; buildFormulaIndex();
-  var fitErr = fitStrengths(); console.log('Fitted strengths avg ΔE to ladders:', fitErr.toFixed(3));
-  runTests();
-}).catch(function(err){ alert('Error loading JSON: '+err); });
-
-// Wire UI
+/* ===== Wire + Load ===== */
 $('#findBtn').addEventListener('click', findClosest);
 $('#clearBtn').addEventListener('click', function(){ $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho(); $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none'; $('#suggestedFormula').style.display='none'; });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
+Promise.all([
+  fetch('colours.json').then(function(r){return r.json();}),
+  fetch('DC_Formulas.json').then(function(r){return r.json();}),
+  fetch('assortment_colour_data.json').then(function(r){return r.json();}),
+  fetch('DC21_jan25.json').then(function(r){return r.json();})
+]).then(function(tuple){
+  COLOURS=tuple[0]; FORMULAS=tuple[1]; ASSORTMENT=tuple[2];
+  DC21_DATA=tuple[3]; loadDC21(DC21_DATA);
+  console.log('[DC21] inks:', Object.keys(INK_COEF).length, 'paperW:', !!PAPER_WHITE, 'paperB:', !!PAPER_BLACK);
+  $('#countLabel').textContent=COLOURS.length; buildFormulaIndex();
+  runTests();
+}).catch(function(err){ alert('Error loading JSON: '+err); });
+
 updateTargetEcho();
 
-// ===== Sanity tests =====
+/* ===== Minimal tests ===== */
 function approxEq(a,b,eps){ return Math.abs(a-b) <= (eps||1e-6); }
 function runTests(){
   try{
     console.assert(approxEq(deltaE2000({L:50,a:0,b:0},{L:50,a:0,b:0}),0),'DE00 identity');
-    var anyInk = Object.keys(INK_RINF)[0]; if (anyInk){ var Lab=spectrumToLab(INK_RINF[anyInk]); console.log('[Test] anyInk Lab', anyInk, Lab); }
-    // simple spectral mix sanity
-    var ex=findExtenderCode(); var keys=getCandidateCodes().slice(0,2);
-    if (keys.length>=1){ var R=mixRinfFromFractions([keys[0], ex].filter(Boolean), [0.3,0.7].filter(Boolean)); var L=spectrumToLab(R); console.assert(isFinite(L.L), 'Spectral mix gives Lab'); }
+    var anyInk = Object.keys(INK_COEF)[0]; if (anyInk){ var Lab=predictLabForMix([anyInk],[1]); console.log('[Test] anyInk Lab via KM', anyInk, Lab); }
+    var keys=getCandidateCodes(); var ex=findExtenderCode();
+    if (keys.length>=1){
+      var R=predictLabForMix([keys[0]].concat(ex?[ex]:[]), [0.3].concat(ex?[0.7]:[]));
+      console.assert(isFinite(R.L), 'Spectral mix gives Lab');
+    }
     console.log('[Tests] OK');
-  }catch(e){ console.warn('[Tests] exception', e); }
+  } catch(e){ console.warn('[Tests] exception', e); }
 }
 
 })();
