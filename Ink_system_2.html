@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Ink Mix Predictor — 6v Anilox (Pantone ΔE + KM)</title>
+<title>Ink Mix Predictor — 6v Anilox (Upgraded Solver)</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root{ --bg:#0f1115; --panel:#151923; --muted:#8a90a5; --text:#e9edf3; --accent:#7bd389; --warn:#f6d36b; --bad:#ff7a7a; --chipBorder:#272b34; }
   *{box-sizing:border-box}
   body{margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text)}
   header{padding:18px 22px; border-bottom:1px solid #232737; background:linear-gradient(180deg,#141824,#11141d); display:flex; justify-content:space-between; align-items:center}
-  h1{margin:0; font-size:18px; letter-spacing:.3px}
+  h1{margin:0; font-size:18px}
   #counts{font-size:12px; color:var(--muted)}
   main{display:grid; gap:16px; grid-template-columns: 360px 1fr; padding:18px}
   .card{background:var(--panel); border:1px solid #232737; border-radius:14px; padding:14px}
@@ -50,12 +50,11 @@
 </head>
 <body>
 <header>
-  <h1>🎯 Ink Mix Predictor — Kubelka–Munk (Calibrated: 6-volume anilox)</h1>
+  <h1>🎯 Ink Mix Predictor — Kubelka–Munk, 6v (Upgraded)</h1>
   <div id="counts" class="pill">Pantones: 0 · Formulas: 0 · Colorants: 0</div>
 </header>
 
 <main>
-  <!-- LEFT: Inputs and Nearest Matches -->
   <section class="card">
     <div class="grid">
       <div>
@@ -63,27 +62,16 @@
         <input id="pantoneSearch" placeholder="e.g., PANTONE 186 C" />
       </div>
       <div class="grid cols-3">
-        <div>
-          <label for="L">L*</label>
-          <input id="L" type="number" step="0.01" value="50" />
-        </div>
-        <div>
-          <label for="a">a*</label>
-          <input id="a" type="number" step="0.01" value="0" />
-        </div>
-        <div>
-          <label for="b">b*</label>
-          <input id="b" type="number" step="0.01" value="0" />
-        </div>
+        <div><label for="L">L*</label><input id="L" type="number" step="0.01" value="50" /></div>
+        <div><label for="a">a*</label><input id="a" type="number" step="0.01" value="0" /></div>
+        <div><label for="b">b*</label><input id="b" type="number" step="0.01" value="0" /></div>
       </div>
       <div class="row">
         <button id="matchBtn" class="primary">Find closest 8</button>
         <span class="hint">Enter LAB or pick a Pantone to prefill LAB.</span>
       </div>
     </div>
-
     <div class="hr"></div>
-
     <div id="nearestWrap">
       <div class="flex-between">
         <div class="sectionTitle">Closest Pantone (ΔE00)</div>
@@ -93,7 +81,6 @@
     </div>
   </section>
 
-  <!-- RIGHT: Existing Formula + Predictor -->
   <section class="card">
     <div class="grid">
       <div class="sectionTitle">Existing Formula (if available)</div>
@@ -101,7 +88,7 @@
 
       <div class="hr"></div>
 
-      <div class="sectionTitle">Predict a New Formula (Two-Constant KM)</div>
+      <div class="sectionTitle">Predict a New Formula (KM + upgraded optimiser)</div>
       <div class="grid cols-2">
         <div class="sliderRow">
           <div class="hint">Max ingredients</div>
@@ -122,7 +109,7 @@
             <option value="always">Always include</option>
             <option value="never">Never include</option>
           </select>
-          <div class="pill">Filmweight t₀ auto-fit (6v)</div>
+          <div class="pill">Filmweight t₀ auto-fit (6v) ±10% micro-scale</div>
         </div>
         <div class="row">
           <button id="predictBtn" class="primary">Suggest formula</button>
@@ -149,12 +136,11 @@
 </main>
 
 <div class="footer">
-  Files must sit next to this page: <span class="kbd">colours.json</span> · <span class="kbd">DC_Formulas.json</span> · <span class="kbd">DC21_jan25.json</span> · <span class="kbd">assortment_colour_data.json</span>. |
-  D50/2°, 45/0, gloss excluded. Filmweight locked by 6v calibration (t₀ auto-fit at load).
+  Files required alongside this page: <span class="kbd">colours.json</span> · <span class="kbd">DC_Formulas.json</span> · <span class="kbd">DC21_jan25.json</span> · <span class="kbd">assortment_colour_data.json</span>.
 </div>
 
 <script>
-/* =============== helpers =============== */
+/* ------------ helpers ------------ */
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 function round2(x){ return Math.round(x*100)/100; }
 function numOr(v, alt){
@@ -173,22 +159,30 @@ function asArray(maybe){
   if (maybe && typeof maybe === 'object'){
     if (Array.isArray(maybe.records)) return maybe.records;
     if (Array.isArray(maybe.data)) return maybe.data;
-    // object-map -> values
     return Object.values(maybe);
   }
   return [];
 }
 function canonicalPantoneName(s){
   if(!s) return '';
-  s = String(s).toUpperCase().trim();
-  // Collapse whitespace, ensure single space before suffix (C/U/M/etc)
-  s = s.replace(/\s+/g,' ').replace(/PANTONE\s*/,'PANTONE ');
-  // Insert space before trailing letter if missing: 186C -> 186 C
+  s = String(s).toUpperCase().trim().replace(/\s+/g,' ');
+  s = s.replace(/PANTONE\s*/,'PANTONE ');
   s = s.replace(/(\d)([A-Z])$/, '$1 $2');
   return s;
 }
+function bestInkLabel(c){
+  const cands = [c.DisplayName, c.FullName, c.LongName, c.Name, c.name, c.Label, c.Code, c.code, c.Id, c.id];
+  const nonEmpty = cands.map(x=> (x==null?'':String(x).trim())).filter(x=>x);
+  if(!nonEmpty.length) return 'Ink';
+  // pick the longest string (most descriptive)
+  nonEmpty.sort((a,b)=>b.length-a.length);
+  // include code/id if distinct & short
+  const extra = (c.code||c.Code||c.id||c.Id||'').toString().trim();
+  if(extra && !nonEmpty[0].toLowerCase().includes(extra.toLowerCase())) return nonEmpty[0] + ' ('+extra+')';
+  return nonEmpty[0];
+}
 
-/* =============== colour math =============== */
+/* ------------ colour math ------------ */
 const WL = Array.from({length:36},(_,i)=>380+10*i);
 const CMF = {
   x:[0.001368,0.002236,0.004243,0.007650,0.014310,0.023190,0.043510,0.077630,0.134380,0.214770,0.283900,0.328500,0.348280,0.348060,0.336200,0.318700,0.290800,0.251100,0.195360,0.142100,0.095640,0.057950,0.032010,0.014700,0.004900,0.002400,0.009300,0.029100,0.063270,0.109600,0.165500,0.225750,0.290400,0.359700,0.433450,0.512050],
@@ -255,14 +249,13 @@ function hexFromLab(L,a,b){
   return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
 }
 
-/* =============== KM engine (two-constant; 6v thickness locked) =============== */
-function mixReflectance(colorantSet, fractions, t0, substrateR){
-  const n = WL.length;
-  const K = new Array(n).fill(0), S = new Array(n).fill(0);
+/* ------------ KM engine (two-constant; 6v thickness with micro-scale) ------------ */
+// fractions sum to 1.  R = function of (fractions, t0*s, substrateR)
+function mixReflectance(colorantSet, fractions, t0, s, substrateR){
+  const n = WL.length, K = new Array(n).fill(0), S = new Array(n).fill(0);
   for(let i=0;i<colorantSet.length;i++){
-    const f = fractions[i]*t0; if(f<=0) continue;
-    const cst = colorantSet[i].consts;
-    const k1=cst.k1||[], k2=cst.k2||[], s1=cst.s1||[], s2=cst.s2||[];
+    const f = fractions[i]*t0*s; if(f<=0) continue;
+    const cst = colorantSet[i].consts; const k1=cst.k1||[], k2=cst.k2||[], s1=cst.s1||[], s2=cst.s2||[];
     for(let j=0;j<n;j++){
       const K1=k1[j]||0, K2=k2[j]||0, S1=s1[j]||0, S2=s2[j]||0;
       K[j] += K1*f + K2*f*f;
@@ -284,236 +277,162 @@ function mixReflectance(colorantSet, fractions, t0, substrateR){
   return R;
 }
 
-/* =============== state =============== */
+/* ------------ state ------------ */
 const state = {
   pantones: [],
-  formulas: new Map(),       // key: canonical Pantone
-  colorants: [],             // {name,consts:{k1,k2,s1,s2}}
+  formulas: new Map(),   // key: canonical Pantone
+  colorants: [],         // {meta, name (best), consts}
   substrateR: new Array(WL.length).fill(0.9),
   t0: 1.0,
   blackNames: ['black','pp60 top black','k'],
   extenderNames: ['extender','transparent','clear','base','varnish'],
   assort: null
 };
+function indexOfBlack(){ for (let i=0;i<state.colorants.length;i++){ const nm = state.colorants[i].name.toLowerCase(); for(const kw of state.blackNames){ if(nm.includes(kw)) return i; } } return -1; }
+function indexOfExtender(){ for (let i=0;i<state.colorants.length;i++){ const nm = state.colorants[i].name.toLowerCase(); for(const kw of state.extenderNames){ if(nm.includes(kw)) return i; } } return -1; }
 
-function indexOfBlack(){
-  for (let i=0;i<state.colorants.length;i++){
-    const nm = state.colorants[i].name.toLowerCase();
-    for(const kw of state.blackNames){ if(nm.includes(kw)) return i; }
-  }
-  return -1;
-}
-function indexOfExtender(){
-  for (let i=0;i<state.colorants.length;i++){
-    const nm = state.colorants[i].name.toLowerCase();
-    for(const kw of state.extenderNames){ if(nm.includes(kw)) return i; }
-  }
-  return -1;
-}
-function defaultInkSet(){ return state.colorants.slice(); }
-
-/* =============== robust JSON loaders =============== */
+/* ------------ robust JSON loading ------------ */
 async function loadAll(){
-  /* colours.json */
-  const coloursRaw = await fetchJSON('colours.json');
-  const colours = asArray(coloursRaw);
+  // colours
+  const colours = asArray(await fetchJSON('colours.json'));
   state.pantones = colours.map(o=>{
-    const L = numOr(o.L, o.l);
-    const a = numOr(o.a, o.A);
-    const b = numOr(o.b, o.B);
+    const L = numOr(o.L, o.l); const a = numOr(o.a, o.A); const b = numOr(o.b, o.B);
     const name = (o.Name||o.name||o.Pantone||o.pantone||o.title||'').toString();
-    const hex = (o.Hex || o.hex);
-    return { name, L, a, b, hex: hex || hexFromLab(L,a,b) };
-  }).filter(x => Number.isFinite(x.L) && Number.isFinite(x.a) && Number.isFinite(x.b));
+    const hex = (o.Hex || o.hex) || hexFromLab(L,a,b);
+    return { name, L, a, b, hex };
+  }).filter(x => Number.isFinite(x.L)&&Number.isFinite(x.a)&&Number.isFinite(x.b));
   document.getElementById('pantoneCount').textContent = String(state.pantones.length) + ' total';
 
-  /* DC_Formulas.json */
+  // formulas
   const formRaw = await fetchJSON('DC_Formulas.json');
   const formArr = asArray(formRaw);
-  const asRecords = formArr.length ? formArr
-                   : (formRaw && typeof formRaw==='object'
-                      ? Object.keys(formRaw).map(k => ({ Pantone:k, ...(formRaw[k]||{}) }))
-                      : []);
+  const recs = formArr.length ? formArr
+              : (formRaw && typeof formRaw==='object' ? Object.keys(formRaw).map(k=>({Pantone:k, ...(formRaw[k]||{})})) : []);
   const byCanon = new Map();
-  for(const rec of asRecords){
+  for(const rec of recs){
     const name0 = (rec.Pantone || rec.Pantone_Name || rec.Name || rec.name || '').toString().trim();
-    const key = canonicalPantoneName(name0);
-    if(!key) continue;
-    const entries = [];
-    for(let i=1;i<=10;i++){
+    const key = canonicalPantoneName(name0); if(!key) continue;
+    const entries=[];
+    for(let i=1;i<=12;i++){
       const inkKeys = [`Ink ${i}`, `Ink${i}`, `Colour ${i}`, `Color ${i}`, `Colorant ${i}`, `Ingredient ${i}`];
       const pctKeys = [(i===1?'%':'%'+i), (i+'%'), `Percent${i}`, `P${i}`, `Amount${i}`];
-      let inkName = ''; for(const k of inkKeys){ if(rec[k]!==undefined){ inkName = String(rec[k]).trim(); if(inkName) break; } }
-      let pct = NaN; for(const pk of pctKeys){ if(rec[pk]!==undefined){ const v=Number(rec[pk]); if(Number.isFinite(v)){ pct=v; break; } } }
+      let inkName=''; for(const K of inkKeys){ if(rec[K]!==undefined){ inkName=String(rec[K]).trim(); if(inkName) break; } }
+      let pct=NaN; for(const P of pctKeys){ if(rec[P]!==undefined){ const v=Number(rec[P]); if(Number.isFinite(v)){ pct=v; break; } } }
       if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
     }
-    // fallback: scan arbitrary "Ink N" with "%N"
-    if(entries.length===0){
-      const keys = Object.keys(rec);
+    if(!entries.length){
+      const keys=Object.keys(rec);
       for(const k of keys){
         const m = k.match(/ink\s*([0-9]+)/i);
         if(m){
-          const idx = m[1];
+          const idx=m[1];
           const inkName = (rec[k]||'').toString().trim();
           const pct = Number(rec['%'+(idx==='1'?'':idx)] ?? rec[idx+'%'] ?? rec['Percent'+idx] ?? rec['P'+idx]);
           if(inkName && Number.isFinite(pct)) entries.push({ink: inkName, percent: pct});
         }
       }
     }
-    if(entries.length){
-      byCanon.set(key, entries);
-    }
+    if(entries.length) byCanon.set(key, entries);
   }
   state.formulas = byCanon;
 
-  /* DC21_jan25.json (calibration) */
+  // calibration (substrate + colorants)
   const dc21 = await fetchJSON('DC21_jan25.json');
-  // substrate reflectance: accept {reflectance:{380:..}} OR array length ~36 OR nested
   const subR = findSubstrateReflectance(dc21);
   if(subR && subR.length===WL.length) state.substrateR = subR;
-
-  // colorants: recursively find array of objects with K/S constants
   const cands = findColorants(dc21);
   state.colorants = cands;
 
-  /* assortment (optional) */
-  try{ state.assort = await fetchJSON('assortment_colour_data.json'); }catch(e){ state.assort=null; }
+  // assortment (optional)
+  try{ state.assort = await fetchJSON('assortment_colour_data.json'); }catch{ state.assort=null; }
 
-  // fit t0 from ladders
-  state.t0 = Number.isFinite(fitThicknessFromLadders()) ? fitThicknessFromLadders() : 1.0;
+  // fit t0 (6v)
+  const tFit = fitThicknessFromLadders();
+  state.t0 = Number.isFinite(tFit) ? tFit : 1.0;
 
   // diagnostics
-  document.getElementById('counts').textContent =
-    `Pantones: ${state.pantones.length} · Formulas: ${state.formulas.size} · Colorants: ${state.colorants.length}`;
+  document.getElementById('counts').textContent = `Pantones: ${state.pantones.length} · Formulas: ${state.formulas.size} · Colorants: ${state.colorants.length}`;
   const hint = document.getElementById('calibHint');
-  if(hint) hint.textContent = 'Calibrated for 6v: thickness scalar t₀ = ' + state.t0.toFixed(3) + ' (auto-fit)';
+  if(hint) hint.textContent = 'Calibrated t₀ = '+state.t0.toFixed(3)+' (with ±10% micro-scale in optimisation)';
 }
-
-// substrate finder
 function findSubstrateReflectance(root){
   let best=null;
-  (function walk(obj){
-    if(!obj || typeof obj!=='object') return;
-    // Direct map by wavelength
-    if(obj.reflectance && typeof obj.reflectance==='object'){
-      const arr = WL.map(wl=>{
-        const v = obj.reflectance[wl] ?? obj.reflectance[String(wl)];
-        return (v!=null)? Number(v) : NaN;
-      });
-      if(arr.every(x=>Number.isFinite(x))) best=arr;
+  (function walk(o){
+    if(!o || typeof o!=='object') return;
+    if(o.reflectance){
+      const v=o.reflectance;
+      if(Array.isArray(v) && v.length>=WL.length){ best=v.slice(0,WL.length).map(Number); }
+      else if(typeof v==='object'){
+        const arr=WL.map(wl=> Number(v[wl] ?? v[String(wl)])); if(arr.every(Number.isFinite)) best=arr;
+      }
     }
-    // Array style
-    if(Array.isArray(obj.reflectance) && obj.reflectance.length>=31){
-      const a = obj.reflectance.map(Number);
-      if(a.length>=WL.length) best=a.slice(0,WL.length);
-    }
-    // Keys like Substrate/Backing etc.
-    const keys = Object.keys(obj);
-    for(const k of keys){
-      const low = k.toLowerCase();
-      if(/substrate|backing|white/.test(low) && typeof obj[k]==='object') walk(obj[k]);
-      else if(typeof obj[k]==='object') walk(obj[k]);
-    }
+    for(const k of Object.keys(o)){ const val=o[k]; if(typeof val==='object') walk(val); }
   })(root);
   return best;
-}
-
-// colorant finder
-function findColorants(root){
-  const out=[];
-  (function walk(node){
-    if(!node) return;
-    if(Array.isArray(node)){
-      // If elements look like colorants (have name & km-like block) -> process
-      if(node.length && typeof node[0]==='object'){
-        const looksLike = node.some(el=>{
-          const keys=Object.keys(el||{});
-          return keys.some(k=>/km|constants|k1|s1/i.test(k));
-        });
-        if(looksLike){
-          node.forEach(el=>{
-            const c = normaliseColorant(el);
-            if(c) out.push(c);
-          });
-        }else{
-          node.forEach(walk);
-        }
-      }
-      return;
-    }
-    if(typeof node==='object'){
-      const keys = Object.keys(node);
-      // Direct known key
-      if(node.colorants && Array.isArray(node.colorants)){
-        node.colorants.forEach(el=>{ const c=normaliseColorant(el); if(c) out.push(c); });
-      }
-      // Otherwise keep walking
-      for(const v of Object.values(node)) walk(v);
-    }
-  })(root);
-  // dedupe by name
-  const seen=new Set(); const uniq=[];
-  for(const c of out){
-    const key=(c.name||c.id||'').toLowerCase();
-    if(!key || seen.has(key)) continue;
-    seen.add(key); uniq.push(c);
-  }
-  return uniq;
 }
 function arrFromMaybe36(v){
   if(!v) return null;
   if(Array.isArray(v) && v.length>=WL.length) return WL.map((_,i)=> Number(v[i])||0);
-  if(typeof v==='object'){
-    const a=WL.map(wl=> Number(v[wl] ?? v[String(wl)] ?? 0));
-    return a;
-  }
+  if(typeof v==='object'){ return WL.map(wl=> Number(v[wl] ?? v[String(wl)] ?? 0)); }
   return null;
 }
 function normaliseColorant(el){
   if(!el || typeof el!=='object') return null;
-  const name = String(el.name || el.code || el.id || el.Title || el.Ink || '').trim();
+  const meta = {...el};
+  const nameBest = bestInkLabel(el);
   const km = el.km_constants || el.KM || el.KMConstants || el.km || {};
-  // accept k1/K1 etc.
   const k1 = arrFromMaybe36(km.k1 || km.K1 || el.k1 || el.K1);
   const k2 = arrFromMaybe36(km.k2 || km.K2 || el.k2 || el.K2);
   const s1 = arrFromMaybe36(km.s1 || km.S1 || el.s1 || el.S1);
   const s2 = arrFromMaybe36(km.s2 || km.S2 || el.s2 || el.S2);
   if(!(k1||s1)) return null;
-  return {
-    id: String(el.id || el.code || name),
-    name: name || ('Ink '+Math.random().toString(36).slice(2,6)),
-    consts: {
-      k1: k1 || new Array(WL.length).fill(0),
-      k2: k2 || new Array(WL.length).fill(0),
-      s1: s1 || new Array(WL.length).fill(0),
-      s2: s2 || new Array(WL.length).fill(0)
+  return { meta, name: nameBest, consts:{ k1:k1||new Array(WL.length).fill(0), k2:k2||new Array(WL.length).fill(0), s1:s1||new Array(WL.length).fill(0), s2:s2||new Array(WL.length).fill(0) } };
+}
+function findColorants(root){
+  const out=[];
+  (function walk(node){
+    if(!node) return;
+    if(Array.isArray(node)){
+      if(node.length && typeof node[0]==='object'){
+        const looks = node.some(el=> el && typeof el==='object' && (el.km_constants||el.KM||el.K1||el.k1||el.s1||el.S1));
+        if(looks){ node.forEach(el=>{ const c=normaliseColorant(el); if(c) out.push(c); }); return; }
+      }
+      node.forEach(walk); return;
     }
-  };
+    if(typeof node==='object'){
+      if(Array.isArray(node.colorants)) node.colorants.forEach(el=>{ const c=normaliseColorant(el); if(c) out.push(c); });
+      for(const v of Object.values(node)) walk(v);
+    }
+  })(root);
+  // dedupe by name string
+  const seen = new Set(); const uniq=[];
+  for(const c of out){ const key=c.name.toLowerCase(); if(!seen.has(key)){ seen.add(key); uniq.push(c); } }
+  return uniq;
 }
 
-/* =============== thickness fit (6v) =============== */
+/* ------------ fit t0 from ladders ------------ */
 function fitThicknessFromLadders(){
   if(!state.assort || state.colorants.length===0) return NaN;
-  const idxByName = {}; for(const c of state.colorants){ idxByName[c.name.toLowerCase()] = c; }
-  const samples = [];
+  const idx = new Map(state.colorants.map(c=>[c.name.toLowerCase(), c]));
+  const samples=[];
   (function scan(obj){
     if(!obj) return;
     if(Array.isArray(obj)){ obj.forEach(scan); return; }
     if(typeof obj==='object'){
-      const keys = Object.keys(obj);
+      const keys=Object.keys(obj);
       const hasConc = keys.some(k=>/concentration|percent|strength|load/i.test(k));
       const L = numOr(obj.L, obj.l), A = numOr(obj.A, obj.a), B = numOr(obj.B, obj.b);
       const hasLab = Number.isFinite(L)&&Number.isFinite(A)&&Number.isFinite(B);
       if(hasConc && hasLab){
         const nm = (obj.name || obj.colorant || obj.Colorant || obj.ink || '').toString().trim().toLowerCase();
-        const cobj = idxByName[nm];
-        if(cobj){
+        const c = idx.get(nm);
+        if(c){
           let conc = obj.concentration; if(!Number.isFinite(Number(conc))) conc = obj.percent || obj.strength || obj.load;
           conc = Number(conc);
           if(Number.isFinite(conc)){
-            if(conc>1.0001) conc = conc/100;
-            conc = clamp(conc, 0, 1);
-            samples.push({cobj, conc, lab:{L, a:A, b:B}});
+            if(conc>1.0001) conc/=100;
+            conc = clamp(conc,0,1);
+            samples.push({cobj:c, conc, lab:{L, a:A, b:B}});
           }
         }
       }
@@ -522,29 +441,29 @@ function fitThicknessFromLadders(){
   })(state.assort);
 
   if(samples.length < 10) return NaN;
+
   const extIdx = indexOfExtender();
   function rmsDE(t0){
     let se=0, n=0;
     for(const s of samples){
       const inks = extIdx>=0 ? [s.cobj, state.colorants[extIdx]] : [s.cobj];
       const fr = extIdx>=0 ? [s.conc, 1 - s.conc] : [s.conc];
-      const R = mixReflectance(inks, fr, t0, state.substrateR);
+      const R = mixReflectance(inks, fr, t0, 1.0, state.substrateR);
       const lab = labFromSpectrum(R);
       const dE = deltaE00(lab, s.lab);
       se += dE*dE; n++;
     }
     return Math.sqrt(se/Math.max(1,n));
   }
-  let bestT = 1.0, bestE = Infinity;
-  for(let t=0.6; t<=1.6; t += 0.02){
-    const tt = Number(t.toFixed(2));
-    const e = rmsDE(tt);
-    if(e < bestE){ bestE = e; bestT = tt; }
+  let bestT=1.0, bestE=Infinity;
+  for(let t=0.6; t<=1.6; t+=0.02){
+    const e=rmsDE(Number(t.toFixed(2)));
+    if(e<bestE){ bestE=e; bestT=Number(t.toFixed(2)); }
   }
   return bestT;
 }
 
-/* =============== nearest Pantone + existing formula =============== */
+/* ------------ Nearest Pantone + Existing Formula ------------ */
 function findNearestPantones(L,a,b,k){
   const target = {L:Number(L), a:Number(a), b:Number(b)};
   const scored = state.pantones.map(p=>{
@@ -555,110 +474,215 @@ function findNearestPantones(L,a,b,k){
   return scored.slice(0,k);
 }
 function showExistingFormula(name){
-  const wrap = document.getElementById('existingFormula');
-  const key = canonicalPantoneName(name);
-  const rec = state.formulas.get(key);
+  const wrap=document.getElementById('existingFormula');
+  const key=canonicalPantoneName(name);
+  const rec=state.formulas.get(key);
   if(!rec){ wrap.innerHTML = '<span class="muted">No stored formula for <b>'+name+'</b>.</span>'; return; }
-  const rows = rec.map(r=>(
-    '<tr><td class="mono">'+r.ink+'</td><td class="mono" style="text-align:right">'+round2(r.percent)+'%</td></tr>'
-  )).join('');
+  const rows = rec.map(r=>'<tr><td class="mono">'+r.ink+'</td><td class="mono" style="text-align:right">'+round2(r.percent)+'%</td></tr>').join('');
   wrap.innerHTML = '<div class="flex-between"><div class="sectionTitle" style="margin:0 0 6px 0">'+name+
     '</div><div class="pill small">Total: '+round2(rec.reduce((s,x)=>s+x.percent,0))+'%</div></div>'+
     '<table class="table">'+rows+'</table>';
 }
 
-/* =============== predictor (constraints + optimiser) =============== */
-function defaultInkSet(){ return state.colorants.slice(); }
+/* ------------ Upgraded predictor ------------ */
+// Forward-select up to maxInks best candidates before fine optimisation.
+function selectInkSubset(targetLab, maxInks){
+  const inks = state.colorants;
+  const N = inks.length;
+  const ext = indexOfExtender();
+  const chosen = new Set();
+  // Start from the single ink that alone gets closest
+  function scoreWithSet(testSet){
+    const fr = new Array(N).fill(0);
+    // naive equal split among chosen (normalised below)
+    const arr=[...testSet];
+    for(const i of arr){ fr[i]=1; }
+    // add 0.3 extender if available to stabilise L*
+    if(ext>=0) fr[ext]+=0.3;
+    let s=fr.reduce((a,b)=>a+b,0); for(let i=0;i<N;i++) fr[i]/=s;
+    // quick one-step optimise s (film micro-scale) only, keep fr fixed
+    let best=Infinity, bestS=1.0, bestLab=null;
+    for(let t=0.9;t<=1.1;t+=0.02){
+      const R = mixReflectance(inks, fr, state.t0, t, state.substrateR);
+      const L = labFromSpectrum(R);
+      const d=deltaE00(targetLab, L);
+      if(d<best){best=d; bestS=t; bestLab=L;}
+    }
+    return {de:best, s:bestS, lab:bestLab};
+  }
+  // greedy forward
+  for(let k=0;k<Math.min(maxInks, Math.max(1,N)); k++){
+    let bestI=-1, bestDE=Infinity, bestPack=null;
+    for(let i=0;i<N;i++){
+      if(chosen.has(i)) continue;
+      const test = new Set(chosen); test.add(i);
+      const got=scoreWithSet(test);
+      if(got.de < bestDE){ bestDE=got.de; bestI=i; bestPack=got; }
+    }
+    if(bestI>=0) chosen.add(bestI);
+  }
+  return [...chosen];
+}
+
 function predictMixForLab(targetLab, options){
   const maxInks = Number(options.maxInks)||4;
   const maxBlackPct = Number(options.maxBlackPct)||10;
   const preferExt = options.preferExt || 'auto';
   const seedPantone = options.seedPantone || null;
 
-  const inks = defaultInkSet();
-  if(inks.length===0) throw new Error('No colorants loaded');
-  const n = inks.length;
-  let fractions = new Array(n).fill(0);
+  const inks = state.colorants;
+  if(!inks.length) throw new Error('No colorants loaded');
 
-  // Seed from existing formula if available
-  if(seedPantone && state.formulas.size){
-    const rec = state.formulas.get(canonicalPantoneName(seedPantone));
-    if(rec){
-      let sum=0;
-      for(const r of rec){
-        const idx = inks.findIndex(c=> c.name.toLowerCase() === r.ink.toLowerCase());
-        if(idx>=0){ fractions[idx] = Math.max(0, r.percent/100); sum += r.percent/100; }
-      }
-      if(sum>0){ for(let i=0;i<n;i++) fractions[i]/=sum; }
-    }
-  }
-  // Otherwise greedy start
-  if(fractions.every(v=>v===0)){
-    const ext = indexOfExtender(); if(ext>=0 && preferExt!=='never') fractions[ext]=0.3;
-    function score(i){
-      const test = fractions.slice(); test[i] += 0.35;
-      let s = test.reduce((a,b)=>a+b,0); if(s>1){ for(let j=0;j<n;j++) test[j]/=s; }
-      const R = mixReflectance(inks, test, state.t0, state.substrateR);
-      const lab = labFromSpectrum(R);
-      return -deltaE00(targetLab, lab);
-    }
-    const picks = inks.map((_,i)=>({i,s:score(i)})).sort((a,b)=>b.s-a.s).slice(0,3).map(x=>x.i);
-    const extIdx = indexOfExtender();
-    let chromaSlots = picks.length - (picks.includes(extIdx)?1:0);
-    for(const i of picks){
-      if(i===extIdx) continue;
-      fractions[i] += (chromaSlots>0? (0.7/chromaSlots) : 0.7);
-    }
-    let s=fractions.reduce((a,b)=>a+b,0); if(s>0){ for(let j=0;j<n;j++) fractions[j]/=s; }
-  }
-
+  const N=inks.length;
   const blackIdx = indexOfBlack(), extIdx = indexOfExtender(), kMaxBlack = maxBlackPct/100;
-  function project(vec){
-    for(let i=0;i<n;i++) vec[i] = Math.max(0, vec[i]);
-    if(blackIdx>=0) vec[blackIdx] = Math.min(vec[blackIdx], kMaxBlack);
-    if(extIdx>=0){
-      if(preferExt==='never') vec[extIdx]=0;
-      if(preferExt==='always') vec[extIdx]=Math.max(vec[extIdx], 0.1);
-    }
-    // sparsify
-    const ranked = vec.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
-    const keep = new Set(ranked.slice(0,maxInks).map(x=>x.i));
-    for(let i=0;i<n;i++) if(!keep.has(i)) vec[i]=0;
-    // renorm
-    let sum = vec.reduce((a,b)=>a+b,0);
-    if(sum<=0){ if(extIdx>=0) vec[extIdx]=1; else vec[0]=1; sum=1; }
-    for(let i=0;i<n;i++) vec[i]/=sum;
-    return vec;
+
+  // --- build candidate subset
+  let subset = selectInkSubset(targetLab, maxInks);
+  // seed with stored formula if available to help labels & realism
+  if(seedPantone && state.formulas.has(canonicalPantoneName(seedPantone))){
+    const rec = state.formulas.get(canonicalPantoneName(seedPantone));
+    const indices = rec.map(r=> inks.findIndex(c=> c.name.toLowerCase()===r.ink.toLowerCase())).filter(i=>i>=0);
+    subset = Array.from(new Set([...subset, ...indices])).slice(0, maxInks);
   }
-  function objective(vec){
-    const R = mixReflectance(inks, vec, state.t0, state.substrateR);
+  if(extIdx>=0 && preferExt!=='never' && !subset.includes(extIdx)) subset = [...subset, extIdx].slice(0, maxInks);
+
+  // --- variables: fractions for subset + micro-scale s
+  const M = subset.length;
+  let x = new Array(M).fill(1/M); // start fractions equal
+  let s = 1.0;
+
+  // helper: project fractions under constraints
+  function project(vec){
+    // map back to full length to enforce black cap
+    const full = new Array(N).fill(0);
+    for(let j=0;j<M;j++) full[subset[j]] = Math.max(0, vec[j]);
+    if(blackIdx>=0){ full[blackIdx] = Math.min(full[blackIdx], kMaxBlack); }
+    if(extIdx>=0){
+      if(preferExt==='never') full[extIdx]=0;
+      if(preferExt==='always') full[extIdx]=Math.max(full[extIdx], 0.1);
+    }
+    // sparsify to ≤ maxInks already done by subset
+    let sum=full.reduce((a,b)=>a+b,0);
+    if(sum<=0){ if(extIdx>=0) full[extIdx]=1; else full[subset[0]]=1; sum=1; }
+    for(let i=0;i<N;i++) full[i]/=sum;
+    // return reduced
+    return subset.map(i=>full[i]);
+  }
+
+  function objective(vec, scale){
+    const full = new Array(N).fill(0);
+    for(let j=0;j<M;j++) full[subset[j]] = vec[j];
+    const R = mixReflectance(inks, full, state.t0, scale, state.substrateR);
     const lab = labFromSpectrum(R);
     const dE = deltaE00(targetLab, lab);
-    const pen = 0.002 * vec.reduce((s,x)=> s + Math.abs(x), 0);
-    return {val:dE+pen, dE, lab};
+    // mild L* dev penalty to push toward correct lightness if chroma is similar
+    const pL = Math.abs(lab.L - targetLab.L) * 0.02;
+    return {val:dE + pL, dE, lab};
   }
 
-  let x = project(fractions.slice()); let best = objective(x), bestX = x.slice();
-  let step = 0.28;
-  for(let it=0; it<150; it++){
-    const eps=1e-3, g=new Array(n).fill(0);
-    const f0=objective(x).val;
-    for(let i=0;i<n;i++){
-      const x1=x.slice(); x1[i]+=eps; project(x1);
-      const f1=objective(x1).val; g[i]=(f1-f0)/eps;
+  // multi-start seeds
+  const seeds=[];
+  // 1) equal in subset (+ optional extender)
+  seeds.push({x: project(x.slice()), s:1.0});
+  // 2) seed from existing formula if present
+  if(seedPantone && state.formulas.has(canonicalPantoneName(seedPantone))){
+    const rec = state.formulas.get(canonicalPantoneName(seedPantone));
+    const tmp = new Array(N).fill(0);
+    let tot=0;
+    for(const r of rec){
+      const idx = inks.findIndex(c=> c.name.toLowerCase()===r.ink.toLowerCase());
+      if(idx>=0){ tmp[idx]+=Math.max(0, r.percent/100); tot+=Math.max(0, r.percent/100); }
     }
-    let xCand=x.map((xi,i)=> xi - step*g[i]); xCand=project(xCand);
-    const fCand=objective(xCand);
-    if(fCand.val <= best.val){ x=xCand; best=fCand; bestX=xCand.slice(); step*=1.05; }
-    else step*=0.5;
+    if(tot>0){ for(let i=0;i<N;i++) tmp[i]/=tot; }
+    seeds.push({x: subset.map(i=>tmp[i]||0), s:1.0});
+  }
+  // 3) greedy chroma-biased
+  const tmp3=new Array(N).fill(0); if(extIdx>=0 && preferExt!=='never') tmp3[extIdx]=0.25;
+  for(const i of subset){ if(i!==extIdx) tmp3[i]+= (0.75/(subset.includes(extIdx)?(subset.length-1):subset.length)); }
+  seeds.push({x: subset.map(i=>tmp3[i]||0), s:1.0});
+  // 4-9) random sparse
+  for(let r=0;r<6;r++){
+    const t=new Array(N).fill(0); const picks=[...subset].sort(()=>Math.random()-0.5).slice(0, Math.max(2, Math.min(4, subset.length)));
+    let rem=1.0; picks.forEach((i,idx)=>{ const share = (idx===picks.length-1)?rem: Math.random()*rem; t[i]+=share; rem-=share; });
+    seeds.push({x: subset.map(i=>t[i]||0), s: 0.95 + 0.1*Math.random()});
   }
 
-  const comp = bestX.map((v,i)=>({name: inks[i].name, idx:i, pct: v*100}))
-                    .filter(c=>c.pct>0.05).sort((a,b)=>b.pct-a.pct);
-  return {components: comp, predictedLab: best.lab, dE: best.dE};
+  // run projected gradient on seeds + small line search on s
+  let best={val:Infinity, dE:Infinity, lab:null, x:null, s:1.0};
+  function clampS(v){ return clamp(v, 0.9, 1.1); }
+  for(const sd of seeds){
+    let xk = project(sd.x.slice()); let sk = clampS(sd.s);
+    let step=0.25;
+    for(let it=0; it<140; it++){
+      const eps=1e-3, g=new Array(M).fill(0);
+      const f0=objective(xk, sk).val;
+      for(let j=0;j<M;j++){
+        const x1=xk.slice(); x1[j]+=eps; const x1p=project(x1);
+        const f1=objective(x1p, sk).val; g[j]=(f1-f0)/eps;
+      }
+      // gradient step on x
+      let xc = xk.map((v,j)=> v - step*g[j]); xc = project(xc);
+      // 1D line search on s
+      let bestLoc={val:Infinity, s:sk};
+      for(const tryS of [sk, clampS(sk*1.03), clampS(sk*0.97)]){
+        const f = objective(xc, tryS).val;
+        if(f<bestLoc.val) bestLoc={val:f, s:tryS};
+      }
+      // accept/reject
+      const fCand = bestLoc.val;
+      if(fCand <= f0){ xk=xc; sk=bestLoc.s; step*=1.06; }
+      else { step*=0.5; }
+    }
+    const res = objective(xk, sk);
+    if(res.val < best.val){ best={...res, x:xk, s:sk}; }
+  }
+
+  // Nelder–Mead local polish on [x..., s]
+  function nmPolish(startX, startS){
+    const D = M+1; // simplex size = dim+1 (dim=M fractions + 1 scale) but we keep sum-to-1 via projection; so treat as M+1 variables with projection
+    const vertices=[]; const base = startX.slice(); let s0=startS;
+    function pack(vx, vs){ return {x: project(vx), s: clamp(vs,0.9,1.1)}; }
+    vertices.push(pack(base, s0));
+    for(let j=0;j<M;j++){
+      const v=base.slice(); v[j]+=0.08; vertices.push(pack(v, s0));
+    }
+    vertices.push(pack(base, clamp(s0*1.02,0.9,1.1)));
+    function f(v){ return objective(v.x, v.s).val; }
+    let V=vertices.map(v=>({v, f:f(v)}));
+    for(let it=0; it<60; it++){
+      V.sort((a,b)=>a.f-b.f);
+      const bestV=V[0].v, worstV=V[V.length-1].v;
+      // centroid of all but worst
+      const c=new Array(M).fill(0); let cs=0;
+      for(let i=0;i<V.length-1;i++){ for(let j=0;j<M;j++) c[j]+=V[i].v.x[j]; cs+=V[i].v.s; }
+      for(let j=0;j<M;j++) c[j]/=(V.length-1); cs/=(V.length-1);
+      const reflect = pack(c.map((cj,j)=> cj + (cj - worstV.x[j])), cs + (cs - worstV.s));
+      const fr = f(reflect);
+      if(fr < V[V.length-2].f){
+        // accept reflect
+        V[V.length-1]={v:reflect, f:fr};
+      } else {
+        // contraction toward best
+        const contr = pack(bestV.x.map((bj,j)=> (bj + worstV.x[j])/2), (bestV.s + worstV.s)/2);
+        V[V.length-1]={v:contr, f:f(contr)};
+      }
+    }
+    V.sort((a,b)=>a.f-b.f);
+    return V[0];
+  }
+  const polished = nmPolish(best.x, best.s);
+  const finalX = polished.v.x, finalS = polished.v.s;
+  const finalObj = objective(finalX, finalS);
+
+  // build components list with proper names
+  const full = new Array(N).fill(0); for(let j=0;j<M;j++) full[subset[j]] = finalX[j];
+  const components = full.map((v,i)=>({ name: state.colorants[i].name, pct: v*100 }))
+                         .filter(c=>c.pct>0.05).sort((a,b)=>b.pct-a.pct);
+
+  return {components, predictedLab: finalObj.lab, dE: finalObj.dE};
 }
 
-/* =============== UI =============== */
+/* ------------ UI ------------ */
 function el(id){ return document.getElementById(id); }
 function renderNearest(list){
   const wrap=el('nearestList'); wrap.innerHTML='';
@@ -689,9 +713,8 @@ function renderPrediction(result){
   out.style.display='block';
 }
 
-/* =============== bootstrap =============== */
+/* ------------ bootstrap ------------ */
 window.addEventListener('DOMContentLoaded', async ()=>{
-  const status=el('predictStatus');
   const maxInks=el('maxInks'), maxInksVal=el('maxInksVal');
   maxInks.addEventListener('input', ()=> maxInksVal.textContent = String(maxInks.value));
   const maxBlack=el('maxBlack'), maxBlackVal=el('maxBlackVal');
@@ -712,8 +735,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 
   el('matchBtn').addEventListener('click', ()=>{
     const L = Number(el('L').value), a = Number(el('a').value), b = Number(el('b').value);
-    const nearest = findNearestPantones(L,a,b,8);
-    renderNearest(nearest);
+    renderNearest(findNearestPantones(L,a,b,8));
   });
 
   el('predictBtn').addEventListener('click', ()=>{
