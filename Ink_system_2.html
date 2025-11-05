@@ -1,693 +1,677 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<title>Ink Mix Predictor — 6v Anilox (IFS Calibrated)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>
-  :root{ --bg:#0f1115; --panel:#151923; --muted:#8a90a5; --text:#e9edf3; --accent:#7bd389; --warn:#f6d36b; --bad:#ff7a7a; --chipBorder:#272b34; }
-  *{box-sizing:border-box}
-  body{margin:0; font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial; background:var(--bg); color:var(--text)}
-  header{padding:18px 22px; border-bottom:1px solid #232737; background:linear-gradient(180deg,#141824,#11141d); display:flex; justify-content:space-between; align-items:center}
-  h1{margin:0; font-size:18px}
-  #counts{font-size:12px; color:var(--muted)}
-  main{display:grid; gap:16px; grid-template-columns: 360px 1fr; padding:18px}
-  .card{background:var(--panel); border:1px solid #232737; border-radius:14px; padding:14px}
-  .row{display:flex; gap:10px; align-items:center}
-  label{display:block; font-size:12px; color:var(--muted); margin-bottom:4px}
-  input[type="number"], input[type="text"], select{
-    width:100%; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3f; background:#0e111a; color:var(--text); outline:none;
-  }
-  input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button{appearance:none;margin:0}
-  button{ background:#1c2230; color:var(--text); border:1px solid #2a2f3f; padding:10px 12px; border-radius:10px; cursor:pointer; }
-  button.primary{background:var(--accent); color:#0b1016; border:none; font-weight:600}
-  .grid{display:grid; gap:10px}
-  .grid.cols-2{grid-template-columns:1fr 1fr}
-  .grid.cols-3{grid-template-columns:1fr 1fr 1fr}
-  .muted{color:var(--muted)}
-  .pill{display:inline-block; padding:2px 8px; border-radius:999px; border:1px solid #2a2f3f; color:var(--muted); font-size:12px}
-  .chip{width:36px; height:24px; border-radius:6px; border:1px solid var(--chipBorder); background:#777}
-  .list{display:grid; gap:8px; margin-top:6px}
-  .swatchRow{display:grid; grid-template-columns: 48px 1fr auto; gap:12px; align-items:center; padding:8px; border-radius:10px; border:1px solid #222738; background:#111521}
-  .swatchRow:hover{border-color:#2e3448}
-  .linkish{cursor:pointer; text-decoration:none; color:inherit}
-  .tag{font-size:11px; padding:2px 6px; border-radius:999px; border:1px solid #2a2f3f; color:var(--muted); background:#0f1420}
-  .sectionTitle{font-weight:600; margin:4px 0 8px}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
-  .flex-between{display:flex; justify-content:space-between; align-items:center}
-  .bad{color:var(--bad)} .warn{color:var(--warn)} .good{color:var(--accent)}
-  .table{width:100%; border-collapse:separate; border-spacing:0 6px; font-size:13px}
-  .table td{padding:6px 8px; background:#0f131f; border-top:1px solid #22283a; border-bottom:1px solid #22283a}
-  .table tr td:first-child{border-left:1px solid #22283a; border-top-left-radius:8px; border-bottom-left-radius:8px}
-  .table tr td:last-child{border-right:1px solid #22283a; border-top-right-radius:8px; border-bottom-right-radius:8px}
-  .small{font-size:12px}
-  .sliderRow{display:grid; grid-template-columns:120px 1fr 56px; gap:10px; align-items:center}
-  .hint{font-size:12px; color:var(--muted)}
-  .hr{height:1px; background:#22283a; margin:10px 0}
-  .kbd{font-size:12px; border:1px solid #2a2f3f; background:#111521; padding:2px 6px; border-radius:6px}
-  .footer{padding:12px 18px; border-top:1px solid #232737; color:var(--muted); font-size:12px}
-</style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Ink Colour Matcher + Predictor</title>
+  <style>
+    :root { --gap: 12px; --radius: 14px; }
+    * { box-sizing: border-box; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
+    .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+    label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
+    input, select { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
+    input::placeholder { color:#7b8496; }
+    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
+    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
+    .btn:hover { filter:brightness(1.1); }
+    table { width:100%; border-collapse:collapse; }
+    th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
+    th { color:#9aa4b2; font-weight:600; }
+    .result-row { transition: background .2s; cursor:pointer; }
+    .result-row:hover { background: rgba(255,255,255,.05); }
+    .swatch { width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
+    .pill { font-size:.8rem; color:#98a2b3; }
+    .muted { color:#7b8496; font-size:.85rem; }
+    .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
+    .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
+    .formula-grid { display:grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items:center; }
+    .fg-ink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
+    .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .flex { display:flex; gap:8px; }
+    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+  </style>
 </head>
 <body>
-<header>
-  <h1>🎯 Ink Mix Predictor — Kubelka–Munk, 6v (IFS calibrated)</h1>
-  <div id="counts" class="pill">Pantones: 0 · Formulas: 0 · Colorants: 0</div>
-</header>
-
-<main>
-  <section class="card">
-    <div class="grid">
-      <div>
-        <label for="pantoneSearch">Pantone search (optional)</label>
-        <input id="pantoneSearch" placeholder="e.g., PANTONE 186 C" />
-      </div>
-      <div class="grid cols-3">
-        <div><label for="L">L*</label><input id="L" type="number" step="0.01" value="50" /></div>
-        <div><label for="a">a*</label><input id="a" type="number" step="0.01" value="0" /></div>
-        <div><label for="b">b*</label><input id="b" type="number" step="0.01" value="0" /></div>
-      </div>
-      <div class="row">
-        <button id="matchBtn" class="primary">Find closest 8</button>
-        <span class="hint">Enter LAB or pick a Pantone to prefill LAB.</span>
-      </div>
-    </div>
-    <div class="hr"></div>
-    <div id="nearestWrap">
-      <div class="flex-between">
-        <div class="sectionTitle">Closest Pantone (ΔE00)</div>
-        <div class="pill small" id="pantoneCount">0 total</div>
-      </div>
-      <div class="list" id="nearestList"></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="grid">
-      <div class="sectionTitle">Existing Formula (if available)</div>
-      <div id="existingFormula" class="muted small">Click a Pantone from the left to reveal stored formula.</div>
-
-      <div class="hr"></div>
-
-      <div class="sectionTitle">Predict a New Formula (KM + optimiser)</div>
-      <div class="grid cols-2">
-        <div class="sliderRow">
-          <div class="hint">Max ingredients</div>
-          <input id="maxInks" type="range" min="2" max="6" step="1" value="4" />
-          <div class="pill" id="maxInksVal">4</div>
-        </div>
-        <div class="sliderRow">
-          <div class="hint">Max Black (%)</div>
-          <input id="maxBlack" type="range" min="0" max="40" step="1" value="10" />
-          <div class="pill" id="maxBlackVal">10%</div>
-        </div>
-      </div>
-      <div class="grid cols-2">
-        <div class="sliderRow">
-          <div class="hint">Extender policy</div>
-          <select id="preferExt">
-            <option value="auto" selected>Auto</option>
-            <option value="always">Always include</option>
-            <option value="never">Never include</option>
-          </select>
-          <div class="pill">Filmweight t₀ auto-fit (6v) ±10% micro-scale</div>
-        </div>
-        <div class="row">
-          <button id="predictBtn" class="primary">Suggest formula</button>
-          <span id="predictStatus" class="hint"></span>
+  <div class="app">
+    <!-- Left Column: Target + Controls -->
+    <div class="card">
+      <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
+        <h1>Ink Colour Matcher</h1>
+        <div class="pill">
+          <span id="countLabel">0</span> reference colours
         </div>
       </div>
 
-      <div class="hr"></div>
-
-      <div id="predictionOutput" style="display:none">
-        <div class="flex-between">
-          <div class="sectionTitle">Suggested Mix</div>
-          <div id="predDe" class="pill">ΔE00: –</div>
-        </div>
-        <table class="table" id="mixTable"></table>
-        <div class="row">
-          <div class="pill" id="predLab">L*a*b*: –</div>
-          <div id="predWarn" class="hint"></div>
-        </div>
-        <div class="hint" id="calibHint"></div>
+      <div class="row" style="margin-top:12px;">
+        <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
+        <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
+        <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
       </div>
-    </div>
-  </section>
-</main>
 
-<div class="footer">
-  Place these files alongside this page: <span class="kbd">colours.json</span> · <span class="kbd">DC_Formulas.json</span> · <span class="kbd">DC21_jan25.json</span> · <span class="kbd">assortment_colour_data.json</span> · <span class="kbd">ifsx_reflectance_abs.json</span> (optional but recommended).
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="pms">Search by PMS (number only)</label>
+          <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+        </div>
+        <div style="align-self:end;">
+          <button class="btn" id="pmsBtn">Find PMS</button>
+        </div>
+      </div>
+
+      <div class="flex" style="margin-top:12px;">
+        <button class="btn" id="findBtn">Find Closest</button>
+        <button class="btn" id="clearBtn">Clear</button>
+        <span class="muted" id="statusMsg" aria-live="polite"></span>
+      </div>
+<!-- Predictor Controls -->
+      <div class="formula-box" id="predictorBox">
+        <h2>Suggest Formula (uses over‑white only)</h2>
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="maxInks">Max inks in recipe</label>
+            <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
+          </div>
+        </div>
+        <div class="flex">
+          <button class="btn" id="suggestBtn">Suggest Formula</button>
+          <div id="predictMsg" class="muted" style="align-self:center;"></div>
+        </div>
+        <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+<!-- Logging UI injected -->
+<div class="row2" style="margin-top:8px;">
+  <div>
+    <label for="pantoneName">Pantone / Name</label>
+    <input id="pantoneName" type="text" placeholder="e.g. PANTONE 485 C">
+  </div>
+  <div>
+    <label for="notes">Notes (optional)</label>
+    <input id="notes" type="text" placeholder="press/anilox/edits...">
+  </div>
+</div>
+<div class="row" style="margin-top:8px;">
+  <div><label for="mL">Measured L*</label><input id="mL" type="number" step="0.01"></div>
+  <div><label for="mA">Measured a*</label><input id="mA" type="number" step="0.01"></div>
+  <div><label for="mB">Measured b*</label><input id="mB" type="number" step="0.01"></div>
+</div>
+<div class="flex" style="margin-top:8px;">
+  <button class="btn" id="logBtn">Log approved</button>
+  <span class="muted" id="logMsg" aria-live="polite"></span>
 </div>
 
+      </div>
+
+    </div>
+
+    <!-- Right Column: Results -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h1>Closest Matches</h1>
+        <div class="stack" style="align-items:center;">
+          <div class="swatch" id="targetSwatch" title="Target"></div>
+          <div class="muted" id="targetEcho">Target: –</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Colour</th>
+            <th>Swatch</th>
+            <th>L*</th>
+            <th>a*</th>
+            <th>b*</th>
+            <th>Distance</th>
+          </tr>
+        </thead>
+        <tbody id="resultsTbody"></tbody>
+      </table>
+      <div id="formulaPanel" class="formula-box" style="display:none;"></div>
+    </div>
+  </div>
+
 <script>
-/* ---------- helpers ---------- */
-function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-function round2(x){ return Math.round(x*100)/100; }
-function numOr(v, alt){
-  const n = (v === null || v === undefined || v === '') ? NaN : Number(v);
-  if (Number.isFinite(n)) return n;
-  const m = (alt === null || alt === undefined || alt === '') ? NaN : Number(alt);
-  return Number.isFinite(m) ? m : NaN;
+// === API config & helpers ===
+const API_BASE = 'https://<your-render-service>.onrender.com'; // ← set this
+if (typeof window.$ === 'undefined') window.$ = (s)=>document.querySelector(s);
+
+(function(){
+'use strict';
+// ===== Utilities =====
+function $(sel){ return document.querySelector(sel); }
+function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+// D65 reference white (2°)
+function labToXyz(L,a,b){
+  var Yn=1, Xn=0.95047, Zn=1.08883;
+  var fy=(L+16)/116;
+  var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
+  return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
-async function fetchJSON(path){
-  const r = await fetch(path);
-  if(!r.ok) throw new Error('Failed to fetch '+path+': '+r.status+' '+r.statusText);
-  return r.json();
+function xyzToLab(X,Y,Z){
+  var Xn=0.95047, Yn=1, Zn=1.08883;
+  var f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
+  var L = 116*f(Y/Yn)-16;
+  var a = 500*(f(X/Xn)-f(Y/Yn));
+  var b = 200*(f(Y/Yn)-f(Z/Zn));
+  return {L:L,a:a,b:b};
 }
-function asArray(maybe){
-  if (Array.isArray(maybe)) return maybe;
-  if (maybe && typeof maybe === 'object'){
-    if (Array.isArray(maybe.records)) return maybe.records;
-    if (Array.isArray(maybe.data)) return maybe.data;
-    return Object.values(maybe);
-  }
-  return [];
-}
-function canonicalPantoneName(s){
-  if(!s) return '';
-  s = String(s).toUpperCase().trim().replace(/\s+/g,' ').replace(/PANTONE\s*/,'PANTONE ');
-  return s.replace(/(\d)([A-Z])$/, '$1 $2');
-}
-function extractInkCode(str){
-  if(!str) return '';
-  const m = String(str).match(/DC\d{2,}-\d{3,}/i);
-  return m ? m[0].toUpperCase() : '';
+function labToSrgb(L,a,b){
+  // Lab (D65) -> XYZ (D65) -> sRGB
+  var xyz = labToXyz(L,a,b);
+  var X=xyz.X, Y=xyz.Y, Z=xyz.Z;
+  var r =  3.2406*X -1.5372*Y -0.4986*Z;
+  var g = -0.9689*X +1.8758*Y +0.0415*Z;
+  var b2=  0.0557*X -0.2040*Y +1.0570*Z;
+  var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; });
+  r=clamp(Math.round(lin[0]*255),0,255);
+  g=clamp(Math.round(lin[1]*255),0,255);
+  b2=clamp(Math.round(lin[2]*255),0,255);
+  return {r:r,g:g,b:b2};
 }
 
-/* ---------- colour math ---------- */
-const WL = Array.from({length:36},(_,i)=>380+10*i);
-const CMF = {
-  x:[0.001368,0.002236,0.004243,0.007650,0.014310,0.023190,0.043510,0.077630,0.134380,0.214770,0.283900,0.328500,0.348280,0.348060,0.336200,0.318700,0.290800,0.251100,0.195360,0.142100,0.095640,0.057950,0.032010,0.014700,0.004900,0.002400,0.009300,0.029100,0.063270,0.109600,0.165500,0.225750,0.290400,0.359700,0.433450,0.512050],
-  y:[0.000039,0.000064,0.000120,0.000217,0.000396,0.000640,0.001210,0.002180,0.004000,0.007300,0.011600,0.016840,0.023000,0.029800,0.038000,0.048000,0.060000,0.073900,0.090980,0.112600,0.139020,0.169300,0.208020,0.258600,0.323000,0.407300,0.503000,0.608200,0.710000,0.793200,0.862000,0.914850,0.954000,0.980300,0.994950,1.000000],
-  z:[0.006450,0.010550,0.020050,0.036210,0.067850,0.110200,0.207400,0.371300,0.645600,1.039050,1.385600,1.622960,1.747060,1.782600,1.772110,1.744100,1.669200,1.528100,1.287640,1.041900,0.812950,0.616200,0.465180,0.353300,0.272000,0.212300,0.158200,0.111700,0.078250,0.057250,0.042160,0.029840,0.020300,0.013400,0.008750,0.005750]
-};
-const D50 = [0.0341,0.3601,0.6861,1.0120,1.3382,1.6643,1.9903,2.3164,2.6424,2.9685,3.2945,3.6205,3.9466,4.2726,4.5987,4.9247,5.2508,5.5768,5.9029,6.2289,6.5550,6.8810,7.2070,7.5331,7.8591,8.1852,8.5112,8.8373,9.1633,9.4893,9.8154,10.141,10.467,10.793,11.119,11.445];
-function trapz(y, step){ let s=0; for(let i=1;i<y.length;i++) s += (y[i-1]+y[i]); return s * step/2; }
-const k_norm = 100 / trapz(WL.map((_,i)=>D50[i]*CMF.y[i]),10);
-const whiteD50 = (()=>({ X: k_norm*trapz(WL.map((_,i)=>D50[i]*CMF.x[i]),10), Y:100, Z: k_norm*trapz(WL.map((_,i)=>D50[i]*CMF.z[i]),10) }))();
-function xyzFromSpectrum(R){
-  const X = k_norm*trapz(WL.map((_,i)=>D50[i]*R[i]*CMF.x[i]),10);
-  const Y = k_norm*trapz(WL.map((_,i)=>D50[i]*R[i]*CMF.y[i]),10);
-  const Z = k_norm*trapz(WL.map((_,i)=>D50[i]*R[i]*CMF.z[i]),10);
-  return {X,Y,Z};
-}
-function labFromXYZ(X,Y,Z){
-  const xr = X/whiteD50.X, yr = Y/whiteD50.Y, zr = Z/whiteD50.Z;
-  const f = t => t>0.008856? Math.cbrt(t): (7.787*t + 16/116);
-  const fx=f(xr), fy=f(yr), fz=f(zr);
-  const L = 116*fy - 16, a = 500*(fx-fy), b = 200*(fy-fz);
-  return {L,a,b};
-}
-function labFromSpectrum(R){ const {X,Y,Z} = xyzFromSpectrum(R); return labFromXYZ(X,Y,Z); }
-function deltaE00(l1,l2){
-  const L1=l1.L, a1=l1.a, b1=l1.b, L2=l2.L, a2=l2.a, b2=l2.b;
-  const kL=1,kC=1,kH=1;
-  const C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), Cbar=(C1+C2)/2;
-  const G=0.5*(1-Math.sqrt(Math.pow(Cbar,7)/(Math.pow(Cbar,7)+Math.pow(25,7))));
-  const a1p=(1+G)*a1, a2p=(1+G)*a2, C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2);
-  const h1p=(Math.atan2(b1,a1p)*180/Math.PI+(Math.atan2(b1,a1p)<0?360:0));
-  const h2p=(Math.atan2(b2,a2p)*180/Math.PI+(Math.atan2(b2,a2p)<0?360:0));
-  const dLp=L2-L1, dCp=C2p-C1p;
-  let dhp=0; if(C1p*C2p!==0){ dhp=h2p-h1p; if(dhp>180) dhp-=360; if(dhp<-180) dhp+=360; }
-  const dHp=2*Math.sqrt(C1p*C2p)*Math.sin((dhp*Math.PI/180)/2);
-  const Lbar=(L1+L2)/2, Cbarp=(C1p+C2p)/2;
-  const hbarp=(C1p*C2p===0)?(h1p+h2p): (Math.abs(h1p-h2p)>180?(h1p+h2p+360)/2:(h1p+h2p)/2);
-  const T=1-0.17*Math.cos((hbarp-30)*Math.PI/180)+0.24*Math.cos((2*hbarp)*Math.PI/180)+0.32*Math.cos((3*hbarp+6)*Math.PI/180)-0.20*Math.cos((4*hbarp-63)*Math.PI/180);
-  const Sl=1+(0.015*Math.pow(Lbar-50,2))/Math.sqrt(20+Math.pow(Lbar-50,2)), Sc=1+0.045*Cbarp, Sh=1+0.015*Cbarp*T;
-  const delTheta=30*Math.exp(-Math.pow((hbarp-275)/25,2)); const Rc=2*Math.sqrt(Math.pow(Cbarp,7)/(Math.pow(Cbarp,7)+Math.pow(25,7)));
-  const Rt=-Rc*Math.sin(2*delTheta*Math.PI/180);
-  return Math.sqrt(Math.pow(dLp/(kL*Sl),2)+Math.pow(dCp/(kC*Sc),2)+Math.pow(dHp/(kH*Sh),2)+Rt*(dCp/(kC*Sc))*(dHp/(kH*Sh)));
-}
-function hexFromLab(L,a,b){
-  if(!Number.isFinite(L)||!Number.isFinite(a)||!Number.isFinite(b)) return '#777';
-  const fy=(L+16)/116, fx=a/500+fy, fz=fy-b/200;
-  const xr=fx**3>0.008856?fx**3:(116*fx-16)/903.3;
-  const yr=L>8?fy**3:L/903.3;
-  const zr=fz**3>0.008856?fz**3:(116*fz-16)/903.3;
-  let X=xr*whiteD50.X, Y=yr*whiteD50.Y, Z=zr*whiteD50.Z;
-  const Ma=[[0.8951,0.2664,-0.1614],[-0.7502,1.7135,0.0367],[0.0389,-0.0685,1.0296]];
-  const MaI=[[0.9869929,-0.1470543,0.1599627],[0.4323053,0.5183603,0.0492912],[-0.0085287,0.0400428,0.9684867]];
-  const mul=(M,v)=>[M[0][0]*v[0]+M[0][1]*v[1]+M[0][2]*v[2],M[1][0]*v[0]+M[1][1]*v[1]+M[1][2]*v[2],M[2][0]*v[0]+M[2][1]*v[1]+M[2][2]*v[2]];
-  const D50w=[whiteD50.X,whiteD50.Y,whiteD50.Z], D65w=[95.047,100,108.883];
-  const cW=mul(Ma,D50w), cD=mul(Ma,D65w), c=mul(Ma,[X,Y,Z]);
-  const S=[cD[0]/cW[0], cD[1]/cW[1], cD[2]/cW[2]], aXYZ=mul(MaI,[c[0]*S[0],c[1]*S[1],c[2]*S[2]]);
-  X=aXYZ[0]; Y=aXYZ[1]; Z=aXYZ[2];
-  let r= 3.2406*X/100 + -1.5372*Y/100 + -0.4986*Z/100;
-  let g=-0.9689*X/100 +  1.8758*Y/100 +  0.0415*Z/100;
-  let b2= 0.0557*X/100 + -0.2040*Y/100 +  1.0570*Z/100;
-  const gamma=u=>u<=0.0031308?12.92*u:(1.055*Math.pow(u,1/2.4)-0.055);
-  [r,g,b2]=[r,g,b2].map(u=>gamma(clamp(u,0,1)));
-  const toHex=t=>(Math.round(t*255)).toString(16).padStart(2,'0');
-  return `#${toHex(r)}${toHex(g)}${toHex(b2)}`;
+// ΔE2000 (kL=kC=kH=1)
+function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
+function deltaE2000(l1,l2){
+  var L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
+  var deg2rad=Math.PI/180;
+  var avgLp=(L1+L2)/2;
+  var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
+  var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
+  var a1p=(1+G)*a1, a2p=(1+G)*a2;
+  var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
+  var h1p=hp(a1p,b1), h2p=hp(a2p,b2);
+  var avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
+  var T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
+          + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
+  var dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
+  var dLp = L2 - L1;
+  var dCp = C2p - C1p;
+  var dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
+  var Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
+  var Sc = 1 + 0.045*avgCp;
+  var Sh = 1 + 0.015*avgCp*T;
+  var Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
+          * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
+  return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
-/* ---------- KM engine (two-constant; 6v thickness with micro-scale & surface reflection) ---------- */
-function mixReflectance(colorantSet, fractions, t0, s, substrateR, surfaceRef){
-  const n = WL.length, K = new Array(n).fill(0), S = new Array(n).fill(0);
-  for(let i=0;i<colorantSet.length;i++){
-    const f = fractions[i]*t0*s; if(f<=0) continue;
-    const cst = colorantSet[i].consts||{}; const k1=cst.k1||[], k2=cst.k2||[], s1=cst.s1||[], s2=cst.s2||[];
-    for(let j=0;j<n;j++){
-      const K1=k1[j]||0, K2=k2[j]||0, S1=s1[j]||0, S2=s2[j]||0;
-      K[j] += K1*f + K2*f*f;
-      S[j] += S1*f + S2*f*f;
-    }
-  }
-  for(let j=0;j<n;j++){ if(S[j]<=1e-12) S[j]=1e-12; }
-  const R = new Array(n);
-  for(let j=0;j<n;j++){
-    const a = 1 + K[j]/S[j];
-    const b = Math.sqrt(Math.max(a*a - 1, 1e-12));
-    const r_inf = a - b;
-    const tau = Math.exp(-2*b*S[j]);
-    const Rg = substrateR[j] ?? 0.9;
-    const denom = 1 - Rg*r_inf*tau;
-    let Rij = denom===0 ? r_inf : (r_inf + (Rg - r_inf)*tau/denom);
-    // Add small surface reflection (gloss) term if provided (scalar ~0.002-0.01)
-    if(Number.isFinite(surfaceRef) && surfaceRef>0) Rij = clamp(Rij + surfaceRef, 0.0001, 0.9999);
-    R[j] = clamp(Rij, 0.0001, 0.9999);
-  }
-  return R;
+// ===== State =====
+var COLOURS = [];// from colours.json
+var FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
+var ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
+
+// Name & PMS helpers
+function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
+function extractPmsNumber(name){
+  if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
 
-/* ---------- state ---------- */
-const state = {
-  pantones: [],
-  formulas: new Map(),   // Pantone key -> [{code,name,percent}...]
-  colorants: [],         // {code,name,consts}
-  substrateR: new Array(WL.length).fill(0.9),
-  surfaceRef: 0.0,
-  t0: 1.0,
-  blackNames: ['black','pp60 top black','k'],
-  extenderNames: ['extender','transparent','clear','base','varnish'],
-  assort: null
-};
-function indexOfBlack(){ for (let i=0;i<state.colorants.length;i++){ const nm = state.colorants[i].name.toLowerCase(); for(const kw of state.blackNames){ if(nm.includes(kw)) return i; } } return -1; }
-function indexOfExtender(){ for (let i=0;i<state.colorants.length;i++){ const nm = state.colorants[i].name.toLowerCase(); for(const kw of state.extenderNames){ if(nm.includes(kw)) return i; } } return -1; }
-
-/* ---------- robust JSON loading tuned to your real files ---------- */
-async function loadAll(){
-  // colours.json
-  const colours = asArray(await fetchJSON('colours.json'));
-  state.pantones = colours.map(o=>{
-    const L = numOr(o.L, o.l); const a = numOr(o.a, o.A); const b = numOr(o.b, o.B);
-    const name = (o.name||o.Name||o.Pantone||o.pantone||o.title||'').toString();
-    const hex = (o.hex||o.Hex) || hexFromLab(L,a,b);
-    return { name, L, a, b, hex };
-  }).filter(x => Number.isFinite(x.L)&&Number.isFinite(x.a)&&Number.isFinite(x.b));
-  document.getElementById('pantoneCount').textContent = String(state.pantones.length) + ' total';
-
-  // DC_Formulas.json: expect { D5v:[...], Sheet1:[...] }
-  const formRoot = await fetchJSON('DC_Formulas.json');
-  const byCanon = new Map();
-  function ingestFormulaRow(rec){
-    const colour = (rec.Colour || rec.Color || rec.Pantone || rec.Name || '').toString().trim();
-    if(!colour) return;
-    const key = canonicalPantoneName(colour);
-    const entries=[];
-    for(let i=1;i<=16;i++){
-      const ink = rec['Ingredient '+i] || rec['Ink '+i] || rec['Colorant '+i] || rec['Colour '+i] || rec['Color '+i];
-      const pct = rec[(i===1?'%':i+'%')] ?? rec['P'+i] ?? rec['Percent'+i] ?? rec['%'+i] ?? rec[i+'%'];
-      if(ink!=null && pct!=null && String(ink).trim()!==''){
-        const nameStr = String(ink).trim();
-        const code = extractInkCode(nameStr);
-        const percent = Number(pct);
-        if(Number.isFinite(percent)) entries.push({ code, name: nameStr, percent });
+var FORMULAS_NORM = {};
+var COLOUR_TO_FORMULA = {};
+function buildFormulaIndex(){
+  var rows = [];
+  FORMULAS_NORM = {};
+  COLOUR_TO_FORMULA = {};
+  // Flatten workbook-style DC_Formulas
+  if (Array.isArray(FORMULAS)) {
+    rows.push.apply(rows, FORMULAS);
+  } else if (FORMULAS && typeof FORMULAS === 'object') {
+    Object.keys(FORMULAS).forEach(function(k){
+      if (Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
+      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
+        rows.push.apply(rows, FORMULAS[k].rows);
       }
-    }
-    if(entries.length){
-      const arr = byCanon.get(key) || [];
-      arr.push(...entries);
-      byCanon.set(key, arr);
-    }
-  }
-  if(formRoot && typeof formRoot==='object'){
-    const sheets = ['D5v','Sheet1'];
-    for(const s of sheets){
-      if(Array.isArray(formRoot[s])){
-        formRoot[s].forEach(ingestFormulaRow);
-      }
-    }
-    // also ingest direct arrays if any
-    if(Array.isArray(formRoot)) formRoot.forEach(ingestFormulaRow);
-  }
-  state.formulas = byCanon;
-
-  // DC21_jan25.json (IFS project exports)
-  const dc21 = await fetchJSON('DC21_jan25.json');
-  // Surface reflection scalar (tiny) if present
-  try{
-    const sr = dc21?.InkFormulation?.Project?.SurfaceReflection?.Spectrum?.Value;
-    if(Array.isArray(sr) && sr.length){ state.surfaceRef = Math.max(0, Math.min(0.02, Number(sr[0]))); }
-  }catch(e){}
-  // Colorants at InkFormulation → Assortment → AssortmentData → Colorants → Colorant[]
-  const colorantsArr = dc21?.InkFormulation?.Assortment?.AssortmentData?.Colorants?.Colorant || [];
-  const parsed = [];
-  for(const el of colorantsArr){
-    const header = el?.Header || {};
-    const name = String(header?.Name || header?.DisplayName || header?.LongName || 'Ink').trim();
-    const code = extractInkCode(name) || extractInkCode(header?.Code) || extractInkCode(header?.Id);
-    const km = el?.Calibration || el?.KM || el?.Constants || {};
-    function arr36(obj, key){
-      const src = obj?.[key];
-      if(!src) return null;
-      if(Array.isArray(src)) return src.slice(0,36).map(Number);
-      if(typeof src==='object'){
-        const v = src.Value || src.value;
-        if(Array.isArray(v)) return v.slice(0,36).map(Number);
-        // map by wavelength
-        const arr = WL.map(wl=> Number(src[wl] ?? src[String(wl)]));
-        if(arr.every(Number.isFinite)) return arr;
-      }
-      return null;
-    }
-    // two-constant
-    const k1 = arr36(km,'k1') || arr36(km,'K1');
-    const k2 = arr36(km,'k2') || arr36(km,'K2') || new Array(WL.length).fill(0);
-    const s1 = arr36(km,'s1') || arr36(km,'S1');
-    const s2 = arr36(km,'s2') || arr36(km,'S2') || new Array(WL.length).fill(0);
-    if(!(k1 && s1)) continue;
-    parsed.push({ code, name, consts:{k1,k2,s1,s2} });
-  }
-  // substrate reflectance: prefer ifsx_reflectance_abs.json
-  try{
-    const refs = await fetchJSON('ifsx_reflectance_abs.json');
-    const keys = Object.keys(refs || {});
-    // choose PP60 Top Black if present, else first entry with 36 values
-    let Rpick = null;
-    for(const k of keys){
-      if(/pp60.*top.*black/i.test(k) && Array.isArray(refs[k]?.R) && refs[k].R.length>=36){ Rpick = refs[k].R.slice(0,36).map(Number); break; }
-    }
-    if(!Rpick){
-      for(const k of keys){
-        const arr = refs[k]?.R;
-        if(Array.isArray(arr) && arr.length>=36){ Rpick = arr.slice(0,36).map(Number); break; }
-      }
-    }
-    if(Rpick) state.substrateR = Rpick.map(v=> clamp(Number(v), 0.0001, 0.9999));
-  }catch(e){
-    // ignore; substrate stays default 0.9
-  }
-  state.colorants = parsed;
-
-  // assortment ladders (optional): { "DC21-101": { "white":[{conc,L,a,b},...], ... } }
-  try{ state.assort = await fetchJSON('assortment_colour_data.json'); }catch{ state.assort=null; }
-
-  // fit t0
-  const tFit = fitThicknessFromLadders();
-  state.t0 = Number.isFinite(tFit) ? tFit : 1.0;
-
-  // diagnostics
-  document.getElementById('counts').textContent = `Pantones: ${state.pantones.length} · Formulas: ${state.formulas.size} · Colorants: ${state.colorants.length}`;
-  const hint = document.getElementById('calibHint');
-  if(hint) hint.textContent = 'Calibrated t₀ = '+state.t0.toFixed(3)+' (±10% micro-scale; surfaceRef='+state.surfaceRef.toFixed(4)+')';
-}
-
-/* ---------- fit t0 from ladders ---------- */
-function fitThicknessFromLadders(){
-  if(!state.assort || state.colorants.length<2) return NaN;
-  const byCode = new Map(state.colorants.map(c=>[c.code || extractInkCode(c.name), c]));
-  const samples=[];
-  for(const [code, ladders] of Object.entries(state.assort || {})){
-    const c = byCode.get(code.toUpperCase());
-    if(!c) continue;
-    for(const side of Object.keys(ladders||{})){
-      const arr = ladders[side];
-      if(!Array.isArray(arr)) continue;
-      for(const r of arr){
-        const conc = Number(r.conc ?? r.concentration ?? r.percent ?? r.load);
-        const L = numOr(r.L, r.l), A = numOr(r.A, r.a), B = numOr(r.B, r.b);
-        if(!Number.isFinite(conc)||!Number.isFinite(L)||!Number.isFinite(A)||!Number.isFinite(B)) continue;
-        const x = conc>1.0001 ? conc/100 : conc;
-        samples.push({cobj:c, conc: clamp(x,0,1), lab:{L, a:A, b:B}});
-      }
-    }
-  }
-  if(samples.length < 8) return NaN;
-  const extIdx = indexOfExtender();
-  function rmsDE(t0){
-    let se=0, n=0;
-    for(const s of samples){
-      const inks = extIdx>=0 ? [s.cobj, state.colorants[extIdx]] : [s.cobj];
-      const fr = extIdx>=0 ? [s.conc, 1 - s.conc] : [s.conc];
-      const R = mixReflectance(inks, fr, t0, 1.0, state.substrateR, state.surfaceRef);
-      const lab = labFromSpectrum(R);
-      const dE = deltaE00(lab, s.lab);
-      se += dE*dE; n++;
-    }
-    return Math.sqrt(se/Math.max(1,n));
-  }
-  let bestT=1.0, bestE=Infinity;
-  for(let t=0.6; t<=1.6; t+=0.02){
-    const e=rmsDE(Number(t.toFixed(2)));
-    if(e<bestE){ bestE=e; bestT=Number(t.toFixed(2)); }
-  }
-  return bestT;
-}
-
-/* ---------- Nearest Pantone + Existing Formula ---------- */
-function findNearestPantones(L,a,b,k){
-  const target = {L:Number(L), a:Number(a), b:Number(b)};
-  const scored = state.pantones.map(p=>{
-    const dE = deltaE00(target, {L:p.L,a:p.a,b:p.b});
-    const hex = p.hex || hexFromLab(p.L,p.a,p.b) || '#777';
-    return {name:p.name, L:p.L, a:p.a, b:p.b, hex, dE};
-  }).sort((x,y)=>x.dE - y.dE);
-  return scored.slice(0,k);
-}
-function showExistingFormula(name){
-  const wrap=document.getElementById('existingFormula');
-  const key=canonicalPantoneName(name);
-  const rec=state.formulas.get(key);
-  if(!rec){ wrap.innerHTML = '<span class="muted">No stored formula for <b>'+name+'</b>.</span>'; return; }
-  const rows = rec.map(r=>'<tr><td class="mono">'+(r.name||r.code||'Ink')+'</td><td class="mono" style="text-align:right">'+round2(r.percent)+'%</td></tr>').join('');
-  wrap.innerHTML = '<div class="flex-between"><div class="sectionTitle" style="margin:0 0 6px 0">'+name+
-    '</div><div class="pill small">Total: '+round2(rec.reduce((s,x)=>s+x.percent,0))+'%</div></div>'+
-    '<table class="table">'+rows+'</table>';
-}
-
-/* ---------- Predictor ---------- */
-function selectInkSubset(targetLab, maxInks){
-  const inks = state.colorants;
-  const N = inks.length;
-  const ext = indexOfExtender();
-  const blacklist = new Set([ext].filter(i=>i>=0));
-  const chosen = new Set();
-
-  function scoreSet(indices){
-    const full = new Array(N).fill(0);
-    indices.forEach(i=> full[i]=1);
-    let sum = full.reduce((a,b)=>a+b,0); if(sum<=0) return {de:Infinity};
-    for(let i=0;i<N;i++) full[i]/=sum;
-    let best=Infinity, bestS=1.0, bestLab=null;
-    for(let t=0.9;t<=1.1;t+=0.02){
-      const R = mixReflectance(inks, full, state.t0, t, state.substrateR, state.surfaceRef);
-      const L = labFromSpectrum(R);
-      const d=deltaE00(targetLab, L);
-      if(d<best){best=d; bestS=t; bestLab=L;}
-    }
-    return {de:best,s:bestS,lab:bestLab};
-  }
-  // first pick
-  let bestI=-1, bestDE=Infinity;
-  for(let i=0;i<N;i++){
-    if(blacklist.has(i)) continue;
-    const got = scoreSet([i]);
-    if(got.de < bestDE){ bestDE=got.de; bestI=i; }
-  }
-  if(bestI>=0) chosen.add(bestI);
-  // add more
-  while(chosen.size < Math.max(2, Math.min(maxInks, N - blacklist.size))){
-    let bestJ=-1, bestJDE=Infinity;
-    for(let j=0;j<N;j++){
-      if(blacklist.has(j) || chosen.has(j)) continue;
-      const got = scoreSet([...chosen, j]);
-      if(got.de < bestJDE){ bestJDE=got.de; bestJ=j; }
-    }
-    if(bestJ>=0) chosen.add(bestJ); else break;
-  }
-  return [...chosen];
-}
-
-function predictMixForLab(targetLab, options){
-  const maxInks = Number(options.maxInks)||4;
-  const maxBlackPct = Number(options.maxBlackPct)||10;
-  const preferExt = options.preferExt || 'auto';
-  const seedPantone = options.seedPantone || null;
-
-  const inks = state.colorants;
-  if(inks.length < 2) throw new Error('Need at least 2 colorants with KM data');
-
-  const N=inks.length;
-  const blackIdx = indexOfBlack(), extIdx = indexOfExtender(), kMaxBlack = maxBlackPct/100;
-
-  // subset (exclude extender in greedy; add later if policy allows)
-  let subset = selectInkSubset(targetLab, maxInks);
-  if(extIdx>=0 && preferExt!=='never' && !subset.includes(extIdx) && subset.length < maxInks) subset.push(extIdx);
-
-  // seed: if Pantone has stored formula, bias those inks by code
-  if(seedPantone && state.formulas.has(canonicalPantoneName(seedPantone))){
-    const rec = state.formulas.get(canonicalPantoneName(seedPantone));
-    const indices = rec.map(r=>{
-      const code = (r.code || extractInkCode(r.name)).toUpperCase();
-      return inks.findIndex(c=> (c.code||'').toUpperCase()===code);
-    }).filter(i=>i>=0);
-    subset = Array.from(new Set([...subset, ...indices])).slice(0, maxInks);
-  }
-
-  const M = subset.length;
-  let x = new Array(M).fill(1/M);
-  function project(vec){
-    const full = new Array(N).fill(0);
-    for(let j=0;j<M;j++) full[subset[j]] = Math.max(0, vec[j]);
-    if(blackIdx>=0) full[blackIdx] = Math.min(full[blackIdx], kMaxBlack);
-    if(extIdx>=0){
-      if(preferExt==='never') full[extIdx]=0;
-      if(preferExt==='always') full[extIdx]=Math.max(full[extIdx], 0.1);
-    }
-    // ensure ≥2 chromatic inks
-    const chrom = subset.filter(i=> i!==extIdx && i!==blackIdx);
-    if(chrom.length>=2){
-      const mass = chrom.reduce((a,i)=>a+full[i],0);
-      if(mass < 0.25){
-        const give = 0.25 - mass;
-        for(let k=0;k<chrom.length;k++) full[chrom[k]] += give/chrom.length;
-        if(extIdx>=0) full[extIdx] = Math.max(0, full[extIdx]-give);
-      }
-    }
-    let sum = full.reduce((a,b)=>a+b,0);
-    if(sum<=0){ if(extIdx>=0) full[extIdx]=1; else full[subset[0]]=1; sum=1; }
-    for(let i=0;i<N;i++) full[i]/=sum;
-    return subset.map(i=>full[i]);
-  }
-
-  function objective(vec, scale){
-    const full = new Array(N).fill(0);
-    for(let j=0;j<M;j++) full[subset[j]] = vec[j];
-    const R = mixReflectance(inks, full, state.t0, scale, state.substrateR, state.surfaceRef);
-    const lab = labFromSpectrum(R);
-    const dE = deltaE00(targetLab, lab);
-    const pL = Math.abs(lab.L - targetLab.L) * 0.02;
-    return {val:dE+pL, dE, lab};
-  }
-
-  // multi-start
-  const seeds=[];
-  seeds.push({x: project(x.slice()), s:1.0});
-  // chroma-biased
-  const tmp=new Array(N).fill(0);
-  const chromSubset = subset.filter(i=> i!==extIdx);
-  chromSubset.forEach(i=> tmp[i]+=1);
-  if(extIdx>=0 && preferExt!=='never') tmp[extIdx]+=0.2;
-  let sum=tmp.reduce((a,b)=>a+b,0); if(sum>0) for(let i=0;i<N;i++) tmp[i]/=sum;
-  seeds.push({x: subset.map(i=>tmp[i]||0), s:1.0});
-  // random
-  for(let r=0;r<6;r++){
-    const t=new Array(N).fill(0); const picks=[...chromSubset].sort(()=>Math.random()-0.5).slice(0, Math.max(2, Math.min(3, chromSubset.length)));
-    let rem=1.0 - (extIdx>=0 && preferExt!=='never' ? 0.2 : 0);
-    picks.forEach((i,idx)=>{ const share = (idx===picks.length-1)?rem: Math.random()*rem; t[i]+=share; rem-=share; });
-    if(extIdx>=0 && preferExt!=='never') t[extIdx]+=0.2;
-    seeds.push({x: subset.map(i=>t[i]||0), s: 0.95 + 0.1*Math.random()});
-  }
-
-  // optimise
-  let best={val:Infinity, dE:Infinity, lab:null, x:null, s:1.0};
-  function clampS(v){ return clamp(v, 0.9, 1.1); }
-  for(const sd of seeds){
-    let xk = project(sd.x.slice()); let sk = clampS(sd.s);
-    let step=0.25;
-    for(let it=0; it<150; it++){
-      const eps=1e-3, g=new Array(M).fill(0);
-      const f0=objective(xk, sk).val;
-      for(let j=0;j<M;j++){
-        const x1=xk.slice(); x1[j]+=eps; const x1p=project(x1);
-        const f1=objective(x1p, sk).val; g[j]=(f1-f0)/eps;
-      }
-      let xc = xk.map((v,j)=> v - step*g[j]); xc = project(xc);
-      let bestLoc={val:Infinity, s:sk};
-      for(const tryS of [sk, clampS(sk*1.03), clampS(sk*0.97)]){
-        const f = objective(xc, tryS).val;
-        if(f<bestLoc.val) bestLoc={val:f, s:tryS};
-      }
-      if(bestLoc.val <= f0){ xk=xc; sk=bestLoc.s; step*=1.06; }
-      else { step*=0.5; }
-    }
-    const res = objective(xk, sk);
-    if(res.val < best.val){ best={...res, x:xk, s:sk}; }
-  }
-
-  const full = new Array(N).fill(0); for(let j=0;j<M;j++) full[subset[j]] = best.x[j];
-  const components = full.map((v,i)=>({ name: state.colorants[i].name, code: state.colorants[i].code, pct: v*100 }))
-                         .filter(c=>c.pct>0.05).sort((a,b)=>b.pct-a.pct);
-  return {components, predictedLab: best.lab, dE: best.dE};
-}
-
-/* ---------- UI ---------- */
-function el(id){ return document.getElementById(id); }
-function renderNearest(list){
-  const wrap=el('nearestList'); wrap.innerHTML='';
-  for(const p of list){
-    const row=document.createElement('a'); row.className='swatchRow linkish';
-    row.innerHTML = '<div class="chip" style="background:'+ (p.hex||'#777') +'"></div>'+
-      '<div><div><b>'+p.name+'</b></div>'+
-      '<div class="muted small">ΔE00 '+round2(p.dE)+' · L*a*b* '+round2(p.L)+', '+round2(p.a)+', '+round2(p.b)+'</div></div>'+
-      '<div><span class="tag">Select</span></div>';
-    row.addEventListener('click', ()=>{
-      el('L').value = p.L.toFixed(2);
-      el('a').value = p.a.toFixed(2);
-      el('b').value = p.b.toFixed(2);
-      showExistingFormula(p.name);
-      el('predictBtn').dataset.seed = p.name;
     });
-    wrap.appendChild(row);
+  }
+  // Build per-colour arrays of inks
+  var byColour = new Map();
+  rows.forEach(function(r){
+    var cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
+    if (!cname) return;
+    var items = [];
+    for (var i = 1; i <= 12; i++) {
+      var ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
+      if (!ink) continue;
+      var pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
+      items.push({ ink: ink, percent: pct });
+    }
+    var arr = byColour.get(cname) || [];
+    arr.push.apply(arr, items);
+    byColour.set(cname, arr);
+    FORMULAS_NORM[normaliseName(cname)] = arr;
+  });
+  // Pre-bind colour names to best formula key
+  (COLOURS || []).forEach(function(c){
+    var name = c.name || c.Colour || c.color || '';
+    var norm = normaliseName(name);
+    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
+    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
+    var p = extractPmsNumber(name);
+    if (p) {
+      byColour.keys();
+      for (var key of byColour.keys()){
+        if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
+      }
+    }
+  });
+}
+
+// ===== UI helpers =====
+function updateTargetEcho(){
+  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(function(v){ return Number.isNaN(v); })){
+    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
+  }
+  $('#targetEcho').textContent = 'Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
+  var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+}
+
+// ===== Matching =====
+function getTargetLab(){
+  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
+}
+function findClosest(){
+  var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+  var rows = COLOURS.map(function(c){ return {
+    raw: c,
+    name: c.name || c.Colour || c.color || '—',
+    L:c.L, a:c.a, b:c.b,
+    de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
+  }; }).sort(function(a,b){ return a.de-b.de; }).slice(0,8); // limit to 8 for a compact list
+
+  var tbody = $('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(function(r){
+    var tr=document.createElement('tr'); tr.className='result-row';
+    var rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML = '\n      <td>'+r.name+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+r.L.toFixed(2)+'</td>\n      <td>'+r.a.toFixed(2)+'</td>\n      <td>'+r.b.toFixed(2)+'</td>\n      <td>'+r.de.toFixed(2)+'</td>';
+    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
+    tbody.appendChild(tr);
+  });
+}
+
+function showFormulaFor(colourName){
+  var panel = $('#formulaPanel');
+  var list = null;
+  var bound = COLOUR_TO_FORMULA[colourName];
+  if(bound) list = FORMULAS_NORM[bound];
+  if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
+  if(!list){
+    var want = extractPmsNumber(colourName);
+    if(want){
+      for (var key in FORMULAS_NORM){
+        if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
+      }
+    }
+  }
+  if(!list || !list.length){ panel.style.display='none'; return; }
+  var html = '<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
+  list.forEach(function(item){
+    var name = item.ink || item.Ink || 'Ink';
+    var pct = item.percent!==''? (item.percent+'%') : '';
+    html += '<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>';
+  });
+  html += '</div>';
+  panel.innerHTML = html; panel.style.display='block';
+}
+
+// ===== PMS Search =====
+function findByPms(){
+  var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
+  var q = qRaw.replace(/^PANTONE\s*/,'');
+  var hits = COLOURS.filter(function(c){
+    var p = extractPmsNumber(c.name||c.Colour||c.color||'');
+    return p && p.includes(q);
+  });
+  var tbody = $('#resultsTbody'); tbody.innerHTML='';
+  if(!hits.length){ alert('No PMS match found'); return; }
+  hits.slice(0,8).forEach(function(c){ // also limit to 8 here
+    var rgb=labToSrgb(c.L,c.a,c.b);
+    var tr=document.createElement('tr'); tr.className='result-row';
+    tr.innerHTML = '\n      <td>'+(c.name||c.Colour||c.color||'—')+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+(+c.L).toFixed(2)+'</td>\n      <td>'+(+c.a).toFixed(2)+'</td>\n      <td>'+(+c.b).toFixed(2)+'</td>\n      <td>—</td>';
+    tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
+    tbody.appendChild(tr);
+  });
+  var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
+}
+
+// ===== Predictor (white‑only basis, raw XYZ in D65) =====
+function buildWhiteBasis(){
+  // Build basis using ONLY over-white measurements at each concentration.
+  // IMPORTANT: keep raw XYZ magnitude (no column normalisation) so lightness is preserved.
+  var basis = []; // {name, ink, conc, vec:[X,Y,Z]}
+  Object.keys(ASSORTMENT).forEach(function(ink){
+    var W = (ASSORTMENT[ink].white||[]);
+    if (!W.length) return;
+    W.slice().sort(function(a,b){ return a.conc-b.conc; }).forEach(function(entry){
+      var xyz = labToXyz(entry.L, entry.a, entry.b); // D65
+      basis.push({ name: ink+'@'+entry.conc+'%', ink: ink, conc: entry.conc, vec:[xyz.X, xyz.Y, xyz.Z] });
+    });
+  });
+  return basis;
+}
+
+// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2, with simplex constraints (w>=0, sum w=1)
+function fwSimplex(A, y, iters, seed){
+  if (iters==null) iters=2000;
+  var N = A[0].length;
+  var w = new Array(N).fill(0);
+  if (seed && seed.length===N){
+    var s0 = seed.reduce(function(a,b){return a+b;},0);
+    if (s0>0) w = seed.map(function(v){ return Math.max(0,v)/s0; }); else w[0]=1;
+  } else {
+    w[0]=1;
+  }
+  function matVec(A, v){
+    return [
+      A[0].reduce(function(s,aj,j){return s+aj*v[j];},0),
+      A[1].reduce(function(s,aj,j){return s+aj*v[j];},0),
+      A[2].reduce(function(s,aj,j){return s+aj*v[j];},0)
+    ];
+  }
+  var Aw = matVec(A, w);
+  for (var t=0;t<iters;t++){
+    var r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]];
+    var bestK=0, bestVal=Infinity;
+    for (var k=0;k<N;k++){
+      var gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
+      if (gk < bestVal){ bestVal=gk; bestK=k; }
+    }
+    var v = [ A[0][bestK]-Aw[0], A[1][bestK]-Aw[1], A[2][bestK]-Aw[2] ];
+    var num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
+    var den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
+    var gamma = num/den; if (!Number.isFinite(gamma)) gamma=0; gamma=Math.max(0, Math.min(1, gamma));
+    for (var j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*(j===bestK?1:0); }
+    Aw = [ (1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK] ];
+    var res2 = r[0]*r[0]+r[1]*r[1]+r[2]*r[2];
+    if (res2 < 1e-10) break;
+  }
+  var s = w.reduce(function(a,b){return a+b;},0) || 1; w = w.map(function(v){ return Math.max(0,v)/s; });
+  return w;
+}
+
+
+async function suggestFormula(){
+  const t = (typeof getTargetLab === 'function') ? getTargetLab() : null;
+  if(!t){ alert('Enter a valid colour first.'); return; }
+
+  const msgEl = document.querySelector('#predictMsg') || document.createElement('div');
+  if (!msgEl.id) { msgEl.id = 'predictMsg'; (document.body||document.documentElement).appendChild(msgEl); }
+  msgEl.textContent = 'Predicting...';
+
+  const box = document.querySelector('#suggestedFormula');
+  if (box) { box.style.display = 'none'; }
+
+  try {
+    const res = await fetch(API_BASE + '/predict', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    const formula = data.formula || {};
+
+    window._lastSuggestion = { target: t, formula };
+
+    const pairs = Object.entries(formula).sort((a,b)=>b[1]-a[1]);
+    let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
+    for (const [ink, pct] of pairs) {
+      html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${pct.toFixed(2)}%</div>`;
+    }
+    html += '</div>';
+
+    if (box) {
+      box.innerHTML = html;
+      box.style.display = 'block';
+    }
+    msgEl.textContent = '';
+  } catch (e) {
+    msgEl.textContent = 'Error: ' + e.message;
   }
 }
-function renderPrediction(result){
-  const out=el('predictionOutput'), table=el('mixTable'), labPill=el('predLab'), dEPill=el('predDe'), warn=el('predWarn');
-  const rows = result.components.map(c=>'<tr><td class="mono">'+(c.name || c.code || 'Ink')+'</td><td class="mono" style="text-align:right">'+round2(c.pct)+'%</td></tr>').join('');
-  table.innerHTML = rows || '<tr><td colspan="2" class="muted">No components found.</td></tr>';
-  labPill.textContent = 'L*a*b*: '+round2(result.predictedLab.L)+', '+round2(result.predictedLab.a)+', '+round2(result.predictedLab.b);
-  dEPill.textContent = 'ΔE00: ' + round2(result.dE);
-  dEPill.className = 'pill ' + (result.dE<=1.5 ? 'good' : (result.dE<=3 ? 'warn' : 'bad'));
-  warn.textContent = (result.components.length>4? 'Many components may be impractical; reduce Max ingredients.' : '');
-  out.style.display='block';
-}
 
-/* ---------- bootstrap ---------- */
-window.addEventListener('DOMContentLoaded', async ()=>{
-  const maxInks=el('maxInks'), maxInksVal=el('maxInksVal'); maxInks.addEventListener('input', ()=> maxInksVal.textContent = String(maxInks.value));
-  const maxBlack=el('maxBlack'), maxBlackVal=el('maxBlackVal'); maxBlack.addEventListener('input', ()=> maxBlackVal.textContent = String(maxBlack.value)+'%');
+  var basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
+  var maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
 
+  // Target in raw XYZ (D65)
+  var t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
+  var y = [t.X, t.Y, t.Z];
+
+  // Design matrix A (3 x N)
+  var A=[[],[],[]]; basis.forEach(function(b){ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
+
+  // Seed: favour extender columns if present
+  var seed = new Array(basis.length).fill(0);
+  for (var j=0;j<basis.length;j++){
+    var ink = String(basis[j].ink||'').toUpperCase();
+    if (ink.indexOf('EXTENDER')>-1 || /\bDC21-00[12]\b/.test(ink)) seed[j] = 1;
+  }
+  var seedSum = seed.reduce(function(a,b){return a+b;},0);
+  if (seedSum === 0) seed[0] = 1; else seed = seed.map(function(v){ return v/seedSum; });
+
+  // Simplex-constrained quadratic fit
+  var w = fwSimplex(A, y, 2000, seed);
+
+  // Second pass: among all zero-error mixes, push weight onto Extender while keeping A w = y
+  w = maximizeExtender(A, y, w, function(idx){
+    var ink = String(basis[idx].ink||'').toUpperCase();
+    return (ink.indexOf('EXTENDER')>-1) || (/DC21-00[12]/.test(ink));
+  });
+
+  // Predicted mix directly from column weights (no re-averaging)
+  var mixXYZ = [0,0,0];
+  for(var j2=0;j2<basis.length;j2++){
+    mixXYZ[0] += w[j2]*basis[j2].vec[0];
+    mixXYZ[1] += w[j2]*basis[j2].vec[1];
+    mixXYZ[2] += w[j2]*basis[j2].vec[2];
+  }
+  var mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
+  var dE = deltaE2000(mixLab, targetLab);
+  var rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
+
+  // Collapse weights by ink for display, then keep top-k inks
+  var byInk = new Map();
+  for(var jj=0;jj<basis.length;jj++){
+    if(w[jj] <= 1e-9) continue;
+    byInk.set(basis[jj].ink, (byInk.get(basis[jj].ink)||0) + w[jj]);
+  }
+  var merged = Array.from(byInk.entries()).map(function(pair){ return {ink:pair[0], weight:pair[1]}; })
+                    .sort(function(a,b){ return b.weight-a.weight; })
+                    .slice(0, maxInks);
+  var dispSum = merged.reduce(function(a,b){return a+b.weight;},0)||1; // renormalise for pretty %s
+  merged.forEach(function(p){ p.weight = p.weight/dispSum; });
+
+  var html = '<h2>Suggested Formula</h2>';
+  html += '<div class="stack" style="align-items:center;">'
+    + '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div>'
+    + '<div class="muted">Predicted: L '+mixLab.L.toFixed(2)+' a '+mixLab.a.toFixed(2)+' b '+mixLab.b.toFixed(2)+' · ΔE00: <strong>'+dE.toFixed(2)+'</strong></div>'
+    + '</div>';
+  html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
+  var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
+
+
+
+// ===== Extender maximiser (keep colour, maximise extender) =====
+function maximizeExtender(A, y, w0, isExt){
   try{
-    await loadAll();
-  }catch(e){
-    console.error(e);
-    alert('Failed to load one or more JSON files. See console for details.\n'+e.message);
-  }
+    // Build candidate index set: top-8 by weight, plus any extender columns
+    var N = w0.length;
+    var idx = Array.from({length:N}, function(_,i){return i;});
+    idx.sort(function(i,j){ return w0[j]-w0[i]; });
+    var cand = idx.slice(0,8);
+    for (var i=0;i<N;i++){ if (isExt(i) && cand.indexOf(i)===-1) cand.push(i); }
 
-  el('pantoneSearch').addEventListener('input', (e)=>{
-    const q=(e.target.value||'').toLowerCase().trim(); if(!q) return;
-    const hit = state.pantones.find(p=>(p.name||'').toLowerCase().includes(q));
-    if(hit){ el('L').value=hit.L.toFixed(2); el('a').value=hit.a.toFixed(2); el('b').value=hit.b.toFixed(2); }
-  });
+    function combos(arr, k){
+      var res=[]; var n=arr.length;
+      function rec(st, path){ if(path.length===k){ res.push(path.slice()); return; } for(var t=st;t<n;t++){ path.push(arr[t]); rec(t+1, path); path.pop(); } }
+      rec(0,[]); return res;
+    }
+    function solve4x4(M, b){ // naive Gaussian elimination (4x4)
+      var A = [M[0].slice(), M[1].slice(), M[2].slice(), M[3].slice()];
+      var x = b.slice();
+      for(var i=0;i<4;i++){
+        // pivot
+        var piv=i, maxv=Math.abs(A[i][i]);
+        for(var r=i+1;r<4;r++){ var v=Math.abs(A[r][i]); if(v>maxv){maxv=v; piv=r;} }
+        if(maxv<1e-12) return null;
+        if(piv!==i){ var tmp=A[i]; A[i]=A[piv]; A[piv]=tmp; var tb=x[i]; x[i]=x[piv]; x[piv]=tb; }
+        // normalize
+        var div=A[i][i]; for(var c=i;c<4;c++) A[i][c]/=div; x[i]/=div;
+        // eliminate
+        for(var r2=0;r2<4;r2++){ if(r2===i) continue; var f=A[r2][i]; if(Math.abs(f)<1e-12) continue; for(var c2=i;c2<4;c2++) A[r2][c2]-=f*A[i][c2]; x[r2]-=f*x[i]; }
+      }
+      return x; // solution
+    }
+    var best = {w:w0, extShare:-1};
+    var target = [y[0], y[1], y[2], 1];
+    var sets = combos(cand, 4);
+    for(var s=0;s<sets.length;s++){
+      var S = sets[s];
+      // must include at least one extender col
+      var okExt=false; for(var q=0;q<S.length;q++){ if(isExt(S[q])) { okExt=true; break; } }
+      if(!okExt) continue;
+      var M = [[],[],[],[]];
+      for(var j=0;j<4;j++){ M[0][j]=A[0][S[j]]; M[1][j]=A[1][S[j]]; M[2][j]=A[2][S[j]]; M[3][j]=1; }
+      var x = solve4x4(M, target);
+      if(!x) continue;
+      // feasibility: nonnegative and close residual
+      var neg=false; for(var j2=0;j2<4;j2++){ if(x[j2]<-1e-9){ neg=true; break; } }
+      if(neg) continue;
+      // compute residual exactly
+      var Ax=[0,0,0];
+      for(var j3=0;j3<4;j3++){ Ax[0]+=A[0][S[j3]]*x[j3]; Ax[1]+=A[1][S[j3]]*x[j3]; Ax[2]+=A[2][S[j3]]*x[j3]; }
+      var r0=Ax[0]-y[0], r1=Ax[1]-y[1], r2=Ax[2]-y[2];
+      if((r0*r0+r1*r1+r2*r2)>1e-8) continue;
+      var sumx = x.reduce(function(a,b){return a+b;},0);
+      if(Math.abs(sumx-1)>1e-6) continue; // preserve convex
+      var ext = 0; for(var j4=0;j4<4;j4++){ if(isExt(S[j4])) ext+=x[j4]; }
+      if(ext > best.extShare){
+        var wNew = new Array(A[0].length).fill(0);
+        for(var j5=0;j5<4;j5++) wNew[S[j5]] = Math.max(0,x[j5]);
+        best = {w:wNew, extShare:ext};
+      }
+    }
+    return (best.extShare>=0)? best.w : w0;
+  }catch(e){ console.warn('maximizeExtender failed', e); return w0; }
+}
 
-  el('matchBtn').addEventListener('click', ()=>{
-    const L = Number(el('L').value), a = Number(el('a').value), b = Number(el('b').value);
-    renderNearest(findNearestPantones(L,a,b,8));
-  });
-
-  el('predictBtn').addEventListener('click', ()=>{
-    const L = Number(el('L').value), a = Number(el('a').value), b = Number(el('b').value);
-    const seed = el('predictBtn').dataset.seed || null;
-    const opts = { maxInks: Number(el('maxInks').value), maxBlackPct: Number(el('maxBlack').value), preferExt: el('preferExt').value, seedPantone: seed };
-    el('predictStatus').textContent = 'Optimising…';
-    setTimeout(()=>{ try{
-      const result = predictMixForLab({L,a,b}, opts);
-      renderPrediction(result);
-      el('predictStatus').textContent = '';
-    }catch(err){ el('predictStatus').textContent = 'Error: ' + (err && err.message ? err.message : String(err)); } }, 10);
-  });
+// ===== Wire up =====
+$('#findBtn').addEventListener('click', findClosest);
+$('#clearBtn').addEventListener('click', function(){
+  $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
+  $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
+  $('#suggestedFormula').style.display='none';
 });
+$('#suggestBtn').addEventListener('click', suggestFormula);
+$('#pmsBtn').addEventListener('click', findByPms);
+['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
+
+// ===== Load JSON =====
+Promise.all([
+  fetch('colours.json').then(function(r){ return r.json(); }),
+  fetch('DC_Formulas.json').then(function(r){ return r.json(); }),
+  fetch('assortment_colour_data.json').then(function(r){ return r.json(); })
+]).then(function(tuple){
+  var colours = tuple[0], formulas = tuple[1], assortment = tuple[2];
+  COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
+  buildFormulaIndex();
+  $('#countLabel').textContent = COLOURS.length;
+}).catch(function(err){ alert('Error loading JSON: '+err); });
+
+updateTargetEcho();
+
+// ===== Self-tests =====
+function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
+function runSelfTests(){
+  // ΔE should be 0 for identical colours
+  var c = {L:50,a:0,b:0};
+  console.assert(approx(deltaE2000(c,c), 0), 'ΔE00(identity) != 0');
+
+  // Symmetry
+  var c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
+  console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
+
+  // Lab -> XYZ -> Lab round-trip (D65)
+  var t={L:70,a:20,b:30};
+  var xyz = labToXyz(t.L,t.a,t.b);
+  var back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
+  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
+
+  // Simplex solver exact fit on convex hull: pick from two vertices
+  // columns at (1,0,0) and (0,1,0), target is (0.25, 0.75, 0)
+  var Atest = [[1,0],[0,1],[0,0]]; var ytest=[0.25,0.75,0];
+  var wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
+  var err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
+                       Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
+                       0);
+  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(function(v){ return v>=-1e-9; }), 'FW simplex exact convex combo failed');
+}
+try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
+})();
+</script>
+<script>
+
+// --- Logging handlers ---
+document.addEventListener('click', function(e){
+  if (e.target && e.target.id === 'logBtn') logApproved();
+  if (e.target && e.target.id === 'exportLink') { e.preventDefault(); exportRows(); }
+});
+
+async function logApproved(){
+  if (!window._lastSuggestion){ alert('Predict first.'); return; }
+  const sug = window._lastSuggestion;
+  const pantone = (document.querySelector('#pantoneName')?.value || '').trim();
+  const notes   = (document.querySelector('#notes')?.value || '').trim();
+  const mL = parseFloat(document.querySelector('#mL')?.value);
+  const mA = parseFloat(document.querySelector('#mA')?.value);
+  const mB = parseFloat(document.querySelector('#mB')?.value);
+
+  const payload = {
+    pantone,
+    target_L: sug.target.L, target_a: sug.target.a, target_b: sug.target.b,
+    suggested: sug.formula,
+    approved: sug.formula,
+    measured_L: Number.isFinite(mL) ? mL : null,
+    measured_a: Number.isFinite(mA) ? mA : null,
+    measured_b: Number.isFinite(mB) ? mB : null,
+    notes
+  };
+
+  const msg = document.querySelector('#logMsg'); if (msg) msg.textContent = 'Saving...';
+  try {
+    const res = await fetch(API_BASE + '/log_approved', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const j = await res.json();
+    if (msg) msg.textContent = 'Saved (id ' + j.id + ').';
+  } catch(err){
+    if (msg) msg.textContent = 'Error: ' + err.message;
+  }
+}
+
+async function exportRows(){
+  try{
+    const res = await fetch(API_BASE + '/export_training');
+    const j = await res.json();
+    if (!j.csv || !j.rows){ alert('No new rows.'); return; }
+    const blob = new Blob([j.csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'new_training_rows.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Export failed: ' + e.message);
+  }
+}
+
 </script>
 </body>
 </html>
