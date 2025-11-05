@@ -85,6 +85,27 @@ Working colourmatcher
           <div id="predictMsg" class="muted" style="align-self:center;"></div>
         </div>
         <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+<!-- Logging UI injected -->
+<div class="row2" style="margin-top:8px;">
+  <div>
+    <label for="pantoneName">Pantone / Name</label>
+    <input id="pantoneName" type="text" placeholder="e.g. PANTONE 485 C">
+  </div>
+  <div>
+    <label for="notes">Notes (optional)</label>
+    <input id="notes" type="text" placeholder="press/anilox/edits...">
+  </div>
+</div>
+<div class="row" style="margin-top:8px;">
+  <div><label for="mL">Measured L*</label><input id="mL" type="number" step="0.01"></div>
+  <div><label for="mA">Measured a*</label><input id="mA" type="number" step="0.01"></div>
+  <div><label for="mB">Measured b*</label><input id="mB" type="number" step="0.01"></div>
+</div>
+<div class="flex" style="margin-top:8px;">
+  <button class="btn" id="logBtn">Log approved</button>
+  <span class="muted" id="logMsg" aria-live="polite"></span>
+</div>
+
       </div>
 
     </div>
@@ -116,6 +137,10 @@ Working colourmatcher
   </div>
 
 <script>
+// === API config & helpers ===
+const API_BASE = 'https://<your-render-service>.onrender.com'; // ← set this
+if (typeof window.$ === 'undefined') window.$ = (s)=>document.querySelector(s);
+
 (function(){
 'use strict';
 // ===== Utilities =====
@@ -373,8 +398,47 @@ function fwSimplex(A, y, iters, seed){
   return w;
 }
 
-function suggestFormula(){
-  var targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
+
+async function suggestFormula(){
+  const t = (typeof getTargetLab === 'function') ? getTargetLab() : null;
+  if(!t){ alert('Enter a valid colour first.'); return; }
+
+  const msgEl = document.querySelector('#predictMsg') || document.createElement('div');
+  if (!msgEl.id) { msgEl.id = 'predictMsg'; (document.body||document.documentElement).appendChild(msgEl); }
+  msgEl.textContent = 'Predicting...';
+
+  const box = document.querySelector('#suggestedFormula');
+  if (box) { box.style.display = 'none'; }
+
+  try {
+    const res = await fetch(API_BASE + '/predict', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    const formula = data.formula || {};
+
+    window._lastSuggestion = { target: t, formula };
+
+    const pairs = Object.entries(formula).sort((a,b)=>b[1]-a[1]);
+    let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
+    for (const [ink, pct] of pairs) {
+      html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${pct.toFixed(2)}%</div>`;
+    }
+    html += '</div>';
+
+    if (box) {
+      box.innerHTML = html;
+      box.style.display = 'block';
+    }
+    msgEl.textContent = '';
+  } catch (e) {
+    msgEl.textContent = 'Error: ' + e.message;
+  }
+}
+
   var basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
   var maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
 
@@ -433,7 +497,8 @@ function suggestFormula(){
     + '</div>';
   html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
   var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
-}
+
+
 
 // ===== Extender maximiser (keep colour, maximise extender) =====
 function maximizeExtender(A, y, w0, isExt){
@@ -552,6 +617,64 @@ function runSelfTests(){
 }
 try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
 })();
+</script>
+<script>
+
+// --- Logging handlers ---
+document.addEventListener('click', function(e){
+  if (e.target && e.target.id === 'logBtn') logApproved();
+  if (e.target && e.target.id === 'exportLink') { e.preventDefault(); exportRows(); }
+});
+
+async function logApproved(){
+  if (!window._lastSuggestion){ alert('Predict first.'); return; }
+  const sug = window._lastSuggestion;
+  const pantone = (document.querySelector('#pantoneName')?.value || '').trim();
+  const notes   = (document.querySelector('#notes')?.value || '').trim();
+  const mL = parseFloat(document.querySelector('#mL')?.value);
+  const mA = parseFloat(document.querySelector('#mA')?.value);
+  const mB = parseFloat(document.querySelector('#mB')?.value);
+
+  const payload = {
+    pantone,
+    target_L: sug.target.L, target_a: sug.target.a, target_b: sug.target.b,
+    suggested: sug.formula,
+    approved: sug.formula,
+    measured_L: Number.isFinite(mL) ? mL : null,
+    measured_a: Number.isFinite(mA) ? mA : null,
+    measured_b: Number.isFinite(mB) ? mB : null,
+    notes
+  };
+
+  const msg = document.querySelector('#logMsg'); if (msg) msg.textContent = 'Saving...';
+  try {
+    const res = await fetch(API_BASE + '/log_approved', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const j = await res.json();
+    if (msg) msg.textContent = 'Saved (id ' + j.id + ').';
+  } catch(err){
+    if (msg) msg.textContent = 'Error: ' + err.message;
+  }
+}
+
+async function exportRows(){
+  try{
+    const res = await fetch(API_BASE + '/export_training');
+    const j = await res.json();
+    if (!j.csv || !j.rows){ alert('No new rows.'); return; }
+    const blob = new Blob([j.csv], {type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'new_training_rows.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }catch(e){
+    alert('Export failed: ' + e.message);
+  }
+}
+
 </script>
 </body>
 </html>
