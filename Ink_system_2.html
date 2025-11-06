@@ -38,13 +38,11 @@
 </head>
 <body>
   <div class="app">
-    <!-- Left Column: Target + Controls -->
+    <!-- Left Column -->
     <div class="card">
       <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
         <h1>Ink Colour Matcher</h1>
-        <div class="pill">
-          <span id="countLabel">0</span> reference colours
-        </div>
+        <div class="pill"><span id="countLabel">0</span> reference colours</div>
       </div>
 
       <div class="row" style="margin-top:12px;">
@@ -69,9 +67,9 @@
         <span class="muted" id="statusMsg" aria-live="polite"></span>
       </div>
 
-      <!-- Predictor box kept for UI continuity, but disabled for Step 1 -->
+      <!-- Predictor box (UI unchanged) -->
       <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula (temporarily disabled)</h2>
+        <h2>Suggest Formula</h2>
         <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="maxInks">Max inks in recipe</label>
@@ -84,10 +82,9 @@
         </div>
         <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
       </div>
-
     </div>
 
-    <!-- Right Column: Results -->
+    <!-- Right Column -->
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
         <h1>Closest Matches</h1>
@@ -99,12 +96,7 @@
       <table>
         <thead>
           <tr>
-            <th>Colour</th>
-            <th>Swatch</th>
-            <th>L*</th>
-            <th>a*</th>
-            <th>b*</th>
-            <th>Distance</th>
+            <th>Colour</th><th>Swatch</th><th>L*</th><th>a*</th><th>b*</th><th>Distance</th>
           </tr>
         </thead>
         <tbody id="resultsTbody"></tbody>
@@ -119,7 +111,10 @@
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
-// D65 whitepoint conversions
+// 🔗 Your API endpoint:
+const API_BASE = 'https://ink-predict-api.onrender.com/'; 
+
+// D65 conversions
 function labToXyz(L,a,b){
   var Yn=1, Xn=0.95047, Zn=1.08883;
   var fy=(L+16)/116;
@@ -178,8 +173,8 @@ var COLOURS = [];
 var FORMULAS = {};
 var FORMULAS_NORM = {};
 var COLOUR_TO_FORMULA = {};
+var _lastSuggestion = null; // stash for step 3 logging
 
-// Name & PMS helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
   if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
@@ -190,7 +185,6 @@ function buildFormulaIndex(){
   var rows = [];
   FORMULAS_NORM = {};
   COLOUR_TO_FORMULA = {};
-  // Flatten workbook-like DC_Formulas
   if (Array.isArray(FORMULAS)) {
     rows.push.apply(rows, FORMULAS);
   } else if (FORMULAS && typeof FORMULAS === 'object') {
@@ -217,7 +211,6 @@ function buildFormulaIndex(){
     byColour.set(cname, arr);
     FORMULAS_NORM[normaliseName(cname)] = arr;
   });
-  // Bind colour names to best formula key
   (COLOURS || []).forEach(function(c){
     var name = c.name || c.Colour || c.color || '';
     var norm = normaliseName(name);
@@ -324,10 +317,40 @@ function findByPms(){
   var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
 }
 
-// ===== Predictor: disabled stub for Step 1 =====
-function suggestFormula(){
-  $('#predictMsg').textContent = 'Predictor removed in Step 1 — UI preserved.';
-  $('#suggestedFormula').style.display='none';
+// ===== Predictor: calls your API =====
+async function suggestFormula(){
+  const btn = $('#suggestBtn'); const msg = $('#predictMsg'); const box = $('#suggestedFormula');
+  const t = getTargetLab();
+  if(!t){ alert('Enter a valid L*a*b* first.'); return; }
+
+  btn.disabled = true; msg.textContent = 'Predicting...'; box.style.display='none'; box.innerHTML='';
+  try{
+    const res = await fetch(API_BASE + '/predict', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
+    });
+    if(!res.ok){
+      const txt = await res.text();
+      throw new Error(`API ${res.status}: ${txt}`);
+    }
+    const data = await res.json();
+    const formula = (data && data.formula) ? data.formula : {};
+    // render (sorted, hide zeros, 2dp)
+    const pairs = Object.entries(formula).filter(([_,v]) => +v > 0).sort((a,b)=>b[1]-a[1]);
+    let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
+    for (const [ink,pct] of pairs) html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+    html += '</div>';
+    box.innerHTML = html;
+    box.style.display = 'block';
+    msg.textContent = '';
+    // stash for future logging (Step 3)
+    _lastSuggestion = { target: t, formula };
+  } catch(err){
+    msg.textContent = String(err.message || err);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ===== Wire up =====
@@ -341,15 +364,15 @@ $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
-// ===== Load JSON (no assortment now; predictor is disabled) =====
+// ===== Load JSON =====
 Promise.all([
-  fetch('colours.json').then(function(r){ return r.json(); }),
-  fetch('DC_Formulas.json').then(function(r){ return r.json(); })
-]).then(function(tuple){
+  fetch('colours.json').then(r=>r.json()),
+  fetch('DC_Formulas.json').then(r=>r.json())
+]).then(tuple=>{
   COLOURS = tuple[0]; FORMULAS = tuple[1];
   buildFormulaIndex();
   $('#countLabel').textContent = COLOURS.length;
-}).catch(function(err){ alert('Error loading JSON: '+err); });
+}).catch(err=>{ alert('Error loading JSON: '+err); });
 
 updateTargetEcho();
 
