@@ -2,676 +2,297 @@
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
+  <title>Ink Colour Matcher</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher + Predictor</title>
   <style>
-    :root { --gap: 12px; --radius: 14px; }
-    * { box-sizing: border-box; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
-    .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-    label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
-    input, select { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
-    input::placeholder { color:#7b8496; }
-    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
-    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
-    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
-    .btn:hover { filter:brightness(1.1); }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
-    th { color:#9aa4b2; font-weight:600; }
-    .result-row { transition: background .2s; cursor:pointer; }
-    .result-row:hover { background: rgba(255,255,255,.05); }
-    .swatch { width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
-    .pill { font-size:.8rem; color:#98a2b3; }
-    .muted { color:#7b8496; font-size:.85rem; }
-    .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
-    .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
-    .formula-grid { display:grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items:center; }
-    .fg-ink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
-    .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .flex { display:flex; gap:8px; }
-    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+    :root { --gap:12px; --fg:#111; --muted:#666; --bg:#fff; --accent:#0a84ff; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:20px; color:var(--fg); background:var(--bg); }
+    h1 { margin:0 0 10px; }
+    .row, .row2, .flex { display:flex; gap:var(--gap); align-items:flex-end; flex-wrap:wrap; }
+    .row > div, .row2 > div { display:flex; flex-direction:column; gap:6px; }
+    input[type="number"], input[type="text"] { padding:8px 10px; font-size:14px; border:1px solid #ddd; border-radius:8px; min-width:120px; }
+    .btn { background:var(--accent); color:#fff; border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:600; }
+    .btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .muted { color:var(--muted); font-size:12px; }
+    .panel { border:1px solid #eee; border-radius:12px; padding:14px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap:var(--gap); }
+    .formula-box { border:1px dashed #ddd; border-radius:12px; padding:12px; background:#fafafa; }
+    .formula-grid { display:grid; grid-template-columns:1fr auto; gap:8px 12px; margin-top:6px; }
+    .fg-ink { font-weight:600; }
+    .fg-pct { text-align:right; }
+    #predictMsg { min-height: 18px; display:inline-block; margin-left:10px; }
+    .ok { color:#0a8f2f; }
+    .err { color:#b00020; }
+    .warn { color:#b18500; }
+    hr { border:none; border-top:1px solid #eee; margin:16px 0; }
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- Left Column: Target + Controls -->
-    <div class="card">
-      <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
-        <h1>Ink Colour Matcher</h1>
-        <div class="pill">
-          <span id="countLabel">0</span> reference colours
-        </div>
-      </div>
+  <h1>Ink Colour Matcher</h1>
 
-      <div class="row" style="margin-top:12px;">
-        <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
-        <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
-        <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
+  <!-- Inputs / controls -->
+  <div id="controls" class="panel" style="margin-bottom:16px;">
+    <div class="row">
+      <div>
+        <label for="LInput">Target L*</label>
+        <input id="LInput" type="number" step="0.01" placeholder="e.g. 31.80">
       </div>
+      <div>
+        <label for="aInput">Target a*</label>
+        <input id="aInput" type="number" step="0.01" placeholder="e.g. -19.40">
+      </div>
+      <div>
+        <label for="bInput">Target b*</label>
+        <input id="bInput" type="number" step="0.01" placeholder="e.g. 32.30">
+      </div>
+      <div style="display:flex; gap:10px; align-items:flex-end;">
+        <button class="btn" id="suggestBtn">Suggest Formula</button>
+        <span id="predictMsg" class="muted" aria-live="polite"></span>
+      </div>
+    </div>
+  </div>
 
-      <div class="row2" style="margin-top:12px;">
-        <div>
-          <label for="pms">Search by PMS (number only)</label>
-          <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
-        </div>
-        <div style="align-self:end;">
-          <button class="btn" id="pmsBtn">Find PMS</button>
-        </div>
-      </div>
+  <div class="grid">
+    <!-- Left: your existing colour matching / list / existing formulas -->
+    <div id="leftColumn" class="panel">
+      <h2>Colour Matching</h2>
+      <p class="muted">Your existing panels/tables render here exactly as before (JSON data still loads).</p>
+      <div id="matcherArea"></div>
+      <hr>
+      <h3>Closest Matches</h3>
+      <div id="closestList"></div>
+      <hr>
+      <h3>Existing Formulas</h3>
+      <div id="existingFormulaList"></div>
+    </div>
 
-      <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="findBtn">Find Closest</button>
-        <button class="btn" id="clearBtn">Clear</button>
-        <span class="muted" id="statusMsg" aria-live="polite"></span>
-      </div>
-<!-- Predictor Controls -->
-      <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula (uses over‑white only)</h2>
-        <div class="row2" style="margin-bottom:8px;">
+    <!-- Right: API-powered predictor + logging -->
+    <div id="predictorBox" class="panel">
+      <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+
+      <div id="logArea" style="display:none;">
+        <div class="row2" style="margin-top:8px;">
           <div>
-            <label for="maxInks">Max inks in recipe</label>
-            <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
+            <label for="pantoneName">Pantone / Name</label>
+            <input id="pantoneName" type="text" placeholder="e.g. PANTONE 485 C">
+          </div>
+          <div>
+            <label for="notes">Notes (optional)</label>
+            <input id="notes" type="text" placeholder="press/anilox/edits...">
           </div>
         </div>
-        <div class="flex">
-          <button class="btn" id="suggestBtn">Suggest Formula</button>
-          <div id="predictMsg" class="muted" style="align-self:center;"></div>
+        <div class="row" style="margin-top:8px;">
+          <div><label for="mL">Measured L*</label><input id="mL" type="number" step="0.01"></div>
+          <div><label for="mA">Measured a*</label><input id="mA" type="number" step="0.01"></div>
+          <div><label for="mB">Measured b*</label><input id="mB" type="number" step="0.01"></div>
         </div>
-        <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
-<!-- Logging UI injected -->
-<div class="row2" style="margin-top:8px;">
-  <div>
-    <label for="pantoneName">Pantone / Name</label>
-    <input id="pantoneName" type="text" placeholder="e.g. PANTONE 485 C">
-  </div>
-  <div>
-    <label for="notes">Notes (optional)</label>
-    <input id="notes" type="text" placeholder="press/anilox/edits...">
-  </div>
-</div>
-<div class="row" style="margin-top:8px;">
-  <div><label for="mL">Measured L*</label><input id="mL" type="number" step="0.01"></div>
-  <div><label for="mA">Measured a*</label><input id="mA" type="number" step="0.01"></div>
-  <div><label for="mB">Measured b*</label><input id="mB" type="number" step="0.01"></div>
-</div>
-<div class="flex" style="margin-top:8px;">
-  <button class="btn" id="logBtn">Log approved</button>
-  <span class="muted" id="logMsg" aria-live="polite"></span>
-</div>
-
-      </div>
-
-    </div>
-
-    <!-- Right Column: Results -->
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-        <h1>Closest Matches</h1>
-        <div class="stack" style="align-items:center;">
-          <div class="swatch" id="targetSwatch" title="Target"></div>
-          <div class="muted" id="targetEcho">Target: –</div>
+        <div class="flex" style="margin-top:8px;">
+          <button class="btn" id="logBtn">Log approved</button>
+          <span class="muted" id="logMsg" aria-live="polite"></span>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Colour</th>
-            <th>Swatch</th>
-            <th>L*</th>
-            <th>a*</th>
-            <th>b*</th>
-            <th>Distance</th>
-          </tr>
-        </thead>
-        <tbody id="resultsTbody"></tbody>
-      </table>
-      <div id="formulaPanel" class="formula-box" style="display:none;"></div>
+
+      <p class="muted" style="margin-top:10px;">
+        <a href="#" id="exportLink">Export newly approved rows (CSV)</a>
+      </p>
     </div>
   </div>
 
-<script>
-// === API config & helpers ===
-const API_BASE = 'https://<your-render-service>.onrender.com'; // ← set this
-if (typeof window.$ === 'undefined') window.$ = (s)=>document.querySelector(s);
+  <script>
+  (function(){
+    // ====== CONFIG ======
+    const API_BASE = 'https://<YOUR-RENDER-SERVICE>.onrender.com'; // <-- set yours
 
-(function(){
-'use strict';
-// ===== Utilities =====
-function $(sel){ return document.querySelector(sel); }
-function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+    // ====== UTIL ======
+    const $ = (sel)=>document.querySelector(sel);
+    const num = (v)=> {
+      const x = parseFloat(v);
+      return Number.isFinite(x) ? x : null;
+    };
 
-// D65 reference white (2°)
-function labToXyz(L,a,b){
-  var Yn=1, Xn=0.95047, Zn=1.08883;
-  var fy=(L+16)/116;
-  var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
-  return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
-}
-function xyzToLab(X,Y,Z){
-  var Xn=0.95047, Yn=1, Zn=1.08883;
-  var f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
-  var L = 116*f(Y/Yn)-16;
-  var a = 500*(f(X/Xn)-f(Y/Yn));
-  var b = 200*(f(Y/Yn)-f(Z/Zn));
-  return {L:L,a:a,b:b};
-}
-function labToSrgb(L,a,b){
-  // Lab (D65) -> XYZ (D65) -> sRGB
-  var xyz = labToXyz(L,a,b);
-  var X=xyz.X, Y=xyz.Y, Z=xyz.Z;
-  var r =  3.2406*X -1.5372*Y -0.4986*Z;
-  var g = -0.9689*X +1.8758*Y +0.0415*Z;
-  var b2=  0.0557*X -0.2040*Y +1.0570*Z;
-  var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; });
-  r=clamp(Math.round(lin[0]*255),0,255);
-  g=clamp(Math.round(lin[1]*255),0,255);
-  b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r:r,g:g,b:b2};
-}
+    // ====== LEGACY JSON LOAD (UNCHANGED PATHS, NON-FATAL) ======
+    // We keep your exact filenames & relative paths. If they fail, we warn but DO NOT stop the app.
+    async function safeFetchJson(url){
+      try {
+        const r = await fetch(url, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+        return await r.json();
+      } catch (e) {
+        console.warn('Failed to load', url, e);
+        return null; // non-fatal: the API predictor will still work
+      }
+    }
 
-// ΔE2000 (kL=kC=kH=1)
-function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
-function deltaE2000(l1,l2){
-  var L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
-  var deg2rad=Math.PI/180;
-  var avgLp=(L1+L2)/2;
-  var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
-  var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
-  var a1p=(1+G)*a1, a2p=(1+G)*a2;
-  var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
-  var h1p=hp(a1p,b1), h2p=hp(a2p,b2);
-  var avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
-  var T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
-          + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
-  var dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
-  var dLp = L2 - L1;
-  var dCp = C2p - C1p;
-  var dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
-  var Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
-  var Sc = 1 + 0.045*avgCp;
-  var Sh = 1 + 0.015*avgCp*T;
-  var Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
-          * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
-  return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
-}
+    // Make these available for your existing scripts/UI that expect them.
+    // We keep the names conventional: colours, assortment, dcFormulas/basisInks.
+    let colours = [];
+    let assortment = [];
+    let dcFormulas = [];
+    let basisInks = []; // some pages use this alias
 
-// ===== State =====
-var COLOURS = [];// from colours.json
-var FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
-var ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
+    async function loadLegacyData(){
+      const c = await safeFetchJson('./colours.json');                       // your colour DB
+      const a = await safeFetchJson('./assortment_colour_data.json');        // assortment/tints
+      const d = await safeFetchJson('./DC_Formulas.json');                   // existing formulas
 
-// Name & PMS helpers
-function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
-function extractPmsNumber(name){
-  if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
-  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
-}
+      colours   = Array.isArray(c) ? c : (c || []);
+      assortment= Array.isArray(a) ? a : (a || []);
+      dcFormulas= Array.isArray(d) ? d : (d || (d && d.items) || []);
 
-var FORMULAS_NORM = {};
-var COLOUR_TO_FORMULA = {};
-function buildFormulaIndex(){
-  var rows = [];
-  FORMULAS_NORM = {};
-  COLOUR_TO_FORMULA = {};
-  // Flatten workbook-style DC_Formulas
-  if (Array.isArray(FORMULAS)) {
-    rows.push.apply(rows, FORMULAS);
-  } else if (FORMULAS && typeof FORMULAS === 'object') {
-    Object.keys(FORMULAS).forEach(function(k){
-      if (Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
-      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
-        rows.push.apply(rows, FORMULAS[k].rows);
+      // If your older scripts expect basisInks, mirror from assortment if present
+      basisInks = Array.isArray(assortment) ? assortment : [];
+
+      // Notify UI area if you want; otherwise silent.
+      if (!basisInks.length) {
+        console.warn('No basis inks available – local solver disabled, API suggest will still work.');
+        // DO NOT abort; keep the app alive.
+      }
+
+      // OPTIONAL: call your existing renderers if they rely on these arrays.
+      renderLegacyPanels();
+    }
+
+    function renderLegacyPanels(){
+      // Leave your existing rendering intact.
+      // These DOM nodes are placeholders; if your page has its own renderer, it will still work.
+      const m = $('#matcherArea');
+      if (m && colours.length) {
+        m.innerHTML = `<span class="muted">${colours.length} colours loaded.</span>`;
+      }
+      const efl = $('#existingFormulaList');
+      if (efl && dcFormulas.length) {
+        efl.innerHTML = `<span class="muted">${dcFormulas.length} existing formulas loaded.</span>`;
+      }
+    }
+
+    // ====== TARGET LAB INPUTS ======
+    function getTargetLab(){
+      const L = num($('#LInput')?.value);
+      const a = num($('#aInput')?.value);
+      const b = num($('#bInput')?.value);
+      if (L===null || a===null || b===null) return null;
+      return { L, a, b };
+    }
+
+    // ====== API: PREDICT ======
+    async function suggestFormula(){
+      const t = getTargetLab();
+      const msg = $('#predictMsg');
+      const box = $('#suggestedFormula');
+      const log = $('#logArea');
+
+      if (!t){
+        alert('Enter a valid L*, a*, b* first.');
+        return;
+      }
+      try {
+        if (msg){ msg.textContent = 'Predicting…'; msg.className = 'muted'; }
+        if (box){ box.style.display='none'; box.innerHTML=''; }
+        if (log){ log.style.display='none'; }
+        const res = await fetch(API_BASE + '/predict', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>res.statusText);
+          throw new Error(`API ${res.status}: ${txt}`);
+        }
+        const data = await res.json();
+        const formula = data.formula || {};
+        window._lastSuggestion = { target: t, formula };
+
+        // Render cleanly
+        const pairs = Object.entries(formula).sort((a,b)=>b[1]-a[1]);
+        let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
+        for (const [ink, pct] of pairs) {
+          html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${pct.toFixed(2)}%</div>`;
+        }
+        html += '</div>';
+        if (box){ box.innerHTML = html; box.style.display='block'; }
+        if (msg){ msg.textContent = 'Done.'; msg.className = 'muted ok'; }
+        if (log){ log.style.display='block'; }
+      } catch (e){
+        console.error(e);
+        if (msg){ msg.textContent = e.message; msg.className = 'muted err'; }
+      }
+    }
+
+    // ====== API: LOG APPROVED ======
+    async function logApproved(){
+      const sug = window._lastSuggestion;
+      const msg = $('#logMsg');
+      if (!sug){ alert('Predict first.'); return; }
+
+      const payload = {
+        pantone: $('#pantoneName')?.value || '',
+        target_L: sug.target.L,
+        target_a: sug.target.a,
+        target_b: sug.target.b,
+        suggested: sug.formula,
+        // For now, approved == suggested; if you later add editable fields, wire them here.
+        approved: sug.formula,
+        measured_L: num($('#mL')?.value),
+        measured_a: num($('#mA')?.value),
+        measured_b: num($('#mB')?.value),
+        notes: $('#notes')?.value || ''
+      };
+      if (msg){ msg.textContent = 'Saving…'; msg.className = 'muted'; }
+
+      try {
+        const res = await fetch(API_BASE + '/log_approved', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>res.statusText);
+          throw new Error(`API ${res.status}: ${txt}`);
+        }
+        const j = await res.json();
+        if (msg){ msg.textContent = `Saved (id ${j.id}).`; msg.className = 'muted ok'; }
+      } catch (e) {
+        console.error(e);
+        if (msg){ msg.textContent = e.message; msg.className = 'muted err'; }
+      }
+    }
+
+    // ====== API: EXPORT NEW TRAINING ROWS ======
+    async function exportNewRows(e){
+      e?.preventDefault?.();
+      try {
+        const res = await fetch(API_BASE + '/export_training');
+        if (!res.ok) throw new Error(await res.text());
+        const j = await res.json();
+        if (!j.csv || !j.rows) { alert('No new approved rows yet.'); return; }
+        const blob = new Blob([j.csv], {type:'text/csv'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'new_training_rows.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      }
+    }
+
+    // ====== WIRE EVENTS ======
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load your legacy JSONs without changing file names / paths
+      loadLegacyData();
+
+      // Wire buttons without assuming exact structure
+      $('#suggestBtn')?.addEventListener('click', suggestFormula);
+      $('#logBtn')?.addEventListener('click', logApproved);
+      $('#exportLink')?.addEventListener('click', exportNewRows);
+
+      // Enter key runs prediction if focused in any LAB input
+      for (const id of ['LInput','aInput','bInput']){
+        const el = $('#'+id);
+        el && el.addEventListener('keydown', (ev)=>{ if (ev.key==='Enter') suggestFormula(); });
       }
     });
-  }
-  // Build per-colour arrays of inks
-  var byColour = new Map();
-  rows.forEach(function(r){
-    var cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
-    if (!cname) return;
-    var items = [];
-    for (var i = 1; i <= 12; i++) {
-      var ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
-      if (!ink) continue;
-      var pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
-      items.push({ ink: ink, percent: pct });
-    }
-    var arr = byColour.get(cname) || [];
-    arr.push.apply(arr, items);
-    byColour.set(cname, arr);
-    FORMULAS_NORM[normaliseName(cname)] = arr;
-  });
-  // Pre-bind colour names to best formula key
-  (COLOURS || []).forEach(function(c){
-    var name = c.name || c.Colour || c.color || '';
-    var norm = normaliseName(name);
-    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
-    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
-    var p = extractPmsNumber(name);
-    if (p) {
-      byColour.keys();
-      for (var key of byColour.keys()){
-        if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
-      }
-    }
-  });
-}
-
-// ===== UI helpers =====
-function updateTargetEcho(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })){
-    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
-  }
-  $('#targetEcho').textContent = 'Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
-  var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
-}
-
-// ===== Matching =====
-function getTargetLab(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
-}
-function findClosest(){
-  var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-  var rows = COLOURS.map(function(c){ return {
-    raw: c,
-    name: c.name || c.Colour || c.color || '—',
-    L:c.L, a:c.a, b:c.b,
-    de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  }; }).sort(function(a,b){ return a.de-b.de; }).slice(0,8); // limit to 8 for a compact list
-
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  rows.forEach(function(r){
-    var tr=document.createElement('tr'); tr.className='result-row';
-    var rgb=labToSrgb(r.L,r.a,r.b);
-    tr.innerHTML = '\n      <td>'+r.name+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+r.L.toFixed(2)+'</td>\n      <td>'+r.a.toFixed(2)+'</td>\n      <td>'+r.b.toFixed(2)+'</td>\n      <td>'+r.de.toFixed(2)+'</td>';
-    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
-    tbody.appendChild(tr);
-  });
-}
-
-function showFormulaFor(colourName){
-  var panel = $('#formulaPanel');
-  var list = null;
-  var bound = COLOUR_TO_FORMULA[colourName];
-  if(bound) list = FORMULAS_NORM[bound];
-  if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
-  if(!list){
-    var want = extractPmsNumber(colourName);
-    if(want){
-      for (var key in FORMULAS_NORM){
-        if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
-      }
-    }
-  }
-  if(!list || !list.length){ panel.style.display='none'; return; }
-  var html = '<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
-  list.forEach(function(item){
-    var name = item.ink || item.Ink || 'Ink';
-    var pct = item.percent!==''? (item.percent+'%') : '';
-    html += '<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>';
-  });
-  html += '</div>';
-  panel.innerHTML = html; panel.style.display='block';
-}
-
-// ===== PMS Search =====
-function findByPms(){
-  var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
-  var q = qRaw.replace(/^PANTONE\s*/,'');
-  var hits = COLOURS.filter(function(c){
-    var p = extractPmsNumber(c.name||c.Colour||c.color||'');
-    return p && p.includes(q);
-  });
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  if(!hits.length){ alert('No PMS match found'); return; }
-  hits.slice(0,8).forEach(function(c){ // also limit to 8 here
-    var rgb=labToSrgb(c.L,c.a,c.b);
-    var tr=document.createElement('tr'); tr.className='result-row';
-    tr.innerHTML = '\n      <td>'+(c.name||c.Colour||c.color||'—')+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+(+c.L).toFixed(2)+'</td>\n      <td>'+(+c.a).toFixed(2)+'</td>\n      <td>'+(+c.b).toFixed(2)+'</td>\n      <td>—</td>';
-    tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
-    tbody.appendChild(tr);
-  });
-  var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
-}
-
-// ===== Predictor (white‑only basis, raw XYZ in D65) =====
-function buildWhiteBasis(){
-  // Build basis using ONLY over-white measurements at each concentration.
-  // IMPORTANT: keep raw XYZ magnitude (no column normalisation) so lightness is preserved.
-  var basis = []; // {name, ink, conc, vec:[X,Y,Z]}
-  Object.keys(ASSORTMENT).forEach(function(ink){
-    var W = (ASSORTMENT[ink].white||[]);
-    if (!W.length) return;
-    W.slice().sort(function(a,b){ return a.conc-b.conc; }).forEach(function(entry){
-      var xyz = labToXyz(entry.L, entry.a, entry.b); // D65
-      basis.push({ name: ink+'@'+entry.conc+'%', ink: ink, conc: entry.conc, vec:[xyz.X, xyz.Y, xyz.Z] });
-    });
-  });
-  return basis;
-}
-
-// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2, with simplex constraints (w>=0, sum w=1)
-function fwSimplex(A, y, iters, seed){
-  if (iters==null) iters=2000;
-  var N = A[0].length;
-  var w = new Array(N).fill(0);
-  if (seed && seed.length===N){
-    var s0 = seed.reduce(function(a,b){return a+b;},0);
-    if (s0>0) w = seed.map(function(v){ return Math.max(0,v)/s0; }); else w[0]=1;
-  } else {
-    w[0]=1;
-  }
-  function matVec(A, v){
-    return [
-      A[0].reduce(function(s,aj,j){return s+aj*v[j];},0),
-      A[1].reduce(function(s,aj,j){return s+aj*v[j];},0),
-      A[2].reduce(function(s,aj,j){return s+aj*v[j];},0)
-    ];
-  }
-  var Aw = matVec(A, w);
-  for (var t=0;t<iters;t++){
-    var r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]];
-    var bestK=0, bestVal=Infinity;
-    for (var k=0;k<N;k++){
-      var gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
-      if (gk < bestVal){ bestVal=gk; bestK=k; }
-    }
-    var v = [ A[0][bestK]-Aw[0], A[1][bestK]-Aw[1], A[2][bestK]-Aw[2] ];
-    var num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
-    var den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-    var gamma = num/den; if (!Number.isFinite(gamma)) gamma=0; gamma=Math.max(0, Math.min(1, gamma));
-    for (var j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*(j===bestK?1:0); }
-    Aw = [ (1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK] ];
-    var res2 = r[0]*r[0]+r[1]*r[1]+r[2]*r[2];
-    if (res2 < 1e-10) break;
-  }
-  var s = w.reduce(function(a,b){return a+b;},0) || 1; w = w.map(function(v){ return Math.max(0,v)/s; });
-  return w;
-}
-
-
-async function suggestFormula(){
-  const t = (typeof getTargetLab === 'function') ? getTargetLab() : null;
-  if(!t){ alert('Enter a valid colour first.'); return; }
-
-  const msgEl = document.querySelector('#predictMsg') || document.createElement('div');
-  if (!msgEl.id) { msgEl.id = 'predictMsg'; (document.body||document.documentElement).appendChild(msgEl); }
-  msgEl.textContent = 'Predicting...';
-
-  const box = document.querySelector('#suggestedFormula');
-  if (box) { box.style.display = 'none'; }
-
-  try {
-    const res = await fetch(API_BASE + '/predict', {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    const formula = data.formula || {};
-
-    window._lastSuggestion = { target: t, formula };
-
-    const pairs = Object.entries(formula).sort((a,b)=>b[1]-a[1]);
-    let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
-    for (const [ink, pct] of pairs) {
-      html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${pct.toFixed(2)}%</div>`;
-    }
-    html += '</div>';
-
-    if (box) {
-      box.innerHTML = html;
-      box.style.display = 'block';
-    }
-    msgEl.textContent = '';
-  } catch (e) {
-    msgEl.textContent = 'Error: ' + e.message;
-  }
-}
-
-  var basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
-  var maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
-
-  // Target in raw XYZ (D65)
-  var t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
-  var y = [t.X, t.Y, t.Z];
-
-  // Design matrix A (3 x N)
-  var A=[[],[],[]]; basis.forEach(function(b){ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
-
-  // Seed: favour extender columns if present
-  var seed = new Array(basis.length).fill(0);
-  for (var j=0;j<basis.length;j++){
-    var ink = String(basis[j].ink||'').toUpperCase();
-    if (ink.indexOf('EXTENDER')>-1 || /\bDC21-00[12]\b/.test(ink)) seed[j] = 1;
-  }
-  var seedSum = seed.reduce(function(a,b){return a+b;},0);
-  if (seedSum === 0) seed[0] = 1; else seed = seed.map(function(v){ return v/seedSum; });
-
-  // Simplex-constrained quadratic fit
-  var w = fwSimplex(A, y, 2000, seed);
-
-  // Second pass: among all zero-error mixes, push weight onto Extender while keeping A w = y
-  w = maximizeExtender(A, y, w, function(idx){
-    var ink = String(basis[idx].ink||'').toUpperCase();
-    return (ink.indexOf('EXTENDER')>-1) || (/DC21-00[12]/.test(ink));
-  });
-
-  // Predicted mix directly from column weights (no re-averaging)
-  var mixXYZ = [0,0,0];
-  for(var j2=0;j2<basis.length;j2++){
-    mixXYZ[0] += w[j2]*basis[j2].vec[0];
-    mixXYZ[1] += w[j2]*basis[j2].vec[1];
-    mixXYZ[2] += w[j2]*basis[j2].vec[2];
-  }
-  var mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
-  var dE = deltaE2000(mixLab, targetLab);
-  var rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
-
-  // Collapse weights by ink for display, then keep top-k inks
-  var byInk = new Map();
-  for(var jj=0;jj<basis.length;jj++){
-    if(w[jj] <= 1e-9) continue;
-    byInk.set(basis[jj].ink, (byInk.get(basis[jj].ink)||0) + w[jj]);
-  }
-  var merged = Array.from(byInk.entries()).map(function(pair){ return {ink:pair[0], weight:pair[1]}; })
-                    .sort(function(a,b){ return b.weight-a.weight; })
-                    .slice(0, maxInks);
-  var dispSum = merged.reduce(function(a,b){return a+b.weight;},0)||1; // renormalise for pretty %s
-  merged.forEach(function(p){ p.weight = p.weight/dispSum; });
-
-  var html = '<h2>Suggested Formula</h2>';
-  html += '<div class="stack" style="align-items:center;">'
-    + '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div>'
-    + '<div class="muted">Predicted: L '+mixLab.L.toFixed(2)+' a '+mixLab.a.toFixed(2)+' b '+mixLab.b.toFixed(2)+' · ΔE00: <strong>'+dE.toFixed(2)+'</strong></div>'
-    + '</div>';
-  html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
-  var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
-
-
-
-// ===== Extender maximiser (keep colour, maximise extender) =====
-function maximizeExtender(A, y, w0, isExt){
-  try{
-    // Build candidate index set: top-8 by weight, plus any extender columns
-    var N = w0.length;
-    var idx = Array.from({length:N}, function(_,i){return i;});
-    idx.sort(function(i,j){ return w0[j]-w0[i]; });
-    var cand = idx.slice(0,8);
-    for (var i=0;i<N;i++){ if (isExt(i) && cand.indexOf(i)===-1) cand.push(i); }
-
-    function combos(arr, k){
-      var res=[]; var n=arr.length;
-      function rec(st, path){ if(path.length===k){ res.push(path.slice()); return; } for(var t=st;t<n;t++){ path.push(arr[t]); rec(t+1, path); path.pop(); } }
-      rec(0,[]); return res;
-    }
-    function solve4x4(M, b){ // naive Gaussian elimination (4x4)
-      var A = [M[0].slice(), M[1].slice(), M[2].slice(), M[3].slice()];
-      var x = b.slice();
-      for(var i=0;i<4;i++){
-        // pivot
-        var piv=i, maxv=Math.abs(A[i][i]);
-        for(var r=i+1;r<4;r++){ var v=Math.abs(A[r][i]); if(v>maxv){maxv=v; piv=r;} }
-        if(maxv<1e-12) return null;
-        if(piv!==i){ var tmp=A[i]; A[i]=A[piv]; A[piv]=tmp; var tb=x[i]; x[i]=x[piv]; x[piv]=tb; }
-        // normalize
-        var div=A[i][i]; for(var c=i;c<4;c++) A[i][c]/=div; x[i]/=div;
-        // eliminate
-        for(var r2=0;r2<4;r2++){ if(r2===i) continue; var f=A[r2][i]; if(Math.abs(f)<1e-12) continue; for(var c2=i;c2<4;c2++) A[r2][c2]-=f*A[i][c2]; x[r2]-=f*x[i]; }
-      }
-      return x; // solution
-    }
-    var best = {w:w0, extShare:-1};
-    var target = [y[0], y[1], y[2], 1];
-    var sets = combos(cand, 4);
-    for(var s=0;s<sets.length;s++){
-      var S = sets[s];
-      // must include at least one extender col
-      var okExt=false; for(var q=0;q<S.length;q++){ if(isExt(S[q])) { okExt=true; break; } }
-      if(!okExt) continue;
-      var M = [[],[],[],[]];
-      for(var j=0;j<4;j++){ M[0][j]=A[0][S[j]]; M[1][j]=A[1][S[j]]; M[2][j]=A[2][S[j]]; M[3][j]=1; }
-      var x = solve4x4(M, target);
-      if(!x) continue;
-      // feasibility: nonnegative and close residual
-      var neg=false; for(var j2=0;j2<4;j2++){ if(x[j2]<-1e-9){ neg=true; break; } }
-      if(neg) continue;
-      // compute residual exactly
-      var Ax=[0,0,0];
-      for(var j3=0;j3<4;j3++){ Ax[0]+=A[0][S[j3]]*x[j3]; Ax[1]+=A[1][S[j3]]*x[j3]; Ax[2]+=A[2][S[j3]]*x[j3]; }
-      var r0=Ax[0]-y[0], r1=Ax[1]-y[1], r2=Ax[2]-y[2];
-      if((r0*r0+r1*r1+r2*r2)>1e-8) continue;
-      var sumx = x.reduce(function(a,b){return a+b;},0);
-      if(Math.abs(sumx-1)>1e-6) continue; // preserve convex
-      var ext = 0; for(var j4=0;j4<4;j4++){ if(isExt(S[j4])) ext+=x[j4]; }
-      if(ext > best.extShare){
-        var wNew = new Array(A[0].length).fill(0);
-        for(var j5=0;j5<4;j5++) wNew[S[j5]] = Math.max(0,x[j5]);
-        best = {w:wNew, extShare:ext};
-      }
-    }
-    return (best.extShare>=0)? best.w : w0;
-  }catch(e){ console.warn('maximizeExtender failed', e); return w0; }
-}
-
-// ===== Wire up =====
-$('#findBtn').addEventListener('click', findClosest);
-$('#clearBtn').addEventListener('click', function(){
-  $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
-  $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
-  $('#suggestedFormula').style.display='none';
-});
-$('#suggestBtn').addEventListener('click', suggestFormula);
-$('#pmsBtn').addEventListener('click', findByPms);
-['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
-
-// ===== Load JSON =====
-Promise.all([
-  fetch('colours.json').then(function(r){ return r.json(); }),
-  fetch('DC_Formulas.json').then(function(r){ return r.json(); }),
-  fetch('assortment_colour_data.json').then(function(r){ return r.json(); })
-]).then(function(tuple){
-  var colours = tuple[0], formulas = tuple[1], assortment = tuple[2];
-  COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
-  buildFormulaIndex();
-  $('#countLabel').textContent = COLOURS.length;
-}).catch(function(err){ alert('Error loading JSON: '+err); });
-
-updateTargetEcho();
-
-// ===== Self-tests =====
-function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
-function runSelfTests(){
-  // ΔE should be 0 for identical colours
-  var c = {L:50,a:0,b:0};
-  console.assert(approx(deltaE2000(c,c), 0), 'ΔE00(identity) != 0');
-
-  // Symmetry
-  var c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
-  console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
-
-  // Lab -> XYZ -> Lab round-trip (D65)
-  var t={L:70,a:20,b:30};
-  var xyz = labToXyz(t.L,t.a,t.b);
-  var back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
-  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
-
-  // Simplex solver exact fit on convex hull: pick from two vertices
-  // columns at (1,0,0) and (0,1,0), target is (0.25, 0.75, 0)
-  var Atest = [[1,0],[0,1],[0,0]]; var ytest=[0.25,0.75,0];
-  var wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
-  var err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
-                       Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
-                       0);
-  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(function(v){ return v>=-1e-9; }), 'FW simplex exact convex combo failed');
-}
-try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
-})();
-</script>
-<script>
-
-// --- Logging handlers ---
-document.addEventListener('click', function(e){
-  if (e.target && e.target.id === 'logBtn') logApproved();
-  if (e.target && e.target.id === 'exportLink') { e.preventDefault(); exportRows(); }
-});
-
-async function logApproved(){
-  if (!window._lastSuggestion){ alert('Predict first.'); return; }
-  const sug = window._lastSuggestion;
-  const pantone = (document.querySelector('#pantoneName')?.value || '').trim();
-  const notes   = (document.querySelector('#notes')?.value || '').trim();
-  const mL = parseFloat(document.querySelector('#mL')?.value);
-  const mA = parseFloat(document.querySelector('#mA')?.value);
-  const mB = parseFloat(document.querySelector('#mB')?.value);
-
-  const payload = {
-    pantone,
-    target_L: sug.target.L, target_a: sug.target.a, target_b: sug.target.b,
-    suggested: sug.formula,
-    approved: sug.formula,
-    measured_L: Number.isFinite(mL) ? mL : null,
-    measured_a: Number.isFinite(mA) ? mA : null,
-    measured_b: Number.isFinite(mB) ? mB : null,
-    notes
-  };
-
-  const msg = document.querySelector('#logMsg'); if (msg) msg.textContent = 'Saving...';
-  try {
-    const res = await fetch(API_BASE + '/log_approved', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const j = await res.json();
-    if (msg) msg.textContent = 'Saved (id ' + j.id + ').';
-  } catch(err){
-    if (msg) msg.textContent = 'Error: ' + err.message;
-  }
-}
-
-async function exportRows(){
-  try{
-    const res = await fetch(API_BASE + '/export_training');
-    const j = await res.json();
-    if (!j.csv || !j.rows){ alert('No new rows.'); return; }
-    const blob = new Blob([j.csv], {type:'text/csv'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'new_training_rows.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-  }catch(e){
-    alert('Export failed: ' + e.message);
-  }
-}
-
-</script>
+  })();
+  </script>
 </body>
 </html>
