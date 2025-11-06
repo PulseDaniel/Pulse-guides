@@ -70,12 +70,21 @@
       <!-- Predictor box (UI unchanged) -->
       <div class="formula-box" id="predictorBox">
         <h2>Suggest Formula</h2>
+
+        <!-- NEW: colour group -->
         <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="groupSelect">Colour group (optional)</label>
+            <select id="groupSelect">
+              <option value="">— none —</option>
+            </select>
+          </div>
           <div>
             <label for="maxInks">Max inks in recipe</label>
             <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
           </div>
         </div>
+
         <div class="flex">
           <button class="btn" id="suggestBtn">Suggest Formula</button>
           <div id="predictMsg" class="muted" style="align-self:center;"></div>
@@ -112,7 +121,7 @@ function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
 // 🔗 Your API endpoint:
-const API_BASE = 'https://ink-predict-api.onrender.com'; 
+const API_BASE = 'https://<your-render-service>.onrender.com'; // <-- set me
 
 // D65 conversions
 function labToXyz(L,a,b){
@@ -173,14 +182,16 @@ var COLOURS = [];
 var FORMULAS = {};
 var FORMULAS_NORM = {};
 var COLOUR_TO_FORMULA = {};
-var _lastSuggestion = null; // stash for step 3 logging
+var _lastSuggestion = null;
 
+// Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
   if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
   return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
 
+// Build formula index from DC_Formulas.json
 function buildFormulaIndex(){
   var rows = [];
   FORMULAS_NORM = {};
@@ -225,7 +236,7 @@ function buildFormulaIndex(){
   });
 }
 
-// ===== UI helpers =====
+// UI helpers
 function updateTargetEcho(){
   var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
   if([L,a,b].some(function(v){ return Number.isNaN(v); })){
@@ -235,11 +246,12 @@ function updateTargetEcho(){
   var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
 }
 
-// ===== Matching =====
+// Matching
 function getTargetLab(){
   var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
   if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
 }
+
 function findClosest(){
   var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
   var rows = COLOURS.map(function(c){ return {
@@ -259,7 +271,12 @@ function findClosest(){
       + '<td>'+r.a.toFixed(2)+'</td>'
       + '<td>'+r.b.toFixed(2)+'</td>'
       + '<td>'+r.de.toFixed(2)+'</td>';
-    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
+    // FIX: clicking a row sets L*a*b* and updates the panel (always)
+    tr.addEventListener('click', function(){
+      $('#L').value = r.L; $('#a').value = r.a; $('#b').value = r.b;
+      updateTargetEcho();
+      showFormulaFor(r.name);
+    });
     tbody.appendChild(tr);
   });
 }
@@ -289,7 +306,7 @@ function showFormulaFor(colourName){
   panel.innerHTML = html; panel.style.display='block';
 }
 
-// ===== PMS Search =====
+// PMS search
 function findByPms(){
   var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
   var q = qRaw.replace(/^PANTONE\s*/,'');
@@ -317,7 +334,7 @@ function findByPms(){
   var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
 }
 
-// ===== Predictor: calls your API =====
+// Predictor → calls your API with optional group
 async function suggestFormula(){
   const btn = $('#suggestBtn'); const msg = $('#predictMsg'); const box = $('#suggestedFormula');
   const t = getTargetLab();
@@ -325,10 +342,14 @@ async function suggestFormula(){
 
   btn.disabled = true; msg.textContent = 'Predicting...'; box.style.display='none'; box.innerHTML='';
   try{
+    const group = ($('#groupSelect').value || '');
+    const body = { L: t.L, a: t.a, b: t.b, lock_neighbours: true };
+    if (group) body.group = group;
+
     const res = await fetch(API_BASE + '/predict', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ L: t.L, a: t.a, b: t.b, lock_neighbours: true })
+      body: JSON.stringify(body)
     });
     if(!res.ok){
       const txt = await res.text();
@@ -336,7 +357,6 @@ async function suggestFormula(){
     }
     const data = await res.json();
     const formula = (data && data.formula) ? data.formula : {};
-    // render (sorted, hide zeros, 2dp)
     const pairs = Object.entries(formula).filter(([_,v]) => +v > 0).sort((a,b)=>b[1]-a[1]);
     let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
     for (const [ink,pct] of pairs) html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
@@ -344,7 +364,6 @@ async function suggestFormula(){
     box.innerHTML = html;
     box.style.display = 'block';
     msg.textContent = '';
-    // stash for future logging (Step 3)
     _lastSuggestion = { target: t, formula };
   } catch(err){
     msg.textContent = String(err.message || err);
@@ -353,7 +372,19 @@ async function suggestFormula(){
   }
 }
 
-// ===== Wire up =====
+// Load groups into dropdown
+async function loadGroups(){
+  try {
+    const r = await fetch(API_BASE + '/groups');
+    const j = await r.json();
+    const sel = document.getElementById('groupSelect');
+    (j.groups || []).forEach(g=>{
+      const opt = document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt);
+    });
+  } catch { /* meh */ }
+}
+
+// Wire up
 $('#findBtn').addEventListener('click', findClosest);
 $('#clearBtn').addEventListener('click', function(){
   $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
@@ -364,7 +395,7 @@ $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
-// ===== Load JSON =====
+// Load data + groups
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
   fetch('DC_Formulas.json').then(r=>r.json())
@@ -374,9 +405,10 @@ Promise.all([
   $('#countLabel').textContent = COLOURS.length;
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
+loadGroups();
 updateTargetEcho();
 
-// ===== Minimal self-tests =====
+// Self-tests
 function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 try {
   var c = {L:50,a:0,b:0};
