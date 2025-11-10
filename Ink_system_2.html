@@ -12,11 +12,12 @@
     .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
     .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
     label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
-    input, select { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
+    input, select, textarea { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
     input::placeholder { color:#7b8496; }
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.8rem; resize:vertical; min-height:80px; }
     .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
     .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
-    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
+    .btn { cursor:pointer; padding:8px 10px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; font-size:.85rem; }
     .btn:hover { filter:brightness(1.1); }
     table { width:100%; border-collapse:collapse; }
     th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
@@ -33,6 +34,8 @@
     .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
     .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .flex { display:flex; gap:8px; }
+    .flex-wrap { display:flex; flex-wrap:wrap; gap:8px; }
+    .w-full { width:100%; }
     @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -67,11 +70,10 @@
         <span class="muted" id="statusMsg" aria-live="polite"></span>
       </div>
 
-      <!-- Predictor box (UI unchanged) -->
+      <!-- Predictor box -->
       <div class="formula-box" id="predictorBox">
         <h2>Suggest Formula</h2>
 
-        <!-- NEW: colour group -->
         <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="groupSelect">Colour group (optional)</label>
@@ -79,16 +81,15 @@
               <option value="">— none —</option>
             </select>
           </div>
-          <div>
-          
-          </div>
+          <div></div>
         </div>
 
         <div class="flex">
           <button class="btn" id="suggestBtn">Suggest Formula</button>
           <div id="predictMsg" class="muted" style="align-self:center;"></div>
         </div>
-        <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+
+        <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
       </div>
     </div>
 
@@ -120,7 +121,7 @@ function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
 // 🔗 Your API endpoint:
-const API_BASE = 'https://ink-predict-api.onrender.com'; // <-- set me
+const API_BASE = 'https://ink-predict-api.onrender.com'; // <-- your Render service
 
 // D65 conversions
 function labToXyz(L,a,b){
@@ -182,6 +183,7 @@ var FORMULAS = {};
 var FORMULAS_NORM = {};
 var COLOUR_TO_FORMULA = {};
 var _lastSuggestion = null;
+var _allInks = []; // from /inks
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -270,7 +272,7 @@ function findClosest(){
       + '<td>'+r.a.toFixed(2)+'</td>'
       + '<td>'+r.b.toFixed(2)+'</td>'
       + '<td>'+r.de.toFixed(2)+'</td>';
-    // FIX: clicking a row sets L*a*b* and updates the panel (always)
+    // clicking sets LAB + shows formula
     tr.addEventListener('click', function(){
       $('#L').value = r.L; $('#a').value = r.a; $('#b').value = r.b;
       updateTargetEcho();
@@ -333,6 +335,29 @@ function findByPms(){
   var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
 }
 
+// Load groups into dropdown
+async function loadGroups(){
+  try {
+    const r = await fetch(API_BASE + '/groups');
+    const j = await r.json();
+    const sel = document.getElementById('groupSelect');
+    (j.groups || []).forEach(g=>{
+      const opt = document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+// Load inks list for editor
+async function loadInks(){
+  try{
+    const r = await fetch(API_BASE + '/inks');
+    const j = await r.json();
+    _allInks = (j.inks || []).slice().sort();
+  } catch {
+    _allInks = [];
+  }
+}
+
 // Predictor → calls your API with optional group
 async function suggestFormula(){
   const btn = $('#suggestBtn'); const msg = $('#predictMsg'); const box = $('#suggestedFormula');
@@ -357,13 +382,50 @@ async function suggestFormula(){
     const data = await res.json();
     const formula = (data && data.formula) ? data.formula : {};
     const pairs = Object.entries(formula).filter(([_,v]) => +v > 0).sort((a,b)=>b[1]-a[1]);
-    let html = '<h2>Suggested Formula</h2><div class="formula-grid">';
-    for (const [ink,pct] of pairs) html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+
+    let html = '<h2>Suggested Formula</h2>';
+    html += '<div class="formula-grid" id="suggestedFormulaGrid">';
+    for (const [ink,pct] of pairs) {
+      html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+    }
     html += '</div>';
+
+    // Edit + save section
+    html += `
+      <div class="flex-wrap" style="margin-top:10px;">
+        <button class="btn" id="editFormulaBtn">Edit formula</button>
+        <span class="muted" id="editHint">Adjust ink list and percentages, then save.</span>
+      </div>
+      <div id="editFormulaSection" style="display:none; margin-top:10px;">
+        <div class="formula-box" style="margin-top:0;">
+          <h3 style="margin:0 0 6px; font-size:.95rem;">Edited formula</h3>
+          <div id="editRows"></div>
+          <div class="flex-wrap" style="margin-top:8px; align-items:center;">
+            <select id="editAddInkSelect" style="flex:1; min-width:140px;"></select>
+            <input id="editAddPct" type="number" step="0.01" min="0" placeholder="%"/>
+            <button class="btn" id="editAddInkBtn">Add ink</button>
+            <button class="btn" id="editNormBtn" title="Scale so total = 100%">Normalise</button>
+          </div>
+          <div class="flex" style="margin-top:8px; justify-content:flex-end;">
+            <button class="btn" id="editSaveBtn">Save edited formula</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;">
+          <label for="savedFormulaJson">Saved formula JSON (for training)</label>
+          <textarea id="savedFormulaJson" readonly></textarea>
+        </div>
+      </div>
+    `;
+
     box.innerHTML = html;
     box.style.display = 'block';
     msg.textContent = '';
+
     _lastSuggestion = { target: t, formula };
+
+    // now wire the editor
+    setupFormulaEditor(formula);
+
   } catch(err){
     msg.textContent = String(err.message || err);
   } finally {
@@ -371,16 +433,115 @@ async function suggestFormula(){
   }
 }
 
-// Load groups into dropdown
-async function loadGroups(){
-  try {
-    const r = await fetch(API_BASE + '/groups');
-    const j = await r.json();
-    const sel = document.getElementById('groupSelect');
-    (j.groups || []).forEach(g=>{
-      const opt = document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt);
+// Build edit UI from a formula object
+async function setupFormulaEditor(formulaObj){
+  await loadInks();
+  const section = $('#editFormulaSection');
+  const btn = $('#editFormulaBtn');
+  const rowsContainer = $('#editRows');
+  const addSel = $('#editAddInkSelect');
+  const addPctInput = $('#editAddPct');
+  const saveOut = $('#savedFormulaJson');
+
+  // fill dropdown
+  addSel.innerHTML = _allInks.map(n=>`<option value="${n}">${n}</option>`).join('');
+
+  // local mutable copy
+  const mix = {...formulaObj};
+
+  function renderRows(){
+    const entries = Object.entries(mix)
+      .filter(([_,v])=>+v>0)
+      .sort((a,b)=>b[1]-a[1]);
+    let inner = '<div class="formula-grid">';
+    for (const [ink,pct] of entries){
+      inner += `
+        <div class="fg-ink">
+          <input type="text" class="editInkName" value="${ink}" />
+        </div>
+        <div class="fg-pct" style="display:flex; gap:6px; align-items:center;">
+          <input type="number" class="editInkPct" value="${(+pct).toFixed(2)}" step="0.01" min="0" style="width:7ch; text-align:right;">%
+          <button class="btn editRemoveBtn" data-ink="${ink}">Remove</button>
+        </div>
+      `;
+    }
+    inner += '</div>';
+    rowsContainer.innerHTML = inner;
+
+    // hook changes
+    rowsContainer.querySelectorAll('.editRemoveBtn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        const name = b.dataset.ink;
+        delete mix[name];
+        renderRows();
+      });
     });
-  } catch { /* meh */ }
+    rowsContainer.querySelectorAll('.editInkName, .editInkPct').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const gridChildren = rowsContainer.querySelectorAll('.formula-grid > *');
+        const newMix = {};
+        for (let i=0; i<gridChildren.length; i+=2){
+          const name = gridChildren[i].querySelector('.editInkName').value.trim();
+          const pct = parseFloat(gridChildren[i+1].querySelector('.editInkPct').value);
+          if (name && Number.isFinite(pct) && pct>0) newMix[name] = pct;
+        }
+        Object.keys(mix).forEach(k=>delete mix[k]);
+        Object.assign(mix, newMix);
+      });
+    });
+  }
+
+  btn.onclick = function(){
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+  };
+
+  $('#editAddInkBtn').onclick = function(){
+    const name = addSel.value;
+    const pct = parseFloat(addPctInput.value || '5');
+    if (!name || !Number.isFinite(pct) || pct <= 0) return;
+    mix[name] = (mix[name] || 0) + pct;
+    addPctInput.value = '';
+    renderRows();
+  };
+
+  $('#editNormBtn').onclick = function(){
+    const sum = Object.values(mix).reduce((a,b)=>a+Number(b||0),0) || 1;
+    Object.keys(mix).forEach(k=>{
+      mix[k] = (mix[k]/sum)*100;
+    });
+    renderRows();
+  };
+
+  $('#editSaveBtn').onclick = function(){
+    // recompute from DOM to be safe
+    const gridChildren = rowsContainer.querySelectorAll('.formula-grid > *');
+    const cleaned = {};
+    for (let i=0; i<gridChildren.length; i+=2){
+      const name = gridChildren[i].querySelector('.editInkName').value.trim();
+      const pct = parseFloat(gridChildren[i+1].querySelector('.editInkPct').value);
+      if (name && Number.isFinite(pct) && pct>0) cleaned[name] = pct;
+    }
+    const sum = Object.values(cleaned).reduce((a,b)=>a+Number(b||0),0) || 1;
+    Object.keys(cleaned).forEach(k=>{
+      cleaned[k] = +(cleaned[k]/sum*100).toFixed(2);
+    });
+
+    const t = _lastSuggestion && _lastSuggestion.target
+      ? {L: _lastSuggestion.target.L, a: _lastSuggestion.target.a, b: _lastSuggestion.target.b}
+      : getTargetLab() || {};
+
+    const payload = {
+      target_L: t.L,
+      target_a: t.a,
+      target_b: t.b,
+      formula: cleaned
+    };
+    saveOut.value = JSON.stringify(payload, null, 2);
+  };
+
+  // initial render
+  renderRows();
+  section.style.display = 'none';
 }
 
 // Wire up
@@ -394,7 +555,7 @@ $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
 
-// Load data + groups
+// Load data + groups + inks
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
   fetch('DC_Formulas.json').then(r=>r.json())
@@ -405,9 +566,10 @@ Promise.all([
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
 loadGroups();
+loadInks();
 updateTargetEcho();
 
-// Self-tests
+// quick sanity tests
 function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 try {
   var c = {L:50,a:0,b:0};
