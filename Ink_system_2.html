@@ -35,7 +35,6 @@
     .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .flex { display:flex; gap:8px; }
     .flex-wrap { display:flex; flex-wrap:wrap; gap:8px; }
-    .w-full { width:100%; }
     @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -45,7 +44,10 @@
     <div class="card">
       <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
         <h1>Ink Colour Matcher</h1>
-        <div class="pill"><span id="countLabel">0</span> reference colours</div>
+        <!-- hidden pill so JS doesn’t complain but user doesn’t see it -->
+        <div class="pill" id="refCountPill" style="display:none;">
+          <span id="countLabel">0</span> reference colours
+        </div>
       </div>
 
       <div class="row" style="margin-top:12px;">
@@ -65,7 +67,7 @@
       </div>
 
       <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="findBtn">Find Closest</button>
+        <button class="btn" id="findBtn">Find closest match</button>
         <button class="btn" id="clearBtn">Clear</button>
         <span class="muted" id="statusMsg" aria-live="polite"></span>
       </div>
@@ -121,7 +123,7 @@ function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 
 // 🔗 Your API endpoint:
-const API_BASE = 'https://ink-predict-api.onrender.com'; // <-- your Render service
+const API_BASE = 'https://ink-predict-api.onrender.com'; // change if needed
 
 // D65 conversions
 function labToXyz(L,a,b){
@@ -183,7 +185,7 @@ var FORMULAS = {};
 var FORMULAS_NORM = {};
 var COLOUR_TO_FORMULA = {};
 var _lastSuggestion = null;
-var _allInks = []; // from /inks
+var _allInks = [];
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -272,7 +274,6 @@ function findClosest(){
       + '<td>'+r.a.toFixed(2)+'</td>'
       + '<td>'+r.b.toFixed(2)+'</td>'
       + '<td>'+r.de.toFixed(2)+'</td>';
-    // clicking sets LAB + shows formula
     tr.addEventListener('click', function(){
       $('#L').value = r.L; $('#a').value = r.a; $('#b').value = r.b;
       updateTargetEcho();
@@ -394,24 +395,39 @@ async function suggestFormula(){
     html += `
       <div class="flex-wrap" style="margin-top:10px;">
         <button class="btn" id="editFormulaBtn">Edit formula</button>
-        <span class="muted" id="editHint">Adjust ink list and percentages, then save.</span>
+        <span class="muted" id="editHint">Tweak the mix and save as approved.</span>
       </div>
       <div id="editFormulaSection" style="display:none; margin-top:10px;">
         <div class="formula-box" style="margin-top:0;">
           <h3 style="margin:0 0 6px; font-size:.95rem;">Edited formula</h3>
+
+          <div class="row2" style="margin-bottom:8px;">
+            <div>
+              <label for="editPantone">Pantone / Name</label>
+              <input id="editPantone" type="text" placeholder="e.g. PANTONE 485 C"/>
+            </div>
+            <div>
+              <label for="editNotes">Notes (optional)</label>
+              <input id="editNotes" type="text" placeholder="press / anilox / comments"/>
+            </div>
+          </div>
+
           <div id="editRows"></div>
+
           <div class="flex-wrap" style="margin-top:8px; align-items:center;">
             <select id="editAddInkSelect" style="flex:1; min-width:140px;"></select>
             <input id="editAddPct" type="number" step="0.01" min="0" placeholder="%"/>
             <button class="btn" id="editAddInkBtn">Add ink</button>
             <button class="btn" id="editNormBtn" title="Scale so total = 100%">Normalise</button>
           </div>
+
           <div class="flex" style="margin-top:8px; justify-content:flex-end;">
             <button class="btn" id="editSaveBtn">Save edited formula</button>
           </div>
         </div>
+
         <div style="margin-top:8px;">
-          <label for="savedFormulaJson">Saved formula JSON (for training)</label>
+          <label for="savedFormulaJson">Payload sent to API</label>
           <textarea id="savedFormulaJson" readonly></textarea>
         </div>
       </div>
@@ -422,8 +438,6 @@ async function suggestFormula(){
     msg.textContent = '';
 
     _lastSuggestion = { target: t, formula };
-
-    // now wire the editor
     setupFormulaEditor(formula);
 
   } catch(err){
@@ -433,7 +447,7 @@ async function suggestFormula(){
   }
 }
 
-// Build edit UI from a formula object
+// Build edit UI from a formula object + wire to /log_approved
 async function setupFormulaEditor(formulaObj){
   await loadInks();
   const section = $('#editFormulaSection');
@@ -442,11 +456,13 @@ async function setupFormulaEditor(formulaObj){
   const addSel = $('#editAddInkSelect');
   const addPctInput = $('#editAddPct');
   const saveOut = $('#savedFormulaJson');
+  const pantoneInput = $('#editPantone');
+  const notesInput = $('#editNotes');
 
-  // fill dropdown
+  if (!pantoneInput.value) pantoneInput.value = ($('#pms').value || '').trim();
+
   addSel.innerHTML = _allInks.map(n=>`<option value="${n}">${n}</option>`).join('');
 
-  // local mutable copy
   const mix = {...formulaObj};
 
   function renderRows(){
@@ -460,7 +476,8 @@ async function setupFormulaEditor(formulaObj){
           <input type="text" class="editInkName" value="${ink}" />
         </div>
         <div class="fg-pct" style="display:flex; gap:6px; align-items:center;">
-          <input type="number" class="editInkPct" value="${(+pct).toFixed(2)}" step="0.01" min="0" style="width:10ch; text-align:right;">%
+          <input type="number" class="editInkPct" value="${(+pct).toFixed(2)}"
+                 step="0.01" min="0" style="width:10ch; text-align:right;">%
           <button class="btn editRemoveBtn" data-ink="${ink}">Remove</button>
         </div>
       `;
@@ -468,21 +485,19 @@ async function setupFormulaEditor(formulaObj){
     inner += '</div>';
     rowsContainer.innerHTML = inner;
 
-    // hook changes
     rowsContainer.querySelectorAll('.editRemoveBtn').forEach(b=>{
       b.addEventListener('click', ()=>{
-        const name = b.dataset.ink;
-        delete mix[name];
+        delete mix[b.dataset.ink];
         renderRows();
       });
     });
     rowsContainer.querySelectorAll('.editInkName, .editInkPct').forEach(inp=>{
       inp.addEventListener('change', ()=>{
-        const gridChildren = rowsContainer.querySelectorAll('.formula-grid > *');
+        const kids = rowsContainer.querySelectorAll('.formula-grid > *');
         const newMix = {};
-        for (let i=0; i<gridChildren.length; i+=2){
-          const name = gridChildren[i].querySelector('.editInkName').value.trim();
-          const pct = parseFloat(gridChildren[i+1].querySelector('.editInkPct').value);
+        for (let i=0; i<kids.length; i+=2){
+          const name = kids[i].querySelector('.editInkName').value.trim();
+          const pct = parseFloat(kids[i+1].querySelector('.editInkPct').value);
           if (name && Number.isFinite(pct) && pct>0) newMix[name] = pct;
         }
         Object.keys(mix).forEach(k=>delete mix[k]);
@@ -512,13 +527,12 @@ async function setupFormulaEditor(formulaObj){
     renderRows();
   };
 
-  $('#editSaveBtn').onclick = function(){
-    // recompute from DOM to be safe
-    const gridChildren = rowsContainer.querySelectorAll('.formula-grid > *');
+  $('#editSaveBtn').onclick = async function(){
+    const kids = rowsContainer.querySelectorAll('.formula-grid > *');
     const cleaned = {};
-    for (let i=0; i<gridChildren.length; i+=2){
-      const name = gridChildren[i].querySelector('.editInkName').value.trim();
-      const pct = parseFloat(gridChildren[i+1].querySelector('.editInkPct').value);
+    for (let i=0; i<kids.length; i+=2){
+      const name = kids[i].querySelector('.editInkName').value.trim();
+      const pct = parseFloat(kids[i+1].querySelector('.editInkPct').value);
       if (name && Number.isFinite(pct) && pct>0) cleaned[name] = pct;
     }
     const sum = Object.values(cleaned).reduce((a,b)=>a+Number(b||0),0) || 1;
@@ -530,16 +544,38 @@ async function setupFormulaEditor(formulaObj){
       ? {L: _lastSuggestion.target.L, a: _lastSuggestion.target.a, b: _lastSuggestion.target.b}
       : getTargetLab() || {};
 
+    const pantone = (pantoneInput.value || $('#pms').value || '').trim() || null;
+    const notes = (notesInput.value || '').trim() || null;
+
     const payload = {
+      pantone: pantone,
       target_L: t.L,
       target_a: t.a,
       target_b: t.b,
-      formula: cleaned
+      suggested: _lastSuggestion ? (_lastSuggestion.formula || {}) : {},
+      approved: cleaned,
+      measured_L: null,
+      measured_a: null,
+      measured_b: null,
+      notes: notes
     };
+
     saveOut.value = JSON.stringify(payload, null, 2);
+
+    try {
+      const res = await fetch(API_BASE + '/log_approved', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const j = await res.json();
+      alert('Saved to training log (id ' + j.id + ').');
+    } catch(e) {
+      alert('Error saving to training log: ' + (e.message || e));
+    }
   };
 
-  // initial render
   renderRows();
   section.style.display = 'none';
 }
@@ -562,25 +598,12 @@ Promise.all([
 ]).then(tuple=>{
   COLOURS = tuple[0]; FORMULAS = tuple[1];
   buildFormulaIndex();
-  $('#countLabel').textContent = COLOURS.length;
+  // countLabel is now hidden, so we don't bother updating it visibly
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
 loadGroups();
 loadInks();
 updateTargetEcho();
-
-// quick sanity tests
-function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
-try {
-  var c = {L:50,a:0,b:0};
-  console.assert(approx(deltaE2000(c,c), 0), 'ΔE00(identity) != 0');
-  var c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
-  console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
-  var t={L:70,a:20,b:30};
-  var xyz = labToXyz(t.L,t.a,t.b);
-  var back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
-  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
-} catch(e){ console.warn('Self-tests failed:', e); }
 })();
 </script>
 </body>
