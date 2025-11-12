@@ -9,12 +9,15 @@
     * { box-sizing: border-box; }
     body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
     h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    .tabs { display:flex; gap:8px; margin:0 auto 16px; max-width:1200px; }
+    .tabbtn { cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
+    .tabbtn[aria-selected="true"] { background:#1b2236; border-color:#394154; }
     .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
     .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
     label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
     input, select, textarea { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
     input::placeholder { color:#7b8496; }
-    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.8rem; resize:vertical; min-height:80px; }
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace; font-size:.8rem; resize:vertical; min-height:80px; }
     .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
     .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
     .btn { cursor:pointer; padding:8px 10px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; font-size:.85rem; }
@@ -24,7 +27,7 @@
     th { color:#9aa4b2; font-weight:600; }
     .result-row { transition: background .2s; cursor:pointer; }
     .result-row:hover { background: rgba(255,255,255,.05); }
-    .swatch { width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
+    .swatch { width:3.2rem; height:2.2rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
     .pill { font-size:.8rem; color:#98a2b3; }
     .muted { color:#7b8496; font-size:.85rem; }
     .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
@@ -33,88 +36,162 @@
     .fg-ink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
     .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .flex { display:flex; gap:8px; }
+    .flex { display:flex; gap:8px; align-items:center; }
     .flex-wrap { display:flex; flex-wrap:wrap; gap:8px; }
-    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+    .center { display:flex; align-items:center; gap:12px; }
+    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .two-col { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- Left Column -->
-    <div class="card">
-      <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
-        <h1>Ink Colour Matcher</h1>
-        <!-- hidden pill so JS doesn’t complain but user doesn’t see it -->
-        <div class="pill" id="refCountPill" style="display:none;">
-          <span id="countLabel">0</span> reference colours
+
+  <!-- Tabs -->
+  <div class="tabs" role="tablist" aria-label="Modes">
+    <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match & Predict</button>
+    <button class="tabbtn" id="tabBtnCompare" role="tab" aria-selected="false" aria-controls="tab-compare">Compare Colours</button>
+  </div>
+
+  <!-- TAB: Match & Predict (existing UI) -->
+  <section id="tab-match" role="tabpanel" aria-labelledby="tabBtnMatch">
+    <div class="app">
+      <!-- Left Column -->
+      <div class="card">
+        <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
+          <h1>Ink Colour Matcher</h1>
+          <!-- hidden count; we keep it to avoid breaking code -->
+          <div class="pill" id="refCountPill" style="display:none;"><span id="countLabel">0</span> reference colours</div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
+          <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
+          <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
+        </div>
+
+        <div class="row2" style="margin-top:12px;">
+          <div>
+            <label for="pms">Search by PMS (number only)</label>
+            <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+          </div>
+          <div style="align-self:end;">
+            <button class="btn" id="pmsBtn">Find PMS</button>
+          </div>
+        </div>
+
+        <div class="flex" style="margin-top:12px;">
+          <button class="btn" id="findBtn">Find closest match</button>
+          <button class="btn" id="clearBtn">Clear</button>
+          <span class="muted" id="statusMsg" aria-live="polite"></span>
+        </div>
+
+        <!-- Predictor box -->
+        <div class="formula-box" id="predictorBox">
+          <h2>Suggest Formula</h2>
+
+          <div class="row2" style="margin-bottom:8px;">
+            <div>
+              <label for="groupSelect">Colour group (optional)</label>
+              <select id="groupSelect"><option value="">— none —</option></select>
+            </div>
+            <div></div>
+          </div>
+
+          <div class="flex">
+            <button class="btn" id="suggestBtn">Suggest Formula</button>
+            <div id="predictMsg" class="muted" style="align-self:center;"></div>
+          </div>
+
+          <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
         </div>
       </div>
 
-      <div class="row" style="margin-top:12px;">
-        <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
-        <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
-        <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
+      <!-- Right Column -->
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h1>Closest Matches</h1>
+          <div class="stack" style="align-items:center;">
+            <div class="swatch" id="targetSwatch" title="Target"></div>
+            <div class="muted" id="targetEcho">Target: –</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Colour</th><th>Swatch</th><th>L*</th><th>a*</th><th>b*</th><th>Distance</th></tr>
+          </thead>
+          <tbody id="resultsTbody"></tbody>
+        </table>
+        <div id="formulaPanel" class="formula-box" style="display:none;"></div>
       </div>
+    </div>
+  </section>
 
-      <div class="row2" style="margin-top:12px;">
+  <!-- TAB: Compare Colours (new) -->
+  <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
+    <div class="card" style="max-width:1200px; margin:0 auto;">
+      <h1>Compare Colours (ΔE2000)</h1>
+
+      <div class="two-col" style="margin-top:12px;">
+        <!-- Colour A -->
         <div>
-          <label for="pms">Search by PMS (number only)</label>
-          <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+          <div class="row2">
+            <div>
+              <label for="cmpASelect">Pick colour A (from references)</label>
+              <input list="cmpListA" id="cmpASelect" placeholder="Type to search…">
+              <datalist id="cmpListA"></datalist>
+            </div>
+            <div style="align-self:end;">
+              <button class="btn" id="cmpALoad">Load A</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <div><label for="AL">A: L*</label><input id="AL" type="number" step="0.01"></div>
+            <div><label for="Aa">A: a*</label><input id="Aa" type="number" step="0.01"></div>
+            <div><label for="Ab">A: b*</label><input id="Ab" type="number" step="0.01"></div>
+          </div>
+          <div class="center" style="margin-top:8px;">
+            <div class="swatch" id="swatchA"></div>
+            <button class="btn" id="useTargetForA">Use current target</button>
+          </div>
         </div>
-        <div style="align-self:end;">
-          <button class="btn" id="pmsBtn">Find PMS</button>
+
+        <!-- Colour B -->
+        <div>
+          <div class="row2">
+            <div>
+              <label for="cmpBSelect">Pick colour B (from references)</label>
+              <input list="cmpListB" id="cmpBSelect" placeholder="Type to search…">
+              <datalist id="cmpListB"></datalist>
+            </div>
+            <div style="align-self:end;">
+              <button class="btn" id="cmpBLoad">Load B</button>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <div><label for="BL">B: L*</label><input id="BL" type="number" step="0.01"></div>
+            <div><label for="Ba">B: a*</label><input id="Ba" type="number" step="0.01"></div>
+            <div><label for="Bb">B: b*</label><input id="Bb" type="number" step="0.01"></div>
+          </div>
+          <div class="center" style="margin-top:8px;">
+            <div class="swatch" id="swatchB"></div>
+            <button class="btn" id="swapAB" title="Swap A and B">Swap A↔B</button>
+          </div>
         </div>
       </div>
 
       <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="findBtn">Find closest match</button>
-        <button class="btn" id="clearBtn">Clear</button>
-        <span class="muted" id="statusMsg" aria-live="polite"></span>
+        <button class="btn" id="cmpCompute">Compute ΔE2000</button>
+        <span class="muted" id="cmpMsg"></span>
       </div>
 
-      <!-- Predictor box -->
-      <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula</h2>
-
-        <div class="row2" style="margin-bottom:8px;">
-          <div>
-            <label for="groupSelect">Colour group (optional)</label>
-            <select id="groupSelect">
-              <option value="">— none —</option>
-            </select>
-          </div>
-          <div></div>
+      <div class="formula-box" id="cmpResult" style="display:none; margin-top:12px;">
+        <h2 style="margin-bottom:6px;">Result</h2>
+        <div id="cmpNumbers" style="font-size:1.05rem;"></div>
+        <div class="muted" style="margin-top:6px;">
+          <small>Guideline: ΔE00 &lt; 1.0 ≈ barely perceptible • &lt; 2.0 ≈ good • 2–3.5 borderline • &gt; 3.5 poor</small>
         </div>
-
-        <div class="flex">
-          <button class="btn" id="suggestBtn">Suggest Formula</button>
-          <div id="predictMsg" class="muted" style="align-self:center;"></div>
-        </div>
-
-        <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
       </div>
     </div>
-
-    <!-- Right Column -->
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-        <h1>Closest Matches</h1>
-        <div class="stack" style="align-items:center;">
-          <div class="swatch" id="targetSwatch" title="Target"></div>
-          <div class="muted" id="targetEcho">Target: –</div>
-        </div>
-      </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Colour</th><th>Swatch</th><th>L*</th><th>a*</th><th>b*</th><th>Distance</th>
-          </tr>
-        </thead>
-        <tbody id="resultsTbody"></tbody>
-      </table>
-      <div id="formulaPanel" class="formula-box" style="display:none;"></div>
-    </div>
-  </div>
+  </section>
 
 <script>
 (function(){
@@ -125,218 +202,202 @@ function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 // 🔗 Your API endpoint:
 const API_BASE = 'https://ink-predict-api.onrender.com'; // change if needed
 
+// ===== Tabs =====
+const tabBtnMatch = $('#tabBtnMatch');
+const tabBtnCompare = $('#tabBtnCompare');
+const tabMatch = $('#tab-match');
+const tabCompare = $('#tab-compare');
+
+function showTab(which){
+  if (which === 'match'){
+    tabMatch.hidden = false; tabBtnMatch.setAttribute('aria-selected','true');
+    tabCompare.hidden = true; tabBtnCompare.setAttribute('aria-selected','false');
+  } else {
+    tabMatch.hidden = true; tabBtnMatch.setAttribute('aria-selected','false');
+    tabCompare.hidden = false; tabBtnCompare.setAttribute('aria-selected','true');
+  }
+}
+tabBtnMatch.addEventListener('click', ()=>showTab('match'));
+tabBtnCompare.addEventListener('click', ()=>showTab('compare'));
+
+// ===== Colour math =====
 // D65 conversions
 function labToXyz(L,a,b){
-  var Yn=1, Xn=0.95047, Zn=1.08883;
-  var fy=(L+16)/116;
-  var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
+  const Yn=1, Xn=0.95047, Zn=1.08883;
+  const fy=(L+16)/116;
+  const fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function xyzToLab(X,Y,Z){
-  var Xn=0.95047, Yn=1, Zn=1.08883;
-  var f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
-  var L = 116*f(Y/Yn)-16;
-  var a = 500*(f(X/Xn)-f(Y/Yn));
-  var b = 200*(f(Y/Yn)-f(Z/Zn));
+  const Xn=0.95047, Yn=1, Zn=1.08883;
+  const f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
+  const L = 116*f(Y/Yn)-16;
+  const a = 500*(f(X/Xn)-f(Y/Yn));
+  const b = 200*(f(Y/Yn)-f(Z/Zn));
   return {L:L,a:a,b:b};
 }
 function labToSrgb(L,a,b){
-  var xyz = labToXyz(L,a,b);
-  var X=xyz.X, Y=xyz.Y, Z=xyz.Z;
-  var r =  3.2406*X -1.5372*Y -0.4986*Z;
-  var g = -0.9689*X +1.8758*Y +0.0415*Z;
-  var b2=  0.0557*X -0.2040*Y +1.0570*Z;
-  var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; });
+  const xyz = labToXyz(L,a,b);
+  const X=xyz.X, Y=xyz.Y, Z=xyz.Z;
+  let r =  3.2406*X -1.5372*Y -0.4986*Z;
+  let g = -0.9689*X +1.8758*Y +0.0415*Z;
+  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
+  const lin=[r,g,b2].map(v=> v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
   r=clamp(Math.round(lin[0]*255),0,255);
   g=clamp(Math.round(lin[1]*255),0,255);
   b2=clamp(Math.round(lin[2]*255),0,255);
   return {r:r,g:g,b:b2};
 }
-
-// ΔE2000
-function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
-function deltaE2000(l1,l2){
-  var L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
-  var deg2rad=Math.PI/180;
-  var avgLp=(L1+L2)/2;
-  var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
-  var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
-  var a1p=(1+G)*a1, a2p=(1+G)*a2;
-  var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
-  var h1p=hp(a1p,b1), h2p=hp(a2p,b2);
-  var avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
-  var T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
+function hp(x,y){ const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
+function deltaE2000(c1,c2){
+  const L1=c1.L,a1=c1.a,b1=c1.b, L2=c2.L,a2=c2.a,b2=c2.b;
+  const deg2rad=Math.PI/180;
+  const avgLp=(L1+L2)/2;
+  const C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
+  const G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
+  const a1p=(1+G)*a1, a2p=(1+G)*a2;
+  const C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
+  const h1p=hp(a1p,b1), h2p=hp(a2p,b2);
+  const avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
+  const T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
           + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
-  var dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
-  var dLp = L2 - L1;
-  var dCp = C2p - C1p;
-  var dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
-  var Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
-  var Sc = 1 + 0.045*avgCp;
-  var Sh = 1 + 0.015*avgCp*T;
-  var Rc=2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)));
-  var Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*deg2rad);
+  let dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
+  const dLp = L2 - L1;
+  const dCp = C2p - C1p;
+  const dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
+  const Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
+  const Sc = 1 + 0.045*avgCp;
+  const Sh = 1 + 0.015*avgCp*T;
+  const Rc=2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)));
+  const Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*deg2rad);
   return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
 // ===== State =====
-var COLOURS = [];
-var FORMULAS = {};
-var FORMULAS_NORM = {};
-var COLOUR_TO_FORMULA = {};
-var _lastSuggestion = null;
-var _allInks = [];
+let COLOURS = [];
+let FORMULAS = {};
+let FORMULAS_NORM = {};
+let COLOUR_TO_FORMULA = {};
+let _lastSuggestion = null;
+let _allInks = [];
 
-// Helpers
+// ===== Helpers =====
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
-  if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
   return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
+function updateTargetEcho(){
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))){
+    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
+  }
+  $('#targetEcho').textContent = `Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
+  const rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+}
 
-// Build formula index from DC_Formulas.json
+// ===== Build formula index (unchanged) =====
 function buildFormulaIndex(){
-  var rows = [];
+  const rows = [];
   FORMULAS_NORM = {};
   COLOUR_TO_FORMULA = {};
   if (Array.isArray(FORMULAS)) {
-    rows.push.apply(rows, FORMULAS);
+    rows.push(...FORMULAS);
   } else if (FORMULAS && typeof FORMULAS === 'object') {
-    Object.keys(FORMULAS).forEach(function(k){
-      if (Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
+    Object.keys(FORMULAS).forEach(k=>{
+      if (Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
       else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
-        rows.push.apply(rows, FORMULAS[k].rows);
+        rows.push(...FORMULAS[k].rows);
       }
     });
   }
-  var byColour = new Map();
-  rows.forEach(function(r){
-    var cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
+  const byColour = new Map();
+  rows.forEach(r=>{
+    const cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
     if (!cname) return;
-    var items = [];
-    for (var i = 1; i <= 12; i++) {
-      var ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
+    const items = [];
+    for (let i = 1; i <= 12; i++) {
+      const ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
       if (!ink) continue;
-      var pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
+      const pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
       items.push({ ink: ink, percent: pct });
     }
-    var arr = byColour.get(cname) || [];
-    arr.push.apply(arr, items);
+    const arr = byColour.get(cname) || [];
+    arr.push(...items);
     byColour.set(cname, arr);
     FORMULAS_NORM[normaliseName(cname)] = arr;
   });
-  (COLOURS || []).forEach(function(c){
-    var name = c.name || c.Colour || c.color || '';
-    var norm = normaliseName(name);
+  (COLOURS || []).forEach(c=>{
+    const name = c.name || c.Colour || c.color || '';
+    const norm = normaliseName(name);
     if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
     if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
-    var p = extractPmsNumber(name);
+    const p = extractPmsNumber(name);
     if (p) {
-      for (var key of byColour.keys()){
+      for (const key of byColour.keys()){
         if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
       }
     }
   });
 }
 
-// UI helpers
-function updateTargetEcho(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })){
-    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
-  }
-  $('#targetEcho').textContent = 'Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
-  var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
-}
-
-// Matching
+// ===== Matching (unchanged) =====
 function getTargetLab(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L:L,a:a,b:b};
 }
-
 function findClosest(){
-  var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-  var rows = COLOURS.map(function(c){ return {
+  const target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
+  const rows = COLOURS.map(c=>({
     raw: c,
     name: c.name || c.Colour || c.color || '—',
     L:c.L, a:c.a, b:c.b,
     de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  }; }).sort(function(a,b){ return a.de-b.de; }).slice(0,8);
+  })).sort((a,b)=>a.de-b.de).slice(0,8);
 
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  rows.forEach(function(r){
-    var tr=document.createElement('tr'); tr.className='result-row';
-    var rgb=labToSrgb(r.L,r.a,r.b);
-    tr.innerHTML = '<td>'+r.name+'</td>'
-      + '<td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>'
-      + '<td>'+r.L.toFixed(2)+'</td>'
-      + '<td>'+r.a.toFixed(2)+'</td>'
-      + '<td>'+r.b.toFixed(2)+'</td>'
-      + '<td>'+r.de.toFixed(2)+'</td>';
+  const tbody = $('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr'); tr.className='result-row';
+    const rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML = `<td>${r.name}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${r.L.toFixed(2)}</td>
+      <td>${r.a.toFixed(2)}</td>
+      <td>${r.b.toFixed(2)}</td>
+      <td>${r.de.toFixed(2)}</td>`;
     tr.addEventListener('click', function(){
       $('#L').value = r.L; $('#a').value = r.a; $('#b').value = r.b;
-      updateTargetEcho();
-      showFormulaFor(r.name);
+      updateTargetEcho(); showFormulaFor(r.name);
     });
     tbody.appendChild(tr);
   });
 }
-
 function showFormulaFor(colourName){
-  var panel = $('#formulaPanel');
-  var list = null;
-  var bound = COLOUR_TO_FORMULA[colourName];
+  const panel = $('#formulaPanel');
+  let list = null;
+  const bound = COLOUR_TO_FORMULA[colourName];
   if(bound) list = FORMULAS_NORM[bound];
   if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
   if(!list){
-    var want = extractPmsNumber(colourName);
+    const want = extractPmsNumber(colourName);
     if(want){
-      for (var key in FORMULAS_NORM){
+      for (const key in FORMULAS_NORM){
         if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
       }
     }
   }
   if(!list || !list.length){ panel.style.display='none'; return; }
-  var html = '<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
-  list.forEach(function(item){
-    var name = item.ink || item.Ink || 'Ink';
-    var pct = item.percent!==''? (item.percent+'%') : '';
-    html += '<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>';
+  let html = `<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
+  list.forEach(item=>{
+    const name = item.ink || item.Ink || 'Ink';
+    const pct = item.percent!==''? (item.percent+'%') : '';
+    html += `<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`;
   });
   html += '</div>';
   panel.innerHTML = html; panel.style.display='block';
 }
 
-// PMS search
-function findByPms(){
-  var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
-  var q = qRaw.replace(/^PANTONE\s*/,'');
-  var hits = COLOURS.filter(function(c){
-    var p = extractPmsNumber(c.name||c.Colour||c.color||'');
-    return p && p.includes(q);
-  });
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  if(!hits.length){ alert('No PMS match found'); return; }
-  hits.slice(0,8).forEach(function(c){
-    var rgb=labToSrgb(c.L,c.a,c.b);
-    var tr=document.createElement('tr'); tr.className='result-row';
-    tr.innerHTML = '<td>'+(c.name||c.Colour||c.color||'—')+'</td>'
-      + '<td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>'
-      + '<td>'+(+c.L).toFixed(2)+'</td>'
-      + '<td>'+(+c.a).toFixed(2)+'</td>'
-      + '<td>'+(+c.b).toFixed(2)+'</td>'
-      + '<td>—</td>';
-    tr.addEventListener('click', function(){
-      $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b;
-      updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||'');
-    });
-    tbody.appendChild(tr);
-  });
-  var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
-}
-
-// Load groups into dropdown
+// ===== Predictor bits (kept) =====
 async function loadGroups(){
   try {
     const r = await fetch(API_BASE + '/groups');
@@ -347,19 +408,13 @@ async function loadGroups(){
     });
   } catch {}
 }
-
-// Load inks list for editor
 async function loadInks(){
   try{
     const r = await fetch(API_BASE + '/inks');
     const j = await r.json();
     _allInks = (j.inks || []).slice().sort();
-  } catch {
-    _allInks = [];
-  }
+  } catch { _allInks = []; }
 }
-
-// Predictor → calls your API with optional group
 async function suggestFormula(){
   const btn = $('#suggestBtn'); const msg = $('#predictMsg'); const box = $('#suggestedFormula');
   const t = getTargetLab();
@@ -384,14 +439,11 @@ async function suggestFormula(){
     const formula = (data && data.formula) ? data.formula : {};
     const pairs = Object.entries(formula).filter(([_,v]) => +v > 0).sort((a,b)=>b[1]-a[1]);
 
-    let html = '<h2>Suggested Formula</h2>';
-    html += '<div class="formula-grid" id="suggestedFormulaGrid">';
-    for (const [ink,pct] of pairs) {
-      html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
-    }
+    let html = '<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
+    for (const [ink,pct] of pairs) html += `<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
     html += '</div>';
 
-    // Edit + save section
+    // Editor UI from previous step
     html += `
       <div class="flex-wrap" style="margin-top:10px;">
         <button class="btn" id="editFormulaBtn">Edit formula</button>
@@ -400,32 +452,21 @@ async function suggestFormula(){
       <div id="editFormulaSection" style="display:none; margin-top:10px;">
         <div class="formula-box" style="margin-top:0;">
           <h3 style="margin:0 0 6px; font-size:.95rem;">Edited formula</h3>
-
           <div class="row2" style="margin-bottom:8px;">
-            <div>
-              <label for="editPantone">Pantone / Name</label>
-              <input id="editPantone" type="text" placeholder="e.g. PANTONE 485 C"/>
-            </div>
-            <div>
-              <label for="editNotes">Notes (optional)</label>
-              <input id="editNotes" type="text" placeholder="press / anilox / comments"/>
-            </div>
+            <div><label for="editPantone">Pantone / Name</label><input id="editPantone" type="text" placeholder="e.g. PANTONE 485 C"/></div>
+            <div><label for="editNotes">Notes (optional)</label><input id="editNotes" type="text" placeholder="press / anilox / comments"/></div>
           </div>
-
           <div id="editRows"></div>
-
           <div class="flex-wrap" style="margin-top:8px; align-items:center;">
             <select id="editAddInkSelect" style="flex:1; min-width:140px;"></select>
             <input id="editAddPct" type="number" step="0.01" min="0" placeholder="%"/>
             <button class="btn" id="editAddInkBtn">Add ink</button>
             <button class="btn" id="editNormBtn" title="Scale so total = 100%">Normalise</button>
           </div>
-
           <div class="flex" style="margin-top:8px; justify-content:flex-end;">
             <button class="btn" id="editSaveBtn">Save edited formula</button>
           </div>
         </div>
-
         <div style="margin-top:8px;">
           <label for="savedFormulaJson">Payload sent to API</label>
           <textarea id="savedFormulaJson" readonly></textarea>
@@ -436,7 +477,6 @@ async function suggestFormula(){
     box.innerHTML = html;
     box.style.display = 'block';
     msg.textContent = '';
-
     _lastSuggestion = { target: t, formula };
     setupFormulaEditor(formula);
 
@@ -446,8 +486,6 @@ async function suggestFormula(){
     btn.disabled = false;
   }
 }
-
-// Build edit UI from a formula object + wire to /log_approved
 async function setupFormulaEditor(formulaObj){
   await loadInks();
   const section = $('#editFormulaSection');
@@ -460,36 +498,25 @@ async function setupFormulaEditor(formulaObj){
   const notesInput = $('#editNotes');
 
   if (!pantoneInput.value) pantoneInput.value = ($('#pms').value || '').trim();
-
   addSel.innerHTML = _allInks.map(n=>`<option value="${n}">${n}</option>`).join('');
-
   const mix = {...formulaObj};
 
   function renderRows(){
-    const entries = Object.entries(mix)
-      .filter(([_,v])=>+v>0)
-      .sort((a,b)=>b[1]-a[1]);
+    const entries = Object.entries(mix).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]);
     let inner = '<div class="formula-grid">';
     for (const [ink,pct] of entries){
       inner += `
-        <div class="fg-ink">
-          <input type="text" class="editInkName" value="${ink}" />
-        </div>
+        <div class="fg-ink"><input type="text" class="editInkName" value="${ink}" /></div>
         <div class="fg-pct" style="display:flex; gap:6px; align-items:center;">
-          <input type="number" class="editInkPct" value="${(+pct).toFixed(2)}"
-                 step="0.01" min="0" style="width:10ch; text-align:right;">%
+          <input type="number" class="editInkPct" value="${(+pct).toFixed(2)}" step="0.01" min="0" style="width:10ch; text-align:right;">%
           <button class="btn editRemoveBtn" data-ink="${ink}">Remove</button>
-        </div>
-      `;
+        </div>`;
     }
     inner += '</div>';
     rowsContainer.innerHTML = inner;
 
     rowsContainer.querySelectorAll('.editRemoveBtn').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        delete mix[b.dataset.ink];
-        renderRows();
-      });
+      b.addEventListener('click', ()=>{ delete mix[b.dataset.ink]; renderRows(); });
     });
     rowsContainer.querySelectorAll('.editInkName, .editInkPct').forEach(inp=>{
       inp.addEventListener('change', ()=>{
@@ -506,28 +533,19 @@ async function setupFormulaEditor(formulaObj){
     });
   }
 
-  btn.onclick = function(){
-    section.style.display = section.style.display === 'none' ? 'block' : 'none';
-  };
-
-  $('#editAddInkBtn').onclick = function(){
+  btn.onclick = ()=>{ section.style.display = section.style.display === 'none' ? 'block' : 'none'; };
+  $('#editAddInkBtn').onclick = ()=>{
     const name = addSel.value;
     const pct = parseFloat(addPctInput.value || '5');
     if (!name || !Number.isFinite(pct) || pct <= 0) return;
-    mix[name] = (mix[name] || 0) + pct;
-    addPctInput.value = '';
-    renderRows();
+    mix[name] = (mix[name] || 0) + pct; addPctInput.value = ''; renderRows();
   };
-
-  $('#editNormBtn').onclick = function(){
+  $('#editNormBtn').onclick = ()=>{
     const sum = Object.values(mix).reduce((a,b)=>a+Number(b||0),0) || 1;
-    Object.keys(mix).forEach(k=>{
-      mix[k] = (mix[k]/sum)*100;
-    });
+    Object.keys(mix).forEach(k=>{ mix[k] = (mix[k]/sum)*100; });
     renderRows();
   };
-
-  $('#editSaveBtn').onclick = async function(){
+  $('#editSaveBtn').onclick = async ()=>{
     const kids = rowsContainer.querySelectorAll('.formula-grid > *');
     const cleaned = {};
     for (let i=0; i<kids.length; i+=2){
@@ -536,51 +554,113 @@ async function setupFormulaEditor(formulaObj){
       if (name && Number.isFinite(pct) && pct>0) cleaned[name] = pct;
     }
     const sum = Object.values(cleaned).reduce((a,b)=>a+Number(b||0),0) || 1;
-    Object.keys(cleaned).forEach(k=>{
-      cleaned[k] = +(cleaned[k]/sum*100).toFixed(2);
-    });
+    Object.keys(cleaned).forEach(k=>{ cleaned[k] = +(cleaned[k]/sum*100).toFixed(2); });
 
-    const t = _lastSuggestion && _lastSuggestion.target
-      ? {L: _lastSuggestion.target.L, a: _lastSuggestion.target.a, b: _lastSuggestion.target.b}
-      : getTargetLab() || {};
-
-    const pantone = (pantoneInput.value || $('#pms').value || '').trim() || null;
-    const notes = (notesInput.value || '').trim() || null;
+    const t = _lastSuggestion && _lastSuggestion.target ? _lastSuggestion.target : getTargetLab() || {};
+    const pantone = ($('#editPantone').value || $('#pms').value || '').trim() || null;
+    const notes = ($('#editNotes').value || '').trim() || null;
 
     const payload = {
-      pantone: pantone,
-      target_L: t.L,
-      target_a: t.a,
-      target_b: t.b,
+      pantone,
+      target_L: t.L, target_a: t.a, target_b: t.b,
       suggested: _lastSuggestion ? (_lastSuggestion.formula || {}) : {},
       approved: cleaned,
-      measured_L: null,
-      measured_a: null,
-      measured_b: null,
-      notes: notes
+      measured_L: null, measured_a: null, measured_b: null,
+      notes
     };
-
     saveOut.value = JSON.stringify(payload, null, 2);
-
     try {
       const res = await fetch(API_BASE + '/log_approved', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify(payload)
       });
       if (!res.ok) throw new Error(await res.text());
       const j = await res.json();
       alert('Saved to training log (id ' + j.id + ').');
-    } catch(e) {
-      alert('Error saving to training log: ' + (e.message || e));
-    }
+    } catch(e) { alert('Error saving to training log: ' + (e.message || e)); }
   };
 
   renderRows();
   section.style.display = 'none';
 }
 
-// Wire up
+// ===== PMS search / actions (unchanged) =====
+function findByPms(){
+  const qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
+  const q = qRaw.replace(/^PANTONE\s*/,'');
+  const hits = COLOURS.filter(c=>{
+    const p = extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q);
+  });
+  const tbody = $('#resultsTbody'); tbody.innerHTML='';
+  if(!hits.length){ alert('No PMS match found'); return; }
+  hits.slice(0,8).forEach(c=>{
+    const rgb=labToSrgb(c.L,c.a,c.b);
+    const tr=document.createElement('tr'); tr.className='result-row';
+    tr.innerHTML = `<td>${(c.name||c.Colour||c.color||'—')}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${(+c.L).toFixed(2)}</td>
+      <td>${(+c.a).toFixed(2)}</td>
+      <td>${(+c.b).toFixed(2)}</td>
+      <td>—</td>`;
+    tr.addEventListener('click', function(){
+      $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b;
+      updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||'');
+    });
+    tbody.appendChild(tr);
+  });
+  const c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
+}
+
+// ===== Compare tab logic =====
+function setSwatchFromFields(prefix){
+  const L = parseFloat($('#'+prefix+'L').value);
+  const a = parseFloat($('#'+prefix+'a').value);
+  const b = parseFloat($('#'+prefix+'b').value);
+  if ([L,a,b].some(v=>Number.isNaN(v))) return;
+  const rgb = labToSrgb(L,a,b);
+  $('#swatch'+prefix).style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+}
+['A','B'].forEach(p=>{
+  ['L','a','b'].forEach(c=>{
+    $('#'+p+c).addEventListener('input', ()=>setSwatchFromFields(p));
+  });
+});
+$('#useTargetForA').addEventListener('click', ()=>{
+  const t = getTargetLab(); if(!t){ alert('No target set on Match tab.'); return; }
+  $('#AL').value = t.L; $('#Aa').value = t.a; $('#Ab').value = t.b; setSwatchFromFields('A');
+});
+$('#swapAB').addEventListener('click', ()=>{
+  const AL=$('#AL').value, Aa=$('#Aa').value, Ab=$('#Ab').value;
+  $('#AL').value = $('#BL').value; $('#Aa').value = $('#Ba').value; $('#Ab').value = $('#Bb').value;
+  $('#BL').value = AL; $('#Ba').value = Aa; $('#Bb').value = Ab;
+  setSwatchFromFields('A'); setSwatchFromFields('B');
+});
+function loadCmpFromName(which){
+  const inp = which==='A' ? $('#cmpASelect') : $('#cmpBSelect');
+  const name = (inp.value||'').trim();
+  if (!name) return;
+  const hit = COLOURS.find(c=>(c.name||c.Colour||c.color||'').trim()===name);
+  if (!hit){ alert('Not found in references.'); return; }
+  $('#'+which+'L').value = hit.L; $('#'+which+'a').value = hit.a; $('#'+which+'b').value = hit.b;
+  setSwatchFromFields(which);
+}
+$('#cmpALoad').addEventListener('click', ()=>loadCmpFromName('A'));
+$('#cmpBLoad').addEventListener('click', ()=>loadCmpFromName('B'));
+$('#cmpCompute').addEventListener('click', ()=>{
+  const a = { L: parseFloat($('#AL').value), a: parseFloat($('#Aa').value), b: parseFloat($('#Ab').value) };
+  const b = { L: parseFloat($('#BL').value), a: parseFloat($('#Ba').value), b: parseFloat($('#Bb').value) };
+  if ([a.L,a.a,a.b,b.L,b.a,b.b].some(v=>Number.isNaN(v))) { $('#cmpMsg').textContent='Please enter valid numbers for both colours.'; return; }
+  const de = deltaE2000(a,b);
+  const dL = (b.L - a.L), da = (b.a - a.a), db = (b.b - a.b);
+  $('#cmpNumbers').innerHTML = `
+    <div class="two-col">
+      <div><strong>ΔE2000:</strong> ${de.toFixed(2)}</div>
+      <div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)}</div>
+    </div>`;
+  $('#cmpResult').style.display='block'; $('#cmpMsg').textContent='';
+});
+
+// ===== Wire up base UI =====
 $('#findBtn').addEventListener('click', findClosest);
 $('#clearBtn').addEventListener('click', function(){
   $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
@@ -589,21 +669,24 @@ $('#clearBtn').addEventListener('click', function(){
 });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
-['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
+['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
 
-// Load data + groups + inks
+// ===== Load data + groups + inks =====
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
   fetch('DC_Formulas.json').then(r=>r.json())
 ]).then(tuple=>{
   COLOURS = tuple[0]; FORMULAS = tuple[1];
   buildFormulaIndex();
-  // countLabel is now hidden, so we don't bother updating it visibly
+  // fill datalists for Compare tab
+  const opts = COLOURS.map(c=>`<option value="${(c.name||c.Colour||c.color||'').trim()}">`).join('');
+  $('#cmpListA').innerHTML = opts; $('#cmpListB').innerHTML = opts;
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
 loadGroups();
 loadInks();
 updateTargetEcho();
+
 })();
 </script>
 </body>
