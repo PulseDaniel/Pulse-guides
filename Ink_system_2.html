@@ -1,52 +1,65 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher + Predictor</title>
-  <style>
-    :root { --gap: 12px; --radius: 14px; }
-    * { box-sizing: border-box; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    .tabs { display:flex; gap:8px; margin:0 auto 16px; max-width:1200px; }
-    .tabbtn { cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
-    .tabbtn[aria-selected="true"] { background:#1b2236; border-color:#394154; }
-    .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
-    .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-    label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
-    input, select, textarea { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
-    input::placeholder { color:#7b8496; }
-    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:.8rem; resize:vertical; min-height:80px; }
-    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
-    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
-    .btn { cursor:pointer; padding:8px 10px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; font-size:.85rem; }
-    .btn:hover { filter:brightness(1.1); }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
-    th { color:#9aa4b2; font-weight:600; }
-    .result-row { transition: background .2s; cursor:pointer; }
-    .result-row:hover { background: rgba(255,255,255,.05); }
-    .swatch { width:3.2rem; height:2.2rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
-    .pill { font-size:.8rem; color:#98a2b3; }
-    .muted { color:#7b8496; font-size:.85rem; }
-    .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
-    .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
-    .formula-grid { display:grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items:center; }
-    .fg-ink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
-    .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .flex { display:flex; gap:8px; align-items:center; }
-    .flex-wrap { display:flex; flex-wrap:wrap; gap:8px; }
-    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
-    .center { display:flex; align-items:center; gap:12px; }
-    .canvasWrap { margin-top:12px; background:#121723; border:1px solid #242938; border-radius:12px; overflow:hidden; }
-    .legend { display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; }
-    .legend .spacer { flex:1; }
-    .legend .btn { padding:6px 10px; font-size:.8rem; }
-    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(0,0,0,.25); }
-    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } .two-col { grid-template-columns:1fr; } }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ink Colour Matcher + Predictor</title>
+<style>
+  :root{ --gap:12px; --radius:14px; }
+  *{ box-sizing:border-box; }
+  body{ font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0; padding:16px; background:#0b0c10; color:#e6e6e6; }
+  h1{ font-size:1.2rem; margin:0 0 8px; }
+  .tabs{ display:flex; gap:8px; margin:0 0 12px; }
+  .tabbtn{ cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
+  .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
+  .app{ max-width:1200px; margin:0 auto; display:grid; gap:var(--gap); grid-template-columns:420px 1fr; align-items:start; }
+  .card{ background:#111318; border:1px solid #22252e; border-radius:var(--radius); padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  label{ display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
+  input, select, textarea{ width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
+  input::placeholder{ color:#7b8496; }
+  textarea{ min-height:80px; resize:vertical; }
+  .row{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+  .btn{ cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
+  .btn:hover{ filter:brightness(1.08); }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric:tabular-nums; }
+  th{ color:#9aa4b2; font-weight:600; }
+  .result-row{ transition:background .2s; cursor:pointer; }
+  .result-row:hover{ background:rgba(255,255,255,.05); }
+  .swatch{ width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
+  .pill{ font-size:.8rem; color:#98a2b3; }
+  .muted{ color:#7b8496; font-size:.85rem; }
+  .formula-box{ background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
+  .formula-box h2{ margin:0 0 8px; font-size:1rem; color:#ccc; }
+  .formula-grid{ display:grid; grid-template-columns:1fr auto; column-gap:12px; row-gap:6px; align-items:center; }
+  .fg-ink{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fg-pct{ text-align:right; min-width:4ch; font-variant-numeric:tabular-nums; color:#cbd5e1; }
+  .stack{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .flex{ display:flex; gap:8px; align-items:center; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  @media (max-width:900px){ .app{ grid-template-columns:1fr; } .two-col{ grid-template-columns:1fr; } }
+
+  /* Modal editor */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal{ width:min(720px, 96vw); max-height:90vh; overflow:auto; background:#10121a; border:1px solid #2a2f3a; border-radius:14px; padding:16px; }
+  .modal h3{ margin:0 0 8px; }
+  .edit-row{ display:grid; grid-template-columns: 1fr 100px 32px; gap:8px; align-items:center; }
+  .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
+  .rem-btn{ width:32px; height:38px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer; }
+  .add-row{ display:grid; grid-template-columns:1fr 120px auto; gap:8px; margin-top:8px; }
+  .footer-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  .note{ font-size:.85rem; color:#9aa4b2; }
+  .mini{ font-size:.8rem; color:#9aa4b2; }
+  .warn{ color:#fca5a5; }
+  .ok{ color:#86efac; }
+
+  /* Compare canvas wrapper (kept from previous) */
+  .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
+  .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
+</style>
 </head>
 <body>
 
@@ -61,7 +74,7 @@
       <div class="card">
         <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
           <h1>Ink Colour Matcher</h1>
-          <div class="pill" id="refCountPill" style="display:none;"><span id="countLabel">0</span> reference colours</div>
+          <div class="pill" id="refCountPill"><span id="countLabel">0</span> reference colours</div>
         </div>
 
         <div class="row" style="margin-top:12px;">
@@ -100,6 +113,10 @@
             <div id="predictMsg" class="muted" style="align-self:center;"></div>
           </div>
           <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
+          <div class="flex" id="editRow" style="display:none; margin-top:8px;">
+            <button class="btn" id="editFormulaBtn">Edit / Tweak formula</button>
+            <span class="mini">Adjust, add/remove inks, then save correction to training log.</span>
+          </div>
         </div>
       </div>
 
@@ -115,7 +132,7 @@
           <thead>
             <tr><th>Colour</th><th>Swatch</th><th>L*</th><th>a*</th><th>b*</th><th>Distance</th></tr>
           </thead>
-        <tbody id="resultsTbody"></tbody>
+          <tbody id="resultsTbody"></tbody>
         </table>
         <div id="formulaPanel" class="formula-box" style="display:none;"></div>
       </div>
@@ -126,7 +143,6 @@
   <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
     <div class="card" style="max-width:1200px; margin:0 auto;">
       <h1>Compare Colours (ΔE2000)</h1>
-
       <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
@@ -135,21 +151,15 @@
               <input list="cmpListA" id="cmpASelect" placeholder="Type to search…">
               <datalist id="cmpListA"></datalist>
             </div>
-            <div style="align-self:end;">
-              <button class="btn" id="cmpALoad">Load A</button>
-            </div>
+            <div style="align-self:end;"><button class="btn" id="cmpALoad">Load A</button></div>
           </div>
           <div class="row" style="margin-top:8px;">
             <div><label for="AL">A: L*</label><input id="AL" type="number" step="0.01"></div>
             <div><label for="Aa">A: a*</label><input id="Aa" type="number" step="0.01"></div>
             <div><label for="Ab">A: b*</label><input id="Ab" type="number" step="0.01"></div>
           </div>
-          <div class="center" style="margin-top:8px;">
-            <div class="swatch" id="swatchA"></div>
-            <button class="btn" id="useTargetForA">Use current target</button>
-          </div>
+          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
         </div>
-
         <div>
           <div class="row2">
             <div>
@@ -157,19 +167,14 @@
               <input list="cmpListB" id="cmpBSelect" placeholder="Type to search…">
               <datalist id="cmpListB"></datalist>
             </div>
-            <div style="align-self:end;">
-              <button class="btn" id="cmpBLoad">Load B</button>
-            </div>
+            <div style="align-self:end;"><button class="btn" id="cmpBLoad">Load B</button></div>
           </div>
           <div class="row" style="margin-top:8px;">
             <div><label for="BL">B: L*</label><input id="BL" type="number" step="0.01"></div>
             <div><label for="Ba">B: a*</label><input id="Ba" type="number" step="0.01"></div>
             <div><label for="Bb">B: b*</label><input id="Bb" type="number" step="0.01"></div>
           </div>
-          <div class="center" style="margin-top:8px;">
-            <div class="swatch" id="swatchB"></div>
-            <button class="btn" id="swapAB" title="Swap A and B">Swap A↔B</button>
-          </div>
+          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div><button class="btn" id="swapAB">Swap A↔B</button></div>
         </div>
       </div>
 
@@ -185,7 +190,7 @@
         <div class="legend">
           <span>A:</span><span id="legendA" class="dot"></span>
           <span style="margin-left:10px;">B:</span><span id="legendB" class="dot"></span>
-          <span class="spacer"></span>
+          <span style="margin-left:auto;"></span>
           <button class="btn" id="resetView">Reset view</button>
           <span style="font-size:.8rem; opacity:.8;">Drag to rotate • Scroll to zoom</span>
         </div>
@@ -194,30 +199,46 @@
     </div>
   </section>
 
+  <!-- Modal: Edit / Tweak Formula -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal">
+      <h3>Edit / Tweak formula</h3>
+      <div class="mini" id="editContext"></div>
+      <div id="editList" style="margin-top:8px; display:grid; gap:6px;"></div>
+      <div class="add-row">
+        <select id="addInkSel"></select>
+        <input id="addPct" type="number" step="0.01" placeholder="% add" class="pct-input mono">
+        <button class="btn" id="addInkBtn">Add ink</button>
+      </div>
+      <div class="two-col" style="margin-top:8px;">
+        <div class="note">Total: <span id="totalPct">0.00</span>% — <span id="totalState" class="warn">needs normalising</span></div>
+        <div class="flex" style="justify-content:flex-end;">
+          <button class="btn" id="normaliseBtn">Normalise to 100%</button>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label for="corrNote">Optional note</label>
+        <textarea id="corrNote" placeholder="e.g., +1.5% black to drop L*, swapped Yellow→Orange bias, etc."></textarea>
+      </div>
+      <div class="footer-row">
+        <button class="btn" id="cancelEdit">Cancel</button>
+        <button class="btn" id="saveCorrection">Save correction</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 (function(){
 'use strict';
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
-function smoothstep(edge0, edge1, x){ const t = clamp((x - edge0) / (edge1 - edge0), 0, 1); return t * t * (3 - 2*t); }
+function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 
-const API_BASE = 'https://ink-predict-api.onrender.com';
+const API_BASE = 'https://ink-predict-api.onrender.com'; // <- your Render URL
 
-// ===== Tabs =====
-const tabBtnMatch = $('#tabBtnMatch');
-const tabBtnCompare = $('#tabBtnCompare');
-const tabMatch = $('#tab-match');
-const tabCompare = $('#tab-compare');
-function showTab(which){
-  if (which === 'match'){ tabMatch.hidden = false; tabBtnMatch.setAttribute('aria-selected','true'); tabCompare.hidden = true; tabBtnCompare.setAttribute('aria-selected','false'); }
-  else { tabMatch.hidden = true; tabBtnMatch.setAttribute('aria-selected','false'); tabCompare.hidden = false; tabBtnCompare.setAttribute('aria-selected','true'); requestLabDraw(); }
-}
-tabBtnMatch.addEventListener('click', ()=>showTab('match'));
-tabBtnCompare.addEventListener('click', ()=>showTab('compare'));
-
-// ===== Colour math =====
+// Colour conversions & ΔE
 function labToXyz(L,a,b){
-  const Yn=1, Xn=0.95047, Zn=1.08883; const fy=(L+16)/116;
+  const Yn=1, Xn=0.95047, Zn=1.08883, fy=(L+16)/116;
   const fx=f=> f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
@@ -248,8 +269,9 @@ function deltaE2000(c1,c2){
 
 // ===== State =====
 let COLOURS=[], FORMULAS={}, FORMULAS_NORM={}, COLOUR_TO_FORMULA={}, _lastSuggestion=null, _allInks=[];
+let _lastContextName = null;
 
-// ===== Helpers =====
+// Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){ if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/); return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null; }
 function updateTargetEcho(){
@@ -259,7 +281,7 @@ function updateTargetEcho(){
   const rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
 
-// ===== Build formula index =====
+// Build formula index from DC_Formulas.json
 function buildFormulaIndex(){
   const rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={};
   if (Array.isArray(FORMULAS)) rows.push(...FORMULAS);
@@ -284,16 +306,24 @@ function buildFormulaIndex(){
   });
 }
 
-// ===== Matching =====
+// Target helpers
 function getTargetLab(){ const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L,a,b}; }
+
+// Matching
 function findClosest(){
   const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
   const rows=COLOURS.map(c=>({raw:c,name:c.name||c.Colour||c.color||'—',L:c.L,a:c.a,b:c.b,de:deltaE2000({L:c.L,a:c.a,b:c.b},target)})).sort((a,b)=>a.de-b.de).slice(0,8);
-  const tbody=$('#resultsTbody'); tbody.innerHTML=''; rows.forEach(r=>{
+  const tbody=$('#resultsTbody'); tbody.innerHTML='';
+  rows.forEach(r=>{
     const tr=document.createElement('tr'); tr.className='result-row';
     const rgb=labToSrgb(r.L,r.a,r.b);
-    tr.innerHTML=`<td>${r.name}</td><td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td><td>${r.L.toFixed(2)}</td><td>${r.a.toFixed(2)}</td><td>${r.b.toFixed(2)}</td><td>${r.de.toFixed(2)}</td>`;
-    tr.addEventListener('click',()=>{ $('#L').value=r.L; $('#a').value=r.a; $('#b').value=r.b; updateTargetEcho(); showFormulaFor(r.name); });
+    tr.innerHTML=`<td>${r.name}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${r.L.toFixed(2)}</td><td>${r.a.toFixed(2)}</td><td>${r.b.toFixed(2)}</td>
+      <td>${r.de.toFixed(2)}</td>`;
+    tr.addEventListener('click',()=>{
+      $('#L').value=r.L; $('#a').value=r.a; $('#b').value=r.b; updateTargetEcho(); showFormulaFor(r.name); _lastContextName = r.name;
+    });
     tbody.appendChild(tr);
   });
 }
@@ -307,45 +337,136 @@ function showFormulaFor(colourName){
   html+='</div>'; panel.innerHTML=html; panel.style.display='block';
 }
 
-// ===== Predictor helpers =====
-async function loadGroups(){ try{ const r=await fetch(API_BASE+'/groups'); const j=await r.json(); const sel=$('#groupSelect'); (j.groups||[]).forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt); }); }catch{} }
-async function loadInks(){ try{ const r=await fetch(API_BASE+'/inks'); const j=await r.json(); _allInks=(j.inks||[]).slice().sort(); }catch{ _allInks=[]; } }
-async function suggestFormula(){
-  const btn=$('#suggestBtn'), msg=$('#predictMsg'), box=$('#suggestedFormula'); const t=getTargetLab();
-  if(!t){ alert('Enter a valid L*a*b* first.'); return; }
-  btn.disabled=true; msg.textContent='Predicting...'; box.style.display='none'; box.innerHTML='';
-  try{
-    const group=($('#groupSelect').value||''); const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true}; if(group) body.group=group;
-    const res=await fetch(API_BASE+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
-    const data=await res.json(); const formula=(data&&data.formula)?data.formula:{};
-    const pairs=Object.entries(formula).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]);
-    let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
-    for (const [ink,pct] of pairs) html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
-    html+='</div>';
-    box.innerHTML=html; box.style.display='block'; msg.textContent='';
-    _lastSuggestion={target:t, formula};
-  }catch(err){ msg.textContent=String(err.message||err); } finally{ btn.disabled=false; }
-}
-
-// ===== PMS search =====
+// PMS search
 function findByPms(){
   const qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
   const q=qRaw.replace(/^PANTONE\s*/,''); const hits=COLOURS.filter(c=>{ const p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q); });
   const tbody=$('#resultsTbody'); tbody.innerHTML=''; if(!hits.length){ alert('No PMS match found'); return; }
   hits.slice(0,8).forEach(c=>{
     const rgb=labToSrgb(c.L,c.a,c.b); const tr=document.createElement('tr'); tr.className='result-row';
-    tr.innerHTML=`<td>${(c.name||c.Colour||c.color||'—')}</td><td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td><td>${(+c.L).toFixed(2)}</td><td>${(+c.a).toFixed(2)}</td><td>${(+c.b).toFixed(2)}</td><td>—</td>`;
-    tr.addEventListener('click',()=>{ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
+    tr.innerHTML=`<td>${(c.name||c.Colour||c.color||'—')}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${(+c.L).toFixed(2)}</td><td>${(+c.a).toFixed(2)}</td><td>${(+c.b).toFixed(2)}</td><td>—</td>`;
+    tr.addEventListener('click',()=>{ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); _lastContextName = c.name||c.Colour||c.color||''; });
     tbody.appendChild(tr);
   });
-  const c0=hits[0]; $('#L').value=c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
+  const c0=hits[0]; $('#L').value=c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho(); _lastContextName = c0.name||c0.Colour||c0.color||'';
 }
 
-// ===== Compare tab logic (auto ΔE on number change) =====
+// Predictor
+async function loadGroups(){
+  try{
+    const r=await fetch(API_BASE+'/groups'); const j=await r.json();
+    const sel=$('#groupSelect'); (j.groups||[]).forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt); });
+  }catch{}
+}
+async function loadInks(){
+  try{ const r=await fetch(API_BASE+'/inks'); const j=await r.json(); _allInks=(j.inks||[]).slice().sort(); }catch{ _allInks=[]; }
+}
+function formulaPairs(formula){ return Object.entries(formula||{}).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]); }
+
+async function suggestFormula(){
+  const btn=$('#suggestBtn'), msg=$('#predictMsg'), box=$('#suggestedFormula');
+  const t=getTargetLab(); if(!t){ alert('Enter a valid L*a*b* first.'); return; }
+  btn.disabled=true; msg.textContent='Predicting…'; box.style.display='none'; box.innerHTML=''; $('#editRow').style.display='none';
+  try{
+    const group=($('#groupSelect').value||''); const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true}; if(group) body.group=group;
+    const res=await fetch(API_BASE+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
+    const data=await res.json(); const pairs=formulaPairs(data.formula);
+    let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
+    for (const [ink,pct] of pairs) html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+    html+='</div>';
+    box.innerHTML=html; box.style.display='block'; msg.textContent='';
+    _lastSuggestion={ target:t, formula:data.formula, group: (group||null) };
+    $('#editRow').style.display='flex';
+  }catch(err){ msg.textContent=String(err.message||err); } finally{ btn.disabled=false; }
+}
+
+// ===== Edit / Tweak modal =====
+const modal = $('#editModal');
+const editList = $('#editList');
+let working = []; // [{ink, pct}]
+function openEdit(){
+  if(!_lastSuggestion || !(_lastSuggestion.formula)) { alert('No suggestion to edit yet.'); return; }
+  working = formulaPairs(_lastSuggestion.formula).map(([ink,p])=>({ink,pct:+(+p).toFixed(2)}));
+  renderEditList();
+  // build add-ink dropdown
+  const sel = $('#addInkSel'); sel.innerHTML = '';
+  _allInks.forEach(name=>{ const opt=document.createElement('option'); opt.value=name; opt.textContent=name; sel.appendChild(opt); });
+  $('#addPct').value = '';
+  $('#corrNote').value = '';
+  $('#editContext').textContent = contextLine();
+  modal.style.display='flex';
+  updateTotals();
+}
+function contextLine(){
+  const t = _lastSuggestion?.target;
+  const name = _lastContextName ? ` · ${_lastContextName}` : '';
+  return `Target: L=${t.L.toFixed(2)} a=${t.a.toFixed(2)} b=${t.b.toFixed(2)}${name}`;
+}
+function closeEdit(){ modal.style.display='none'; }
+function renderEditList(){
+  editList.innerHTML = '';
+  working.forEach((row, idx)=>{
+    const wrap = document.createElement('div'); wrap.className='edit-row';
+    const nameInput = document.createElement('input'); nameInput.value=row.ink; nameInput.readOnly=true; nameInput.className='mono';
+    const pctInput = document.createElement('input'); pctInput.type='number'; pctInput.step='0.01'; pctInput.value=Number(row.pct).toFixed(2); pctInput.className='pct-input mono'; pctInput.addEventListener('input',()=>{ row.pct = +pctInput.value; updateTotals(); });
+    const del = document.createElement('button'); del.className='rem-btn'; del.innerHTML='✕'; del.title='Remove'; del.addEventListener('click',()=>{ working.splice(idx,1); renderEditList(); updateTotals(); });
+    wrap.appendChild(nameInput); wrap.appendChild(pctInput); wrap.appendChild(del); editList.appendChild(wrap);
+  });
+}
+function updateTotals(){
+  const total = working.reduce((s,r)=> s + (+r.pct||0), 0);
+  $('#totalPct').textContent = total.toFixed(2);
+  const good = approx(total,100,0.01);
+  $('#totalState').textContent = good ? 'normalised' : 'needs normalising';
+  $('#totalState').className = good ? 'ok' : 'warn';
+}
+function normalise(){
+  const sum = working.reduce((s,r)=> s + (+r.pct||0), 0) || 1;
+  working.forEach(r=> r.pct = +(r.pct * 100 / sum).toFixed(2));
+  renderEditList(); updateTotals();
+}
+function addInk(){
+  const name = $('#addInkSel').value; let pct = +($('#addPct').value||0);
+  if(!name || !(pct>0)) return;
+  const found = working.find(r=> r.ink === name);
+  if(found) found.pct = +(found.pct + pct).toFixed(2);
+  else working.push({ink:name, pct:+pct.toFixed(2)});
+  $('#addPct').value=''; renderEditList(); updateTotals();
+}
+async function saveCorrection(){
+  if(!_lastSuggestion) return;
+  // Ensure normalised
+  const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
+  if (!approx(sum,100,0.02)) normalise();
+  const corrected = {}; working.forEach(r=>{ if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2); });
+  const payload = {
+    target: _lastSuggestion.target,
+    group: _lastSuggestion.group || null,
+    original: _lastSuggestion.formula,
+    corrected,
+    context_name: _lastContextName || null,
+    note: ($('#corrNote').value||'').trim() || null
+  };
+  try{
+    const res = await fetch(API_BASE + '/log_correction', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
+    alert('Saved correction. It will be available for the next training cycle.');
+    closeEdit();
+  }catch(err){
+    alert('Error saving correction: ' + (err.message||err));
+  }
+}
+
+// ===== Compare tab logic + 3D viz (kept condensed) =====
 function setSwatchFromFields(prefix){
   const L=parseFloat($('#'+prefix+'L').value), a=parseFloat($('#'+prefix+'a').value), b=parseFloat($('#'+prefix+'b').value);
-  if ([L,a,b].some(v=>Number.isNaN(v))) return; const rgb=labToSrgb(L,a,b); $('#swatch'+prefix).style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  if ([L,a,b].some(v=>Number.isNaN(v))) return; const rgb=labToSrgb(L,a,b);
+  $('#swatch'+prefix).style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
   const legend = prefix === 'A' ? $('#legendA') : $('#legendB');
   legend.style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
@@ -359,18 +480,12 @@ function computeCompareDE(){
   $('#cmpNumbers').innerHTML=`<div class="two-col"><div><strong>ΔE2000:</strong> ${de.toFixed(2)}</div><div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)}</div></div>`;
   $('#cmpResult').style.display='block'; requestLabDraw();
 }
-document.addEventListener('input', (e)=>{
-  if (e.target && e.target.tagName === 'INPUT' && e.target.type === 'number') {
-    if (!tabCompare.hidden) {
-      const id = e.target.id || '';
-      if (/^(AL|Aa|Ab|BL|Ba|Bb)$/.test(id)) { setSwatchFromFields(id[0]); computeCompareDE(); }
-      else { requestLabDraw(); }
-    }
+document.addEventListener('input',(e)=>{
+  if (e.target && e.target.tagName==='INPUT' && e.target.type==='number'){
+    const id=e.target.id||'';
+    if (/^(AL|Aa|Ab)$/.test(id)) { setSwatchFromFields('A'); computeCompareDE(); }
+    if (/^(BL|Ba|Bb)$/.test(id)) { setSwatchFromFields('B'); computeCompareDE(); }
   }
-});
-$('#useTargetForA').addEventListener('click', ()=>{
-  const t=getTargetLab(); if(!t){ alert('No target set on Match tab.'); return; }
-  $('#AL').value=t.L; $('#Aa').value=t.a; $('#Ab').value=t.b; setSwatchFromFields('A'); computeCompareDE();
 });
 $('#swapAB').addEventListener('click', ()=>{
   const AL=$('#AL').value, Aa=$('#Aa').value, Ab=$('#Ab').value;
@@ -378,291 +493,160 @@ $('#swapAB').addEventListener('click', ()=>{
   $('#BL').value=AL; $('#Ba').value=Aa; $('#Bb').value=Ab; setSwatchFromFields('A'); setSwatchFromFields('B'); computeCompareDE();
 });
 
-// ===== 3D Lab Viz
-const canvas = $('#labCanvas');
-const ctx = canvas.getContext('2d');
-const DEFAULT_VIEW = { rx: -0.6, ry: 0.8, s: 220 };
-let rotX = DEFAULT_VIEW.rx, rotY = DEFAULT_VIEW.ry, scale3d = DEFAULT_VIEW.s;
-let dragging = false, lastX=0, lastY=0;
-
-canvas.addEventListener('mousedown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mouseup', ()=> dragging=false);
-window.addEventListener('mousemove', e=>{
-  if (!dragging) return;
-  const dx=(e.clientX-lastX), dy=(e.clientY-lastY); lastX=e.clientX; lastY=e.clientY;
-  rotY -= dx*0.005;
-  rotX -= dy*0.005;
-  requestLabDraw();
-});
-canvas.addEventListener('wheel', e=>{
-  e.preventDefault();
-  const factor = (e.deltaY>0)? 0.9 : 1.1;
-  scale3d = clamp(scale3d*factor, 80, 1200);
-  requestLabDraw();
-},{passive:false});
-$('#resetView').addEventListener('click', ()=>{
-  rotX = DEFAULT_VIEW.rx; rotY = DEFAULT_VIEW.ry; scale3d = DEFAULT_VIEW.s; requestLabDraw();
-});
-
+// Simple 3D LAB sphere with coloured panes (same as last good version)
+const canvas=$('#labCanvas'), ctx=canvas.getContext('2d');
+const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
+let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
+let dragging=false,lastX=0,lastY=0;
+canvas.addEventListener('mousedown',e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup',()=> dragging=false);
+window.addEventListener('mousemove',e=>{ if(!dragging) return; const dx=(e.clientX-lastX), dy=(e.clientY-lastY); lastX=e.clientX; lastY=e.clientY; rotY -= dx*0.005; rotX -= dy*0.005; requestLabDraw(); });
+canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f=(e.deltaY>0)?0.9:1.1; scale3d=clamp(scale3d*f,80,1200); requestLabDraw(); }, {passive:false});
+$('#resetView').addEventListener('click', ()=>{ rotX=DEFAULT_VIEW.rx; rotY=DEFAULT_VIEW.ry; scale3d=DEFAULT_VIEW.s; requestLabDraw(); });
 function normLab(L,a,b){ return { x:(a/128), y:((L-50)/50), z:(b/128) }; }
-function rot3(p){
-  const cosX=Math.cos(rotX), sinX=Math.sin(rotX);
-  const cosY=Math.cos(rotY), sinY=Math.sin(rotY);
-  let y = p.y*cosX - p.z*sinX;
-  let z = p.y*sinX + p.z*cosX;
-  let x = p.x*cosY + z*sinY;
-  z = -p.x*sinY + z*cosY;
-  return {x,y,z};
+function rot3(p){ const cX=Math.cos(rotX), sX=Math.sin(rotX), cY=Math.cos(rotY), sY=Math.sin(rotY); let y=p.y*cX - p.z*sX; let z=p.y*sX + p.z*cX; let x=p.x*cY + z*sY; z = -p.x*sY + z*cY; return {x,y,z}; }
+function proj(p){ const d=3; const z=p.z+3.5; const k=d/(z); return {u:canvas.width/2 + p.x*scale3d*k, v:canvas.height/2 - p.y*scale3d*k, k, z:p.z}; }
+function drawSpherePanes(){
+  const R=1.08, M=24, P=18, baseAlpha=0.20; const thetas=[...Array(M)].map((_,i)=>-Math.PI + i*(2*Math.PI/(M-1)));
+  const phis=[...Array(P)].map((_,j)=>-Math.PI/2 + j*((Math.PI)/(P-1)));
+  function objPoint(phi,theta){ return { x0:R*Math.cos(phi)*Math.cos(theta), y0:R*Math.sin(phi), z0:R*Math.cos(phi)*Math.sin(theta) }; }
+  function toScreen(o){ const pr=rot3({x:o.x0,y:o.y0,z:o.z0}); const sc=proj(pr); return {u:sc.u,v:sc.v,z:pr.z,k:sc.k}; }
+  function rgbaFromObj(o,a){ const L=o.y0*50+50, A=o.x0*128, B=o.z0*128; const rgb=labToSrgb(L,A,B); return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
+  const quads=[];
+  for(let j=0,idx=0;j<P-1;j++){
+    for(let i=0;i<M-1;i++,idx++){
+      const o00=objPoint(phis[j],thetas[i]), o10=objPoint(phis[j],thetas[i+1]);
+      const o01=objPoint(phis[j+1],thetas[i]), o11=objPoint(phis[j+1],thetas[i+1]);
+      const ux=o10.x0-o00.x0, uy=o10.y0-o00.y0, uz=o10.z0-o00.z0;
+      const vx=o01.x0-o00.x0, vy=o01.y0-o00.y0, vz=o01.z0-o00.z0;
+      const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+      const nRot=rot3({x:nx,y:ny,z:nz}); const nLen=Math.hypot(nRot.x,nRot.y,nRot.z)||1e-9; const nzCam=nRot.z/nLen;
+      if (nzCam < -0.15) continue; // cull strong back-faces
+      const vis = (nzCam<=0)?0: (nzCam>=0.1?1:(nzCam/0.1)); const alpha=baseAlpha*(0.15+0.85*vis);
+      const s00=toScreen(o00), s10=toScreen(o10), s01=toScreen(o01), s11=toScreen(o11);
+      const avgZ=(s00.z+s10.z+s01.z+s11.z)/4;
+      const oMid={ x0:(o00.x0+o10.x0+o01.x0+o11.x0)/4, y0:(o00.y0+o10.y0+o01.y0+o11.y0)/4, z0:(o00.z0+o10.z0+o01.z0+o11.z0)/4 };
+      const col=rgbaFromObj(oMid,alpha);
+      const stableZ = avgZ + ((i*37 + j*101) % 113) * 1e-6;
+      quads.push({stableZ, col, pts:[s00,s10,s11,s01]});
+    }
+  }
+  quads.sort((a,b)=> a.stableZ - b.stableZ);
+  ctx.save(); ctx.lineWidth=0.6;
+  for(const q of quads){ ctx.fillStyle=q.col; ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.beginPath(); ctx.moveTo(q.pts[0].u,q.pts[0].v); for(let k=1;k<q.pts.length;k++) ctx.lineTo(q.pts[k].u,q.pts[k].v); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  ctx.restore();
 }
-function proj(p){
-  const d = 3; const z = p.z + 3.5; const k = d / (z);
-  return { u: canvas.width/2 + p.x * scale3d * k, v: canvas.height/2 - p.y * scale3d * k, k, z: p.z };
+function drawSphere(){
+  const R=1.1, MER=28, PAR=20, STEP=Math.PI/64;
+  function tint(x0,y0,z0,a){ const L=y0*50+50,A=x0*128,B=z0*128; const rgb=labToSrgb(L,A,B); return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
+  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0})); const rad=Math.hypot(edge.u-c.u, edge.v-c.v);
+  ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(c.u,c.v,rad,0,Math.PI*2); ctx.stroke();
+  for(let i=0;i<MER;i++){
+    const th=-Math.PI + i*(2*Math.PI/(MER-1)); let first=true,lastObj=null,lastScr=null;
+    for(let t=-Math.PI/2;t<=Math.PI/2;t+=STEP){
+      const x0=R*Math.cos(t)*Math.cos(th), y0=R*Math.sin(t), z0=R*Math.cos(t)*Math.sin(th);
+      const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
+      if(!first){ const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2; ctx.strokeStyle=tint(mx0,my0,mz0,0.22); ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(lastScr.u,lastScr.v); ctx.lineTo(q.u,q.v); ctx.stroke(); }
+      first=false; lastObj={x:x0,y:y0,z:z0}; lastScr=q;
+    }
+  }
+  for(let j=0;j<PAR;j++){
+    const ph=-Math.PI/2 + j*(Math.PI/(PAR-1)); let first=true,lastObj=null,lastScr=null;
+    for(let t=-Math.PI;t<=Math.PI;t+=STEP){
+      const x0=R*Math.cos(ph)*Math.cos(t), y0=R*Math.sin(ph), z0=R*Math.cos(ph)*Math.sin(t);
+      const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
+      if(!first){ const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2; ctx.strokeStyle=tint(mx0,my0,mz0,0.22); ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(lastScr.u,lastScr.v); ctx.lineTo(q.u,q.v); ctx.stroke(); }
+      first=false; lastObj={x:x0,y:y0,z:z0}; lastScr=q;
+    }
+  }
+}
+function drawPointLab(L,a,b,label){
+  const p=proj(rot3(normLab(L,a,b))), rgb=labToSrgb(L,a,b), col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  ctx.fillStyle=col; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2); ctx.fill(); ctx.lineWidth=1; ctx.stroke();
+  ctx.fillStyle='#e5e7eb'; ctx.font='12px ui-sans-serif, system-ui'; ctx.fillText(label, p.u+8, p.v-8);
+  return p;
+}
+function drawLineLab(A,B){
+  const p1=proj(rot3(normLab(A.L,A.a,A.b))); const p2=proj(rot3(normLab(B.L,B.a,B.b)));
+  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
 }
 function drawAxes(){
-  const axes = [
-    {from:{L:50,a:-128,b:0}, to:{L:50,a:128,b:0}, label:'+a*'},
-    {from:{L:0,a:0,b:0},     to:{L:100,a:0,b:0},  label:'L*'},
-    {from:{L:50,a:0,b:-128}, to:{L:50,a:0,b:128}, label:'+b*'},
-  ];
-  ctx.lineWidth = 2.2;
-  ctx.strokeStyle='#d1d5db';
-  ctx.fillStyle = '#e5e7eb';
-  ctx.font = '12px ui-sans-serif, system-ui';
-  axes.forEach(ax=>{
-    const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b)));
-    const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
+  const axes=[ {from:{L:50,a:-128,b:0},to:{L:50,a:128,b:0},label:'+a*'}, {from:{L:0,a:0,b:0},to:{L:100,a:0,b:0},label:'L*'}, {from:{L:50,a:0,b:-128},to:{L:50,a:0,b:128},label:'+b*'} ];
+  ctx.lineWidth=2.2; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.fillStyle='#e5e7eb'; ctx.font='12px ui-sans-serif, system-ui';
+  axes.forEach(ax=>{ const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b))); const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
     ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
-    const TICKS = 6;
-    for (let i=1;i<TICKS;i++){
-      const t=i/TICKS;
-      const L = ax.from.L + (ax.to.L-ax.from.L)*t;
-      const a = ax.from.a + (ax.to.a-ax.from.a)*t;
-      const b = ax.from.b + (ax.to.b-ax.from.b)*t;
-      const p=proj(rot3(normLab(L,a,b)));
-      const dirX = (p2.u - p1.u), dirV = (p2.v - p1.v);
-      const len = Math.hypot(dirX, dirV);
-      const nx = -dirV/len, ny = dirX/len;
-      const tick = 6 * p.k;
-      ctx.beginPath(); ctx.moveTo(p.u - nx*tick, p.v - ny*tick); ctx.lineTo(p.u + nx*tick, p.v + ny*tick); ctx.stroke();
+    // ticks
+    const T=6; for(let i=1;i<T;i++){ const t=i/T; const L=ax.from.L+(ax.to.L-ax.from.L)*t, a=ax.from.a+(ax.to.a-ax.from.a)*t, b=ax.from.b+(ax.to.b-ax.from.b)*t; const p=proj(rot3(normLab(L,a,b)));
+      const dirX=(p2.u-p1.u), dirV=(p2.v-p1.v), len=Math.hypot(dirX,dirV)||1, nx=-dirV/len, ny=dirX/len, tick=6*p.k;
+      ctx.beginPath(); ctx.moveTo(p.u-nx*tick,p.v-ny*tick); ctx.lineTo(p.u+nx*tick,p.v+ny*tick); ctx.stroke();
     }
     ctx.fillText(ax.label, p2.u+6, p2.v-6);
   });
 }
-
-// ======= PANES (kept!) with smooth silhouette fade, stable ordering =======
-function drawSpherePanes(){
-  const R = 1.08;
-  const M = 24, P = 18;
-  const baseAlpha = 0.22;
-
-  const thetas = Array.from({length:M}, (_,i)=> -Math.PI + i*(2*Math.PI/(M-1)));
-  const phis   = Array.from({length:P}, (_,j)=> -Math.PI/2 + j*((Math.PI)/(P-1)));
-
-  function objPoint(phi, theta){
-    const x0 = R * Math.cos(phi) * Math.cos(theta);
-    const y0 = R * Math.sin(phi);
-    const z0 = R * Math.cos(phi) * Math.sin(theta);
-    return {x0,y0,z0};
-  }
-  function toScreen(o){
-    const pr = rot3({x:o.x0, y:o.y0, z:o.z0});
-    const sc = proj(pr);
-    return {u:sc.u, v:sc.v, z:pr.z, k:sc.k};
-  }
-  function rgbaFromObj(o, a){
-    const L = o.y0 * 50 + 50, A = o.x0 * 128, B = o.z0 * 128;
-    const rgb = labToSrgb(L, A, B);
-    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
-  }
-
-  const quads = [];
-  let idx = 0;
-  for (let j = 0; j < P-1; j++){
-    for (let i = 0; i < M-1; i++, idx++){
-      const o00 = objPoint(phis[j],   thetas[i]);
-      const o10 = objPoint(phis[j],   thetas[i+1]);
-      const o01 = objPoint(phis[j+1], thetas[i]);
-      const o11 = objPoint(phis[j+1], thetas[i+1]);
-
-      // normal in object space
-      const ux = o10.x0 - o00.x0, uy = o10.y0 - o00.y0, uz = o10.z0 - o00.z0;
-      const vx = o01.x0 - o00.x0, vy = o01.y0 - o00.y0, vz = o01.z0 - o00.z0;
-      const nx = uy*vz - uz*vy, ny = uz*vx - ux*vz, nz = ux*vy - uy*vx;
-
-      // rotate normal to camera space and normalise
-      const nRot = rot3({x:nx, y:ny, z:nz});
-      const nLen = Math.hypot(nRot.x, nRot.y, nRot.z) || 1e-9;
-      const nzCam = nRot.z / nLen; // -1..1 (view dir ~ +z)
-
-      // Fade near silhouette; keep panes visible instead of popping
-      // Fully drop only strong back-faces to save fill
-      if (nzCam < -0.15) continue; // true back-face
-      const vis = smoothstep(0.0, 0.08, nzCam); // 0 at silhouette-, 1 when facing
-      const alpha = baseAlpha * (0.15 + 0.85*vis); // never zero -> no popping
-
-      const s00 = toScreen(o00), s10 = toScreen(o10), s01 = toScreen(o01), s11 = toScreen(o11);
-      const avgZ = (s00.z + s10.z + s01.z + s11.z)/4;
-
-      const oMid = { x0:(o00.x0+o10.x0+o01.x0+o11.x0)/4,
-                     y0:(o00.y0+o10.y0+o01.y0+o11.y0)/4,
-                     z0:(o00.z0+o10.z0+o01.z0+o11.z0)/4 };
-      const col = rgbaFromObj(oMid, alpha);
-
-      // stable ordering: avgZ plus tiny deterministic bias
-      const stableZ = avgZ + ((i*37 + j*101) % 113) * 1e-6;
-
-      quads.push({stableZ, col, pts:[s00, s10, s11, s01]});
-    }
-  }
-
-  quads.sort((a,b)=> a.stableZ - b.stableZ);
-
-  ctx.save();
-  ctx.lineWidth = 0.6;
-  for (const q of quads){
-    ctx.fillStyle = q.col;
-    ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-    ctx.beginPath();
-    ctx.moveTo(q.pts[0].u, q.pts[0].v);
-    for (let k=1;k<q.pts.length;k++) ctx.lineTo(q.pts[k].u, q.pts[k].v);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-// wireframe (kept)
-function drawSphere(){
-  const R = 1.1;
-  const MERIDIANS = 28;
-  const PARALLELS = 20;
-  const STEP = Math.PI / 64;
-  const alpha = 0.24;
-
-  function tintFromObjXYZ(x0, y0, z0, a){
-    const L = y0 * 50 + 50, A = x0 * 128, B = z0 * 128;
-    const rgb = labToSrgb(L, A, B);
-    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
-  }
-
-  const c = proj(rot3({x:0,y:0,z:0}));
-  const edge = proj(rot3({x:R,y:0,z:0}));
-  const rad = Math.hypot(edge.u - c.u, edge.v - c.v);
-  ctx.strokeStyle = 'rgba(248,250,252,0.28)';
-  ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(c.u, c.v, rad, 0, Math.PI*2); ctx.stroke();
-
-  for (let i = 0; i < MERIDIANS; i++){
-    const theta = -Math.PI + i * (2*Math.PI / (MERIDIANS-1));
-    let first = true, lastObj = null, lastScr = null;
-    for (let t = -Math.PI/2; t <= Math.PI/2; t += STEP){
-      const x0 = R * Math.cos(t) * Math.cos(theta);
-      const y0 = R * Math.sin(t);
-      const z0 = R * Math.cos(t) * Math.sin(theta);
-      const p = rot3({x:x0, y:y0, z:z0});
-      const q = proj(p);
-      if (!first){
-        const mx0 = (lastObj.x + x0)/2, my0 = (lastObj.y + y0)/2, mz0 = (lastObj.z + z0)/2;
-        ctx.strokeStyle = tintFromObjXYZ(mx0, my0, mz0, alpha);
-        ctx.lineWidth = 1.8;
-        ctx.beginPath(); ctx.moveTo(lastScr.u, lastScr.v); ctx.lineTo(q.u, q.v); ctx.stroke();
-      }
-      first = false; lastObj = {x:x0, y:y0, z:z0}; lastScr = q;
-    }
-  }
-
-  for (let j = 0; j < PARALLELS; j++){
-    const phi = -Math.PI/2 + j * (Math.PI / (PARALLELS-1));
-    let first = true, lastObj = null, lastScr = null;
-    for (let t = -Math.PI; t <= Math.PI; t += STEP){
-      const x0 = R * Math.cos(phi) * Math.cos(t);
-      const y0 = R * Math.sin(phi);
-      const z0 = R * Math.cos(phi) * Math.sin(t);
-      const p = rot3({x:x0, y:y0, z:z0});
-      const q = proj(p);
-      if (!first){
-        const mx0 = (lastObj.x + x0)/2, my0 = (lastObj.y + y0)/2, mz0 = (lastObj.z + z0)/2;
-        ctx.strokeStyle = tintFromObjXYZ(mx0, my0, mz0, alpha);
-        ctx.lineWidth = 1.8;
-        ctx.beginPath(); ctx.moveTo(lastScr.u, lastScr.v); ctx.lineTo(q.u, q.v); ctx.stroke();
-      }
-      first = false; lastObj = {x:x0, y:y0, z:z0}; lastScr = q;
-    }
-  }
-}
-
-function drawPointLab(L,a,b, label){
-  const p = proj(rot3(normLab(L,a,b)));
-  const rgb = labToSrgb(L,a,b);
-  const col = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
-  ctx.fillStyle = col;
-  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-  ctx.beginPath(); ctx.arc(p.u, p.v, 6*p.k, 0, Math.PI*2); ctx.fill(); ctx.lineWidth=1; ctx.stroke();
-  ctx.fillStyle='#cbd5e1';
-  ctx.font='12px ui-sans-serif, system-ui';
-  ctx.fillText(label, p.u+8, p.v-8);
-  return p;
-}
-function drawLineLab(A,B){
-  const p1 = proj(rot3(normLab(A.L,A.a,A.b)));
-  const p2 = proj(rot3(normLab(B.L,B.a,B.b)));
-  ctx.strokeStyle = 'rgba(148,163,184,0.9)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
-}
-
 function drawLabScene(){
-  const a = { L: parseFloat($('#AL').value), a: parseFloat($('#Aa').value), b: parseFloat($('#Ab').value) };
-  const b = { L: parseFloat($('#BL').value), a: parseFloat($('#Ba').value), b: parseFloat($('#Bb').value) };
-
+  const a={L:parseFloat($('#AL').value), a:parseFloat($('#Aa').value), b:parseFloat($('#Ab').value)};
+  const b={L:parseFloat($('#BL').value), a:parseFloat($('#Ba').value), b:parseFloat($('#Bb').value)};
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle = '#121723';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-
-  drawSpherePanes();   // panes stay
-  drawSphere();        // wireframe
-  drawAxes();          // strong axes
-
-  const aValid = [a.L,a.a,a.b].every(Number.isFinite);
-  const bValid = [b.L,b.a,b.b].every(Number.isFinite);
-  if (aValid && bValid){
-    drawLineLab(a,b);
-    drawPointLab(a.L,a.a,a.b,'A');
-    drawPointLab(b.L,b.a,b.b,'B');
-    const de = deltaE2000(a,b);
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '13px ui-sans-serif, system-ui';
-    ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18);
-  } else {
-    ctx.fillStyle='#94a3b8';
-    ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18);
-  }
+  ctx.fillStyle='#0f1219'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawSpherePanes(); drawSphere(); drawAxes();
+  const aValid=[a.L,a.a,a.b].every(Number.isFinite), bValid=[b.L,b.a,b.b].every(Number.isFinite);
+  if (aValid && bValid){ drawLineLab(a,b); drawPointLab(a.L,a.a,a.b,'A'); drawPointLab(b.L,b.a,b.b,'B'); const de=deltaE2000(a,b); ctx.fillStyle='#e5e7eb'; ctx.font='13px ui-sans-serif, system-ui'; ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18); }
+  else { ctx.fillStyle='#e5e7eb'; ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18); }
 }
+let rafId=null; function requestLabDraw(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
 
-let rafId=null;
-function requestLabDraw(){ if (rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
+// Tabs
+const tabBtnMatch=$('#tabBtnMatch'), tabBtnCompare=$('#tabBtnCompare'), tabMatch=$('#tab-match'), tabCompare=$('#tab-compare');
+function showTab(which){ if(which==='match'){ tabMatch.hidden=false; tabBtnMatch.setAttribute('aria-selected','true'); tabCompare.hidden=true; tabBtnCompare.setAttribute('aria-selected','false'); } else { tabMatch.hidden=true; tabBtnMatch.setAttribute('aria-selected','false'); tabCompare.hidden=false; tabBtnCompare.setAttribute('aria-selected','true'); requestLabDraw(); } }
+tabBtnMatch.addEventListener('click',()=>showTab('match')); tabBtnCompare.addEventListener('click',()=>showTab('compare'));
 
-// ===== Wire up base UI =====
+// Wire up
 $('#findBtn').addEventListener('click', findClosest);
-$('#clearBtn').addEventListener('click', function(){
-  $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
-  $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
-  $('#suggestedFormula').style.display='none'; $('#predictMsg').textContent='';
-});
+$('#clearBtn').addEventListener('click', ()=>{ $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho(); $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none'; $('#suggestedFormula').style.display='none'; $('#predictMsg').textContent=''; $('#editRow').style.display='none'; });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
 
-// ===== Load data + groups + inks =====
+// Edit modal events
+$('#editFormulaBtn').addEventListener('click', openEdit);
+$('#cancelEdit').addEventListener('click', closeEdit);
+$('#normaliseBtn').addEventListener('click', normalise);
+$('#addInkBtn').addEventListener('click', addInk);
+$('#addPct').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addInk(); } });
+$('#saveCorrection').addEventListener('click', saveCorrection);
+
+// Load data
 Promise.all([ fetch('colours.json').then(r=>r.json()), fetch('DC_Formulas.json').then(r=>r.json()) ])
 .then(tuple=>{
   COLOURS=tuple[0]; FORMULAS=tuple[1]; buildFormulaIndex();
+  $('#countLabel').textContent = COLOURS.length;
+  // datalists for compare tab
   const opts=COLOURS.map(c=>`<option value="${(c.name||c.Colour||c.color||'').trim()}">`).join('');
   document.body.insertAdjacentHTML('beforeend', `<datalist id="cmpListA">${opts}</datalist><datalist id="cmpListB">${opts}</datalist>`);
 }).catch(err=>{ alert('Error loading JSON: '+err); });
 
 loadGroups(); loadInks(); updateTargetEcho();
-requestLabDraw();
+
+// Compare tab quick-load
+$('#cmpALoad').addEventListener('click', ()=>{
+  const name=$('#cmpASelect').value; if(!name) return;
+  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name); if(!c) return;
+  $('#AL').value=c.L; $('#Aa').value=c.a; $('#Ab').value=c.b; setSwatchFromFields('A'); computeCompareDE();
+});
+$('#cmpBLoad').addEventListener('click', ()=>{
+  const name=$('#cmpBSelect').value; if(!name) return;
+  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name); if(!c) return;
+  $('#BL').value=c.L; $('#Ba').value=c.a; $('#Bb').value=c.b; setSwatchFromFields('B'); computeCompareDE();
+});
+
+// Self-tests
+try{
+  const c={L:50,a:0,b:0};
+  console.assert(approx(deltaE2000(c,c),0),'ΔE00 identity');
+  const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
+  console.assert(approx(deltaE2000(c1,c2),deltaE2000(c2,c1),1e-9),'ΔE00 symmetry');
+}catch(e){ console.warn('Self-tests failed:', e); }
+
 })();
 </script>
 </body>
