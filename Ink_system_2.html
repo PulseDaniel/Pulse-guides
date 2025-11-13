@@ -55,7 +55,7 @@
   .warn{ color:#fca5a5; }
   .ok{ color:#86efac; }
 
-  /* Compare canvas wrapper (kept from previous) */
+  /* Compare canvas wrapper */
   .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
@@ -365,22 +365,42 @@ async function loadInks(){
 }
 function formulaPairs(formula){ return Object.entries(formula||{}).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]); }
 
+// UPDATED: always reveal edit button after successful render
 async function suggestFormula(){
   const btn=$('#suggestBtn'), msg=$('#predictMsg'), box=$('#suggestedFormula');
   const t=getTargetLab(); if(!t){ alert('Enter a valid L*a*b* first.'); return; }
-  btn.disabled=true; msg.textContent='Predicting…'; box.style.display='none'; box.innerHTML=''; $('#editRow').style.display='none';
+
+  btn.disabled=true; msg.textContent='Predicting…';
+  box.style.display='none'; box.innerHTML='';
+  $('#editRow').style.display='none';
+
   try{
     const group=($('#groupSelect').value||''); const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true}; if(group) body.group=group;
     const res=await fetch(API_BASE+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
-    const data=await res.json(); const pairs=formulaPairs(data.formula);
+    const data=await res.json();
+    const formula = (data && typeof data.formula === 'object') ? data.formula : {};
+    const pairs=formulaPairs(formula);
+
     let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
-    for (const [ink,pct] of pairs) html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+    if (pairs.length === 0) {
+      html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
+    } else {
+      for (const [ink,pct] of pairs) html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+    }
     html+='</div>';
     box.innerHTML=html; box.style.display='block'; msg.textContent='';
-    _lastSuggestion={ target:t, formula:data.formula, group: (group||null) };
+
+    _lastSuggestion={ target:t, formula, group: (group||null) };
+
+    // ✅ force-show edit row now that we rendered a suggestion
     $('#editRow').style.display='flex';
-  }catch(err){ msg.textContent=String(err.message||err); } finally{ btn.disabled=false; }
+  }catch(err){
+    msg.textContent=String(err.message||err);
+    $('#editRow').style.display='none';
+  } finally {
+    btn.disabled=false;
+  }
 }
 
 // ===== Edit / Tweak modal =====
@@ -462,7 +482,7 @@ async function saveCorrection(){
   }
 }
 
-// ===== Compare tab logic + 3D viz (kept condensed) =====
+// ===== Compare tab logic + 3D viz =====
 function setSwatchFromFields(prefix){
   const L=parseFloat($('#'+prefix+'L').value), a=parseFloat($('#'+prefix+'a').value), b=parseFloat($('#'+prefix+'b').value);
   if ([L,a,b].some(v=>Number.isNaN(v))) return; const rgb=labToSrgb(L,a,b);
@@ -493,7 +513,7 @@ $('#swapAB').addEventListener('click', ()=>{
   $('#BL').value=AL; $('#Ba').value=Aa; $('#Bb').value=Ab; setSwatchFromFields('A'); setSwatchFromFields('B'); computeCompareDE();
 });
 
-// Simple 3D LAB sphere with coloured panes (same as last good version)
+// 3D LAB sphere with coloured panes
 const canvas=$('#labCanvas'), ctx=canvas.getContext('2d');
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
@@ -521,7 +541,7 @@ function drawSpherePanes(){
       const vx=o01.x0-o00.x0, vy=o01.y0-o00.y0, vz=o01.z0-o00.z0;
       const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
       const nRot=rot3({x:nx,y:ny,z:nz}); const nLen=Math.hypot(nRot.x,nRot.y,nRot.z)||1e-9; const nzCam=nRot.z/nLen;
-      if (nzCam < -0.15) continue; // cull strong back-faces
+      if (nzCam < -0.15) continue;
       const vis = (nzCam<=0)?0: (nzCam>=0.1?1:(nzCam/0.1)); const alpha=baseAlpha*(0.15+0.85*vis);
       const s00=toScreen(o00), s10=toScreen(o10), s01=toScreen(o01), s11=toScreen(o11);
       const avgZ=(s00.z+s10.z+s01.z+s11.z)/4;
@@ -575,7 +595,6 @@ function drawAxes(){
   ctx.lineWidth=2.2; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.fillStyle='#e5e7eb'; ctx.font='12px ui-sans-serif, system-ui';
   axes.forEach(ax=>{ const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b))); const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
     ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
-    // ticks
     const T=6; for(let i=1;i<T;i++){ const t=i/T; const L=ax.from.L+(ax.to.L-ax.from.L)*t, a=ax.from.a+(ax.to.a-ax.from.a)*t, b=ax.from.b+(ax.to.b-ax.from.b)*t; const p=proj(rot3(normLab(L,a,b)));
       const dirX=(p2.u-p1.u), dirV=(p2.v-p1.v), len=Math.hypot(dirX,dirV)||1, nx=-dirV/len, ny=dirX/len, tick=6*p.k;
       ctx.beginPath(); ctx.moveTo(p.u-nx*tick,p.v-ny*tick); ctx.lineTo(p.u+nx*tick,p.v+ny*tick); ctx.stroke();
@@ -646,6 +665,9 @@ try{
   const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
   console.assert(approx(deltaE2000(c1,c2),deltaE2000(c2,c1),1e-9),'ΔE00 symmetry');
 }catch(e){ console.warn('Self-tests failed:', e); }
+
+// Optional console helper to force-show edit row
+// window.__showEdit = () => { document.getElementById('editRow').style.display = 'flex'; };
 
 })();
 </script>
