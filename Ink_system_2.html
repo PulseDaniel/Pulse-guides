@@ -308,8 +308,10 @@ function labToSrgb(L,a,b){
   let g = -0.9689*X +1.8758*Y +0.0415*Z;
   let b2=  0.0557*X -0.2040*Y +1.0570*Z;
   const lin=[r,g,b2].map(v=> v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
-  r=clamp(Math.round(lin[0]*255),0,255); g=clamp(Math.round(lin[1]*255),0,255); b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r,g:b2===undefined?g:b2,b:b2};
+  r=clamp(Math.round(lin[0]*255),0,255);
+  g=clamp(Math.round(lin[1]*255),0,255);
+  b2=clamp(Math.round(lin[2]*255),0,255);
+  return { r, g, b: b2 };
 }
 function hp(x,y){ const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
 function deltaE2000(c1,c2){
