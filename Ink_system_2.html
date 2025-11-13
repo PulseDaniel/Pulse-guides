@@ -9,7 +9,7 @@
   *{ box-sizing:border-box; }
   body{ font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0; padding:16px; background:#0b0c10; color:#e6e6e6; }
   h1{ font-size:1.2rem; margin:0 0 8px; }
-  .tabs{ display:flex; gap:8px; margin:0 0 12px; }
+  .tabs{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
   .tabbtn{ cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
   .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
   .app{ max-width:1200px; margin:0 auto; display:grid; gap:var(--gap); grid-template-columns:420px 1fr; align-items:start; }
@@ -36,7 +36,7 @@
   .fg-ink{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .fg-pct{ text-align:right; min-width:4ch; font-variant-numeric:tabular-nums; color:#cbd5e1; }
   .stack{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .flex{ display:flex; gap:8px; align-items:center; }
+  .flex{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
   .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   @media (max-width:900px){ .app{ grid-template-columns:1fr; } .two-col{ grid-template-columns:1fr; } }
@@ -49,7 +49,7 @@
   .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
   .rem-btn{ width:32px; height:38px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer; }
   .add-row{ display:grid; grid-template-columns:1fr 120px auto; gap:8px; margin-top:8px; }
-  .footer-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+  .footer-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
   .note{ font-size:.85rem; color:#9aa4b2; }
   .mini{ font-size:.8rem; color:#9aa4b2; }
   .warn{ color:#fca5a5; }
@@ -57,8 +57,14 @@
 
   /* Compare canvas wrapper */
   .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
-  .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; }
+  .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
+
+  /* Libraries */
+  .lib-list{ margin-top:8px; border-top:1px dashed #2a2f3a; padding-top:8px; }
+  .lib-item{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.9rem; }
+  .lib-item-name{ font-weight:600; }
+  .lib-badge{ font-size:.75rem; color:#9aa4b2; }
 </style>
 </head>
 <body>
@@ -66,6 +72,7 @@
   <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match & Predict</button>
     <button class="tabbtn" id="tabBtnCompare" role="tab" aria-selected="false" aria-controls="tab-compare">Compare Colours</button>
+    <button class="tabbtn" id="tabBtnLibraries" role="tab" aria-selected="false" aria-controls="tab-libraries">Colour Sets</button>
   </div>
 
   <!-- TAB: Match & Predict -->
@@ -73,8 +80,15 @@
     <div class="app">
       <div class="card">
         <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
-          <h1>Ink Colour Matcher</h1>
-          <div class="pill" id="refCountPill"><span id="countLabel">0</span> reference colours</div>
+          <div>
+            <h1>Ink Colour Matcher</h1>
+            <div class="pill">Active library: <span id="activeLibLabel">Pantone (base)</span></div>
+          </div>
+          <div style="min-width:200px;">
+            <label for="librarySelect">Colour library</label>
+            <select id="librarySelect"></select>
+          </div>
+          <div class="pill" id="refCountPill"><span id="countLabel">0</span> colours</div>
         </div>
 
         <div class="row" style="margin-top:12px;">
@@ -114,7 +128,7 @@
           </div>
           <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
           <div class="flex" id="editRow" style="display:none; margin-top:8px;">
-            <button class="btn" id="editFormulaBtn">Edit / Tweak formula</button>
+            <button class="btn" id="editFormulaBtn">Edit formula</button>
             <span class="mini">Adjust, add/remove inks, then save correction to training log.</span>
           </div>
         </div>
@@ -142,12 +156,22 @@
   <!-- TAB: Compare Colours -->
   <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
     <div class="card" style="max-width:1200px; margin:0 auto;">
-      <h1>Compare Colours (ΔE2000)</h1>
+      <div class="flex" style="justify-content:space-between;">
+        <div>
+          <h1>Compare Colours (ΔE2000)</h1>
+          <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
+        </div>
+        <div style="min-width:220px;">
+          <label for="cmpLibrarySelect">Colour library</label>
+          <select id="cmpLibrarySelect"></select>
+        </div>
+      </div>
+
       <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
             <div>
-              <label for="cmpASelect">Pick colour A (from references)</label>
+              <label for="cmpASelect">Pick colour A (from active library)</label>
               <input list="cmpListA" id="cmpASelect" placeholder="Type to search…">
               <datalist id="cmpListA"></datalist>
             </div>
@@ -163,7 +187,7 @@
         <div>
           <div class="row2">
             <div>
-              <label for="cmpBSelect">Pick colour B (from references)</label>
+              <label for="cmpBSelect">Pick colour B (from active library)</label>
               <input list="cmpListB" id="cmpBSelect" placeholder="Type to search…">
               <datalist id="cmpListB"></datalist>
             </div>
@@ -199,10 +223,46 @@
     </div>
   </section>
 
-  <!-- Modal: Edit / Tweak Formula -->
+  <!-- TAB: Colour Sets (libraries) -->
+  <section id="tab-libraries" role="tabpanel" aria-labelledby="tabBtnLibraries" hidden>
+    <div class="card" style="max-width:900px; margin:0 auto;">
+      <h1>Colour Sets (Libraries)</h1>
+      <p class="muted">
+        Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
+        in the <strong>Match &amp; Predict</strong> and <strong>Compare Colours</strong> tabs.
+      </p>
+      <p class="muted" style="margin-top:6px;">
+        <strong>CSV format:</strong> first row as headers. Required columns: <code>Name</code>, <code>L</code>,
+        <code>a</code>, <code>b</code> (or <code>L*</code>, <code>a*</code>, <code>b*</code>).
+      </p>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="libName">Library name</label>
+          <input id="libName" type="text" placeholder="e.g. Customer ACME Spot Colours">
+        </div>
+        <div>
+          <label for="libFile">CSV file</label>
+          <input id="libFile" type="file" accept=".csv,text/csv">
+        </div>
+      </div>
+
+      <div class="flex" style="margin-top:12px;">
+        <button class="btn" id="libAddBtn">Add library</button>
+        <button class="btn" id="libTemplateBtn">Download example CSV</button>
+        <span class="mini">Files stay local to this browser (saved in localStorage).</span>
+      </div>
+
+      <div class="lib-list" id="libList">
+        <!-- Populated in JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal: Edit Formula -->
   <div class="modal-backdrop" id="editModal">
     <div class="modal">
-      <h3>Edit / Tweak formula</h3>
+      <h3>Edit formula</h3>
       <div class="mini" id="editContext"></div>
       <div id="editList" style="margin-top:8px; display:grid; gap:6px;"></div>
       <div class="add-row">
@@ -236,7 +296,7 @@ function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; 
 
 const API_BASE = 'https://ink-predict-api.onrender.com'; // <- your Render URL
 
-// Colour conversions & ΔE
+// ===== Colour math =====
 function labToXyz(L,a,b){
   const Yn=1, Xn=0.95047, Zn=1.08883, fy=(L+16)/116;
   const fx=f=> f>0.206893?f*f*f:(f-16/116)/7.787;
@@ -249,7 +309,7 @@ function labToSrgb(L,a,b){
   let b2=  0.0557*X -0.2040*Y +1.0570*Z;
   const lin=[r,g,b2].map(v=> v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
   r=clamp(Math.round(lin[0]*255),0,255); g=clamp(Math.round(lin[1]*255),0,255); b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r,g,b:b2};
+  return {r,g:b2===undefined?g:b2,b:b2};
 }
 function hp(x,y){ const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
 function deltaE2000(c1,c2){
@@ -262,14 +322,27 @@ function deltaE2000(c1,c2){
   let dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
   const dLp = L2 - L1, dCp = C2p - C1p, dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*d2r)/2);
   const Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2)), Sc = 1 + 0.045*avgCp;
-  const Sh = 1 + 0.015*avgCp*T, Rc=2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)));
+  const Sh = 1 + 0.015*avgCp*T;
+  const Rc=2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)));
   const Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*d2r);
   return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
 // ===== State =====
-let COLOURS=[], FORMULAS={}, FORMULAS_NORM={}, COLOUR_TO_FORMULA={}, _lastSuggestion=null, _allInks=[];
+let BASE_COLOURS = [];   // built-in Pantone set
+let COLOURS = [];        // active library view
+let FORMULAS = {};
+let FORMULAS_NORM = {};
+let COLOUR_TO_FORMULA = {};
+let _lastSuggestion = null;
 let _lastContextName = null;
+let _allInks = [];
+
+const LIB_KEY = 'ink_user_libraries_v1';
+const LIB_BASE_ID = 'base';
+const LIB_ALL_ID = 'all';
+let userLibraries = []; // [{id,name,colours:[]}]
+let activeLibraryId = LIB_BASE_ID;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -281,7 +354,7 @@ function updateTargetEcho(){
   const rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
 
-// Build formula index from DC_Formulas.json
+// Build formula index from DC_Formulas.json (Pantone library)
 function buildFormulaIndex(){
   const rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={};
   if (Array.isArray(FORMULAS)) rows.push(...FORMULAS);
@@ -297,7 +370,7 @@ function buildFormulaIndex(){
     const items=[]; for (let i=1;i<=12;i++){ const ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i]; if(!ink) continue; const pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||''; items.push({ink,percent:pct}); }
     const arr=byColour.get(cname)||[]; arr.push(...items); byColour.set(cname,arr); FORMULAS_NORM[normaliseName(cname)]=arr;
   });
-  (COLOURS||[]).forEach(c=>{
+  (BASE_COLOURS||[]).forEach(c=>{
     const name=c.name||c.Colour||c.color||'', norm=normaliseName(name);
     if (byColour.has(name)) { COLOUR_TO_FORMULA[name]=norm; return; }
     if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; }
@@ -306,10 +379,128 @@ function buildFormulaIndex(){
   });
 }
 
-// Target helpers
+// Library handling
+function saveLibraries(){
+  try{
+    const plain = userLibraries.map(l=>({id:l.id,name:l.name,colours:l.colours}));
+    localStorage.setItem(LIB_KEY, JSON.stringify(plain));
+  }catch{}
+}
+function loadLibraries(){
+  try{
+    const raw = localStorage.getItem(LIB_KEY);
+    if (!raw) { userLibraries = []; return; }
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) { userLibraries = []; return; }
+    userLibraries = arr.map(l=>({
+      id: String(l.id || crypto.randomUUID()),
+      name: String(l.name || 'Unnamed'),
+      colours: Array.isArray(l.colours) ? l.colours.map(co=>({
+        name: String(co.name || co.Colour || co.color || 'Untitled'),
+        L: Number(co.L ?? co.Lstar ?? co['L*'] ?? 0),
+        a: Number(co.a ?? co.astar ?? co['a*'] ?? 0),
+        b: Number(co.b ?? co.bstar ?? co['b*'] ?? 0),
+      })) : []
+    }));
+  }catch{ userLibraries = []; }
+}
+function libraryOptions(){
+  const opts = [
+    {id: LIB_BASE_ID, label: 'Pantone (base)'},
+  ];
+  userLibraries.forEach(l => opts.push({id: l.id, label: l.name}));
+  if (userLibraries.length) opts.push({id: LIB_ALL_ID, label: 'All libraries (combined)'});
+  return opts;
+}
+function refreshLibrarySelects(){
+  const opts = libraryOptions();
+  const sel1 = $('#librarySelect');
+  const sel2 = $('#cmpLibrarySelect');
+  const build = (sel)=>{
+    sel.innerHTML = '';
+    opts.forEach(o=>{
+      const opt = document.createElement('option');
+      opt.value = o.id; opt.textContent = o.label; sel.appendChild(opt);
+    });
+    if (!opts.find(o=>o.id === activeLibraryId)) activeLibraryId = LIB_BASE_ID;
+    sel.value = activeLibraryId;
+  };
+  build(sel1); build(sel2);
+  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone (base)';
+  $('#activeLibLabel').textContent = activeLabel;
+  $('#cmpLibLabel').textContent = activeLabel;
+}
+function getActiveColours(){
+  if (activeLibraryId === LIB_BASE_ID) return BASE_COLOURS;
+  if (activeLibraryId === LIB_ALL_ID){
+    let all = [...BASE_COLOURS];
+    userLibraries.forEach(l => { all = all.concat(l.colours); });
+    return all;
+  }
+  const lib = userLibraries.find(l=>l.id === activeLibraryId);
+  return lib ? lib.colours : BASE_COLOURS;
+}
+function refreshActiveColours(){
+  COLOURS = getActiveColours();
+  $('#countLabel').textContent = COLOURS.length;
+  $('#resultsTbody').innerHTML = '';
+  $('#formulaPanel').style.display = 'none';
+  refreshCompareDatalists();
+}
+function renderLibraryList(){
+  const wrap = $('#libList');
+  if (!userLibraries.length){
+    wrap.innerHTML = '<div class="muted">No custom libraries yet. Add one above.</div>';
+    return;
+  }
+  let html = '<h3 style="margin-top:8px;">Your libraries</h3>';
+  userLibraries.forEach(l=>{
+    html += `<div class="lib-item">
+      <div>
+        <div class="lib-item-name">${l.name}</div>
+        <div class="lib-badge">${l.colours.length} colours</div>
+      </div>
+      <button class="btn" data-del-lib="${l.id}">Delete</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-del-lib]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-del-lib');
+      userLibraries = userLibraries.filter(l=>l.id !== id);
+      saveLibraries();
+      refreshLibrarySelects();
+      refreshActiveColours();
+      renderLibraryList();
+    });
+  });
+}
+
+// parse CSV into colours
+function parseCsvColours(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+  if (!lines.length) return [];
+  const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const idxName = header.findIndex(h=>['name','colour','color'].includes(h));
+  const idxL = header.findIndex(h=>['l','l*','lstar'].includes(h));
+  const idxA = header.findIndex(h=>['a','a*','astar'].includes(h));
+  const idxB = header.findIndex(h=>['b','b*','bstar'].includes(h));
+  if (idxName<0 || idxL<0 || idxA<0 || idxB<0) throw new Error('CSV must have columns: Name, L, a, b');
+  const out = [];
+  for (let i=1;i<lines.length;i++){
+    const parts = lines[i].split(',').map(x=>x.trim());
+    if (parts.length <= Math.max(idxName,idxL,idxA,idxB)) continue;
+    const name = parts[idxName] || `Row ${i+1}`;
+    const L = parseFloat(parts[idxL]), a = parseFloat(parts[idxA]), b = parseFloat(parts[idxB]);
+    if ([L,a,b].some(v=>Number.isNaN(v))) continue;
+    out.push({name, L, a, b});
+  }
+  return out;
+}
+
+// ===== Matching / PMS / formulas =====
 function getTargetLab(){ const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L,a,b}; }
 
-// Matching
 function findClosest(){
   const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
   const rows=COLOURS.map(c=>({raw:c,name:c.name||c.Colour||c.color||'—',L:c.L,a:c.a,b:c.b,de:deltaE2000({L:c.L,a:c.a,b:c.b},target)})).sort((a,b)=>a.de-b.de).slice(0,8);
@@ -336,8 +527,6 @@ function showFormulaFor(colourName){
   list.forEach(item=>{ const name=item.ink||item.Ink||'Ink'; const pct=item.percent!==''?(item.percent+'%'):''; html+=`<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`; });
   html+='</div>'; panel.innerHTML=html; panel.style.display='block';
 }
-
-// PMS search
 function findByPms(){
   const qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
   const q=qRaw.replace(/^PANTONE\s*/,''); const hits=COLOURS.filter(c=>{ const p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q); });
@@ -353,7 +542,7 @@ function findByPms(){
   const c0=hits[0]; $('#L').value=c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho(); _lastContextName = c0.name||c0.Colour||c0.color||'';
 }
 
-// Predictor
+// Predictor / groups
 async function loadGroups(){
   try{
     const r=await fetch(API_BASE+'/groups'); const j=await r.json();
@@ -365,7 +554,6 @@ async function loadInks(){
 }
 function formulaPairs(formula){ return Object.entries(formula||{}).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]); }
 
-// UPDATED: always reveal edit button after successful render
 async function suggestFormula(){
   const btn=$('#suggestBtn'), msg=$('#predictMsg'), box=$('#suggestedFormula');
   const t=getTargetLab(); if(!t){ alert('Enter a valid L*a*b* first.'); return; }
@@ -393,7 +581,6 @@ async function suggestFormula(){
 
     _lastSuggestion={ target:t, formula, group: (group||null) };
 
-    // ✅ force-show edit row now that we rendered a suggestion
     $('#editRow').style.display='flex';
   }catch(err){
     msg.textContent=String(err.message||err);
@@ -403,15 +590,20 @@ async function suggestFormula(){
   }
 }
 
-// ===== Edit / Tweak modal =====
+// ===== Edit modal / logging =====
 const modal = $('#editModal');
 const editList = $('#editList');
 let working = []; // [{ink, pct}]
+function contextLine(){
+  const t = _lastSuggestion?.target;
+  if (!t) return '';
+  const name = _lastContextName ? ` · ${_lastContextName}` : '';
+  return `Target: L=${t.L.toFixed(2)} a=${t.a.toFixed(2)} b=${t.b.toFixed(2)}${name}`;
+}
 function openEdit(){
   if(!_lastSuggestion || !(_lastSuggestion.formula)) { alert('No suggestion to edit yet.'); return; }
   working = formulaPairs(_lastSuggestion.formula).map(([ink,p])=>({ink,pct:+(+p).toFixed(2)}));
   renderEditList();
-  // build add-ink dropdown
   const sel = $('#addInkSel'); sel.innerHTML = '';
   _allInks.forEach(name=>{ const opt=document.createElement('option'); opt.value=name; opt.textContent=name; sel.appendChild(opt); });
   $('#addPct').value = '';
@@ -419,11 +611,6 @@ function openEdit(){
   $('#editContext').textContent = contextLine();
   modal.style.display='flex';
   updateTotals();
-}
-function contextLine(){
-  const t = _lastSuggestion?.target;
-  const name = _lastContextName ? ` · ${_lastContextName}` : '';
-  return `Target: L=${t.L.toFixed(2)} a=${t.a.toFixed(2)} b=${t.b.toFixed(2)}${name}`;
 }
 function closeEdit(){ modal.style.display='none'; }
 function renderEditList(){
@@ -458,7 +645,6 @@ function addInk(){
 }
 async function saveCorrection(){
   if(!_lastSuggestion) return;
-  // Ensure normalised
   const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
   if (!approx(sum,100,0.02)) normalise();
   const corrected = {}; working.forEach(r=>{ if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2); });
@@ -468,7 +654,8 @@ async function saveCorrection(){
     original: _lastSuggestion.formula,
     corrected,
     context_name: _lastContextName || null,
-    note: ($('#corrNote').value||'').trim() || null
+    note: ($('#corrNote').value||'').trim() || null,
+    measured: null
   };
   try{
     const res = await fetch(API_BASE + '/log_correction', {
@@ -523,9 +710,11 @@ window.addEventListener('mouseup',()=> dragging=false);
 window.addEventListener('mousemove',e=>{ if(!dragging) return; const dx=(e.clientX-lastX), dy=(e.clientY-lastY); lastX=e.clientX; lastY=e.clientY; rotY -= dx*0.005; rotX -= dy*0.005; requestLabDraw(); });
 canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f=(e.deltaY>0)?0.9:1.1; scale3d=clamp(scale3d*f,80,1200); requestLabDraw(); }, {passive:false});
 $('#resetView').addEventListener('click', ()=>{ rotX=DEFAULT_VIEW.rx; rotY=DEFAULT_VIEW.ry; scale3d=DEFAULT_VIEW.s; requestLabDraw(); });
+
 function normLab(L,a,b){ return { x:(a/128), y:((L-50)/50), z:(b/128) }; }
 function rot3(p){ const cX=Math.cos(rotX), sX=Math.sin(rotX), cY=Math.cos(rotY), sY=Math.sin(rotY); let y=p.y*cX - p.z*sX; let z=p.y*sX + p.z*cX; let x=p.x*cY + z*sY; z = -p.x*sY + z*cY; return {x,y,z}; }
 function proj(p){ const d=3; const z=p.z+3.5; const k=d/(z); return {u:canvas.width/2 + p.x*scale3d*k, v:canvas.height/2 - p.y*scale3d*k, k, z:p.z}; }
+
 function drawSpherePanes(){
   const R=1.08, M=24, P=18, baseAlpha=0.20; const thetas=[...Array(M)].map((_,i)=>-Math.PI + i*(2*Math.PI/(M-1)));
   const phis=[...Array(P)].map((_,j)=>-Math.PI/2 + j*((Math.PI)/(P-1)));
@@ -559,7 +748,7 @@ function drawSpherePanes(){
 function drawSphere(){
   const R=1.1, MER=28, PAR=20, STEP=Math.PI/64;
   function tint(x0,y0,z0,a){ const L=y0*50+50,A=x0*128,B=z0*128; const rgb=labToSrgb(L,A,B); return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
-  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0})); const rad=Math.hypot(edge.u-c.u, edge.v-c.v);
+  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0})); const rad=Math.hypot(edge.u+c.u*-1, edge.v+c.v*-1);
   ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(c.u,c.v,rad,0,Math.PI*2); ctx.stroke();
   for(let i=0;i<MER;i++){
     const th=-Math.PI + i*(2*Math.PI/(MER-1)); let first=true,lastObj=null,lastScr=null;
@@ -610,14 +799,35 @@ function drawLabScene(){
   drawSpherePanes(); drawSphere(); drawAxes();
   const aValid=[a.L,a.a,a.b].every(Number.isFinite), bValid=[b.L,b.a,b.b].every(Number.isFinite);
   if (aValid && bValid){ drawLineLab(a,b); drawPointLab(a.L,a.a,a.b,'A'); drawPointLab(b.L,b.a,b.b,'B'); const de=deltaE2000(a,b); ctx.fillStyle='#e5e7eb'; ctx.font='13px ui-sans-serif, system-ui'; ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18); }
-  else { ctx.fillStyle='#e5e7eb'; ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18); }
+  else { ctx.fillStyle='#e5e7eb'; ctx.font='13px ui-sans-serif, system-ui'; ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18); }
 }
 let rafId=null; function requestLabDraw(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
 
-// Tabs
-const tabBtnMatch=$('#tabBtnMatch'), tabBtnCompare=$('#tabBtnCompare'), tabMatch=$('#tab-match'), tabCompare=$('#tab-compare');
-function showTab(which){ if(which==='match'){ tabMatch.hidden=false; tabBtnMatch.setAttribute('aria-selected','true'); tabCompare.hidden=true; tabBtnCompare.setAttribute('aria-selected','false'); } else { tabMatch.hidden=true; tabBtnMatch.setAttribute('aria-selected','false'); tabCompare.hidden=false; tabBtnCompare.setAttribute('aria-selected','true'); requestLabDraw(); } }
-tabBtnMatch.addEventListener('click',()=>showTab('match')); tabBtnCompare.addEventListener('click',()=>showTab('compare'));
+// Compare tab datalists based on active library
+function refreshCompareDatalists(){
+  const opts = COLOURS.map(c=>{
+    const name = (c.name||c.Colour||c.color||'').trim();
+    return name ? `<option value="${name}">` : '';
+  }).join('');
+  $('#cmpListA').innerHTML = opts;
+  $('#cmpListB').innerHTML = opts;
+}
+
+// Tabs switching
+const tabBtnMatch=$('#tabBtnMatch'), tabBtnCompare=$('#tabBtnCompare'), tabBtnLibraries=$('#tabBtnLibraries');
+const tabMatch=$('#tab-match'), tabCompare=$('#tab-compare'), tabLibraries=$('#tab-libraries');
+function showTab(which){
+  tabMatch.hidden = which!=='match';
+  tabCompare.hidden = which!=='compare';
+  tabLibraries.hidden = which!=='libraries';
+  tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
+  tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
+  tabBtnLibraries.setAttribute('aria-selected', which==='libraries' ? 'true':'false');
+  if (which === 'compare') requestLabDraw();
+}
+tabBtnMatch.addEventListener('click',()=>showTab('match'));
+tabBtnCompare.addEventListener('click',()=>showTab('compare'));
+tabBtnLibraries.addEventListener('click',()=>showTab('libraries'));
 
 // Wire up
 $('#findBtn').addEventListener('click', findClosest);
@@ -626,7 +836,6 @@ $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
 
-// Edit modal events
 $('#editFormulaBtn').addEventListener('click', openEdit);
 $('#cancelEdit').addEventListener('click', closeEdit);
 $('#normaliseBtn').addEventListener('click', normalise);
@@ -634,17 +843,61 @@ $('#addInkBtn').addEventListener('click', addInk);
 $('#addPct').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addInk(); } });
 $('#saveCorrection').addEventListener('click', saveCorrection);
 
-// Load data
-Promise.all([ fetch('colours.json').then(r=>r.json()), fetch('DC_Formulas.json').then(r=>r.json()) ])
-.then(tuple=>{
-  COLOURS=tuple[0]; FORMULAS=tuple[1]; buildFormulaIndex();
-  $('#countLabel').textContent = COLOURS.length;
-  // datalists for compare tab
-  const opts=COLOURS.map(c=>`<option value="${(c.name||c.Colour||c.color||'').trim()}">`).join('');
-  document.body.insertAdjacentHTML('beforeend', `<datalist id="cmpListA">${opts}</datalist><datalist id="cmpListB">${opts}</datalist>`);
-}).catch(err=>{ alert('Error loading JSON: '+err); });
+// Library UI events
+$('#librarySelect').addEventListener('change', (e)=>{
+  activeLibraryId = e.target.value || LIB_BASE_ID;
+  refreshLibrarySelects();
+  refreshActiveColours();
+});
+$('#cmpLibrarySelect').addEventListener('change', (e)=>{
+  activeLibraryId = e.target.value || LIB_BASE_ID;
+  refreshLibrarySelects();
+  refreshActiveColours();
+});
+$('#libAddBtn').addEventListener('click', ()=>{
+  const name = ($('#libName').value||'').trim();
+  const file = $('#libFile').files[0];
+  if (!name){ alert('Please enter a library name.'); return; }
+  if (!file){ alert('Please choose a CSV file.'); return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const colours = parseCsvColours(reader.result);
+      if (!colours.length){ alert('No valid rows found (L/a/b empty?).'); return; }
+      const lib = { id: crypto.randomUUID(), name, colours };
+      userLibraries.push(lib);
+      saveLibraries();
+      $('#libName').value=''; $('#libFile').value='';
+      renderLibraryList();
+      refreshLibrarySelects();
+      // keep current library unless you want to auto-switch
+    }catch(err){
+      alert('Error parsing CSV: ' + (err.message||err));
+    }
+  };
+  reader.onerror = ()=> alert('Error reading file.');
+  reader.readAsText(file);
+});
 
-loadGroups(); loadInks(); updateTargetEcho();
+// Download example CSV
+$('#libTemplateBtn').addEventListener('click', ()=>{
+  const csv = [
+    'Name,L,a,b',
+    'Custom Red 1,50.00,70.00,50.00',
+    'Custom Green 1,55.00,-40.00,40.00',
+    'Custom Blue 1,45.00,20.00,-50.00',
+    'Warm Grey-ish,70.00,2.00,5.00'
+  ].join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'colour_library_template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
 
 // Compare tab quick-load
 $('#cmpALoad').addEventListener('click', ()=>{
@@ -658,16 +911,28 @@ $('#cmpBLoad').addEventListener('click', ()=>{
   $('#BL').value=c.L; $('#Ba').value=c.a; $('#Bb').value=c.b; setSwatchFromFields('B'); computeCompareDE();
 });
 
-// Self-tests
+// Data load
+Promise.all([ fetch('colours.json').then(r=>r.json()), fetch('DC_Formulas.json').then(r=>r.json()) ])
+.then(tuple=>{
+  BASE_COLOURS=tuple[0].map(c=>({name:c.name||c.Colour||c.color||'', L:c.L, a:c.a, b:c.b}));
+  COLOURS = BASE_COLOURS.slice();
+  FORMULAS=tuple[1];
+  buildFormulaIndex();
+  loadLibraries();
+  refreshLibrarySelects();
+  refreshActiveColours();
+  renderLibraryList();
+}).catch(err=>{ alert('Error loading JSON: '+err); });
+
+loadGroups(); loadInks(); updateTargetEcho();
+
+// Self-test
 try{
   const c={L:50,a:0,b:0};
   console.assert(approx(deltaE2000(c,c),0),'ΔE00 identity');
   const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
   console.assert(approx(deltaE2000(c1,c2),deltaE2000(c2,c1),1e-9),'ΔE00 symmetry');
 }catch(e){ console.warn('Self-tests failed:', e); }
-
-// Optional console helper to force-show edit row
-// window.__showEdit = () => { document.getElementById('editRow').style.display = 'flex'; };
 
 })();
 </script>
