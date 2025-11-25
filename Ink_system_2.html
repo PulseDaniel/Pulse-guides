@@ -39,7 +39,7 @@
   .flex{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
   .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-  .btn-connected{ background:#14532d; border-color:#22c55e; color:#bbf7d0; }
+    .btn-connected{ background:#14532d; border-color:#22c55e; color:#bbf7d0; }
   @media (max-width:900px){ .app{ grid-template-columns:1fr; } .two-col{ grid-template-columns:1fr; } }
 
   /* Modal editor */
@@ -92,11 +92,16 @@
           <div class="pill" id="refCountPill"><span id="countLabel">0</span> colours</div>
         </div>
 
-        <div class="row" style="margin-top:12px;">
+                <div class="row" style="margin-top:12px;">
           <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
           <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
           <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
         </div>
+        <div class="flex" style="margin-top:12px; gap:8px;">
+          <button class="btn" id="spectroConnectBtnMatch">Connect device</button>
+          <button class="btn" id="spectroScanTargetBtn">Scan into target</button>
+        </div>
+
 
         <div class="row2" style="margin-top:12px;">
           <div>
@@ -168,6 +173,12 @@
         </div>
       </div>
 
+      <div class="flex" style="margin-top:8px;">
+        <button class="btn" id="spectroConnectBtnCompare">Connect device</button>
+        <span class="mini">Use the spectro to scan directly into A/B.</span>
+      </div>
+
+
       <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
@@ -184,6 +195,9 @@
             <div><label for="Ab">A: b*</label><input id="Ab" type="number" step="0.01"></div>
           </div>
           <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
+          <div class="flex" style="margin-top:8px;">
+            <button class="btn" id="spectroScanCompareABtn">Scan into A</button>
+          </div>
         </div>
         <div>
           <div class="row2">
@@ -199,7 +213,8 @@
             <div><label for="Ba">B: a*</label><input id="Ba" type="number" step="0.01"></div>
             <div><label for="Bb">B: b*</label><input id="Bb" type="number" step="0.01"></div>
           </div>
-          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div><button class="btn" id="swapAB">Swap A↔B</button></div>
+          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
+          <div class="flex" style="margin-top:8px;"><button class="btn" id="spectroScanCompareBBtn">Scan into B</button></div>
         </div>
       </div>
 
@@ -302,6 +317,7 @@
             <thead>
               <tr>
                 <th>#</th>
+                <th>Swatch</th>
                 <th>Ink name</th>
                 <th>Conc</th>
                 <th>L*</th>
@@ -438,22 +454,6 @@ function updateTargetEcho(){
   if([L,a,b].some(v=>Number.isNaN(v))){ $('#targetEcho').textContent='Target: –'; $('#targetSwatch').style.background='#0000'; return; }
   $('#targetEcho').textContent=`Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
   const rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
-}
-
-function setSpectroConnectedUI(connected){
-  spectroConnected = !!connected;
-  const btn = $('#spectroConnectBtn');
-  const statusEl = $('#spectroStatus');
-  if (!btn) return;
-  if (connected){
-    btn.textContent = 'Connected';
-    btn.classList.add('btn-connected');
-    if (statusEl && !statusEl.textContent) statusEl.textContent = 'Connected.';
-  } else {
-    btn.textContent = 'Connect device';
-    btn.classList.remove('btn-connected');
-    if (statusEl && statusEl.textContent === 'Connected.') statusEl.textContent = '';
-  }
 }
 
 // Build formula index from DC_Formulas.json (Pantone library)
@@ -598,276 +598,6 @@ function parseCsvColours(text){
     out.push({name, L, a, b});
   }
   return out;
-}
-
-
-// ===== Spectro (Web Serial) integration & ink curve table =====
-function setSpectroConnectedUI(connected){
-  spectroConnected = !!connected;
-  const btn = $('#spectroConnectBtn');
-  const statusEl = $('#spectroStatus');
-  if (!btn) return;
-  if (connected){
-    btn.textContent = 'Connected';
-    btn.classList.add('btn-connected');
-    if (statusEl && !statusEl.textContent) statusEl.textContent = 'Connected.';
-  } else {
-    btn.textContent = 'Connect device';
-    btn.classList.remove('btn-connected');
-    if (statusEl && statusEl.textContent === 'Connected.') statusEl.textContent = '';
-  }
-}
-
-async function spectroEnsureSupported(){
-  if (!('serial' in navigator)){
-    throw new Error('Web Serial not supported. Use Chrome/Edge over HTTPS.');
-  }
-}
-
-async function spectroConnect(){
-  const statusEl = $('#spectroStatus');
-  try{
-    await spectroEnsureSupported();
-  }catch(err){
-    if (statusEl) statusEl.textContent = err.message || String(err);
-    throw err;
-  }
-
-  if (spectroPort && spectroPort.readable && spectroPort.writable){
-    setSpectroConnectedUI(true);
-    if (statusEl) statusEl.textContent = 'Already connected.';
-    return spectroPort;
-  }
-
-  try{
-    if (statusEl) statusEl.textContent = 'Select device…';
-    const port = await navigator.serial.requestPort();
-    await port.open({
-      baudRate: 115200,
-      dataBits: 8,
-      stopBits: 1,
-      parity: 'none',
-      flowControl: 'none',
-    });
-    spectroPort = port;
-    setSpectroConnectedUI(true);
-    if (statusEl) statusEl.textContent = 'Connected.';
-
-    if (navigator.serial && typeof navigator.serial.addEventListener === 'function'){
-      navigator.serial.addEventListener('disconnect', (event)=>{
-        if (event.target === spectroPort){
-          spectroPort = null;
-          setSpectroConnectedUI(false);
-          const s = $('#spectroStatus');
-          if (s) s.textContent = 'Device disconnected.';
-        }
-      });
-    }
-
-    return port;
-  }catch(err){
-    if (statusEl) statusEl.textContent = 'Connect failed: ' + (err.message || err);
-    setSpectroConnectedUI(false);
-    throw err;
-  }
-}
-
-async function spectroMeasureOnce(){
-  const statusEl = $('#spectroStatus');
-  if (!spectroPort){
-    await spectroConnect();
-  }
-  const port = spectroPort;
-  if (!port || !port.readable || !port.writable){
-    setSpectroConnectedUI(false);
-    throw new Error('Port is not open.');
-  }
-
-  if (statusEl) statusEl.textContent = 'Measuring…';
-
-  const encoder = new TextEncoder();
-  const writer = port.writable.getWriter();
-  await writer.write(encoder.encode('SA_001_measureData\r\n'));
-  writer.releaseLock();
-
-  const reader = port.readable.getReader();
-  const decoder = new TextDecoder();
-  let text = '';
-
-  try{
-    while (true){
-      const { value, done } = await reader.read();
-      if (done) break;
-      if (value){
-        text += decoder.decode(value, { stream:true });
-        if (text.includes('Data transmission has been successfully completed.')) break;
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  if (statusEl) statusEl.textContent = 'Measurement received.';
-  return text;
-}
-
-function parseSpectroMeasurement(text){
-  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  let L = null, a = null, b = null;
-  const spectrum = {};
-
-  for (let i=0;i<lines.length;i++){
-    const line = lines[i];
-    if (line.startsWith('CIE-Lab')){
-      if (i+1 < lines.length){
-        const parts = lines[i+1].split(/\s+/).filter(Boolean);
-        if (parts.length >= 3){
-          L = parseFloat(parts[0]);
-          a = parseFloat(parts[1]);
-          b = parseFloat(parts[2]);
-        }
-      }
-    } else if (line.startsWith('Spectral reflectance')){
-      for (let j=i+1;j<lines.length;j++){
-        const l2 = lines[j];
-        if (l2.startsWith('Data transmission')) break;
-        const m = l2.match(/^(\d{3})nm:(.+)%/);
-        if (m){
-          const wl = parseInt(m[1],10);
-          const val = parseFloat(m[2]);
-          if (!Number.isNaN(wl) && !Number.isNaN(val)){
-            spectrum[wl] = val;
-          }
-        }
-      }
-    }
-  }
-
-  return { L, a, b, spectrum, raw:text };
-}
-
-function addInkCurveRecord(inkName, concentration, meas){
-  const rec = {
-    inkName: String(inkName || '').trim(),
-    concentration: Number(concentration),
-    L: meas.L,
-    a: meas.a,
-    b: meas.b,
-    spectrum: meas.spectrum,
-    ts: Date.now(),
-  };
-  INK_CURVES.push(rec);
-  saveInkCurves();
-  renderInkCurvesTable();
-  return rec;
-}
-
-function renderInkCurvesTable(){
-  const tbody = $('#inkCurvesTbody');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  INK_CURVES.forEach((rec, idx)=>{
-    const tr = document.createElement('tr');
-
-    const tdIndex = document.createElement('td');
-    tdIndex.textContent = String(idx+1);
-    tr.appendChild(tdIndex);
-
-    const tdName = document.createElement('td');
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.value = rec.inkName || '';
-    nameInput.className = 'mono';
-    nameInput.addEventListener('change', ()=>{
-      rec.inkName = nameInput.value.trim();
-      saveInkCurves();
-    });
-    tdName.appendChild(nameInput);
-    tr.appendChild(tdName);
-
-    const tdConc = document.createElement('td');
-    const concInput = document.createElement('input');
-    concInput.type = 'number';
-    concInput.step = '0.01';
-    concInput.value = Number(rec.concentration || 0).toString();
-    concInput.className = 'mono';
-    concInput.addEventListener('change', ()=>{
-      const v = parseFloat(concInput.value);
-      rec.concentration = (v>0 ? v : 0);
-      saveInkCurves();
-    });
-    tdConc.appendChild(concInput);
-    tr.appendChild(tdConc);
-
-    const tdL = document.createElement('td');
-    tdL.textContent = Number.isFinite(rec.L) ? rec.L.toFixed(2) : '—';
-    tr.appendChild(tdL);
-
-    const tdA = document.createElement('td');
-    tdA.textContent = Number.isFinite(rec.a) ? rec.a.toFixed(2) : '—';
-    tr.appendChild(tdA);
-
-    const tdB = document.createElement('td');
-    tdB.textContent = Number.isFinite(rec.b) ? rec.b.toFixed(2) : '—';
-    tr.appendChild(tdB);
-
-    const tdActions = document.createElement('td');
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn';
-    delBtn.textContent = 'Delete';
-    delBtn.addEventListener('click', ()=>{
-      if (!confirm('Delete this measurement?')) return;
-      INK_CURVES.splice(idx,1);
-      saveInkCurves();
-      renderInkCurvesTable();
-    });
-    tdActions.appendChild(delBtn);
-    tr.appendChild(tdActions);
-
-    tbody.appendChild(tr);
-  });
-}
-
-function downloadInkCurvesCsv(){
-  if (!INK_CURVES.length){
-    alert('No measurements stored yet.');
-    return;
-  }
-  const wavelengths = [];
-  for (let wl=400; wl<=700; wl+=10) wavelengths.push(wl);
-
-  const header = ['InkName','Concentration','L','a','b'].concat(
-    wavelengths.map(wl=>'R'+wl)
-  );
-  const lines = [header.join(',')];
-
-  INK_CURVES.forEach(rec=>{
-    const row = [
-      rec.inkName,
-      rec.concentration,
-      rec.L,
-      rec.a,
-      rec.b,
-    ];
-    wavelengths.forEach(wl=>{
-      const v = rec.spectrum && Object.prototype.hasOwnProperty.call(rec.spectrum,wl)
-        ? rec.spectrum[wl]
-        : '';
-      row.push(v);
-    });
-    lines.push(row.join(','));
-  });
-
-  const blob = new Blob([lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'ink_curves.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 // ===== Matching / PMS / formulas =====
@@ -1041,6 +771,343 @@ async function saveCorrection(){
   }
 }
 
+
+// ===== Spectro (Web Serial) integration & ink curve table =====
+function setSpectroConnectedUI(connected){
+  spectroConnected = !!connected;
+  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare'];
+  ids.forEach(id=>{
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (connected){
+      btn.textContent = 'Connected';
+      btn.classList.add('btn-connected');
+    } else {
+      btn.textContent = 'Connect device';
+      btn.classList.remove('btn-connected');
+    }
+  });
+  const statusEl = document.getElementById('spectroStatus');
+  if (statusEl){
+    if (connected && !statusEl.textContent) statusEl.textContent = 'Connected.';
+    if (!connected && statusEl.textContent === 'Connected.') statusEl.textContent = '';
+  }
+}
+
+async function spectroEnsureSupported(){
+  if (!('serial' in navigator)){
+    throw new Error('Web Serial not supported. Use Chrome/Edge over HTTPS.');
+  }
+}
+
+async function spectroConnect(){
+  const statusEl = document.getElementById('spectroStatus');
+  try{
+    await spectroEnsureSupported();
+  }catch(err){
+    if (statusEl) statusEl.textContent = err.message || String(err);
+    throw err;
+  }
+
+  if (spectroPort && spectroPort.readable && spectroPort.writable){
+    setSpectroConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Already connected.';
+    return spectroPort;
+  }
+
+  try{
+    if (statusEl) statusEl.textContent = 'Select device…';
+    const port = await navigator.serial.requestPort();
+    await port.open({
+      baudRate: 115200,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'none',
+      flowControl: 'none',
+    });
+    spectroPort = port;
+    setSpectroConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Connected.';
+
+    if (navigator.serial && typeof navigator.serial.addEventListener === 'function'){
+      navigator.serial.addEventListener('disconnect', (event)=>{
+        if (event.target === spectroPort){
+          spectroPort = null;
+          setSpectroConnectedUI(false);
+          const s = document.getElementById('spectroStatus');
+          if (s) s.textContent = 'Device disconnected.';
+        }
+      });
+    }
+
+    return port;
+  }catch(err){
+    if (statusEl) statusEl.textContent = 'Connect failed: ' + (err.message || err);
+    setSpectroConnectedUI(false);
+    throw err;
+  }
+}
+
+async function spectroMeasureOnce(){
+  const statusEl = document.getElementById('spectroStatus');
+  if (!spectroPort){
+    await spectroConnect();
+  }
+  const port = spectroPort;
+  if (!port || !port.readable || !port.writable){
+    setSpectroConnectedUI(false);
+    throw new Error('Port is not open.');
+  }
+
+  if (statusEl) statusEl.textContent = 'Measuring…';
+
+  const encoder = new TextEncoder();
+  const writer = port.writable.getWriter();
+  await writer.write(encoder.encode('SA_001_measureData\r\n'));
+  writer.releaseLock();
+
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
+  let textResp = '';
+
+  try{
+    while (true){
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value){
+        textResp += decoder.decode(value, { stream:true });
+        if (textResp.includes('Data transmission has been successfully completed.')) break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (statusEl) statusEl.textContent = 'Measurement received.';
+  return textResp;
+}
+
+function parseSpectroMeasurement(textResp){
+  const lines = textResp.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let L = null, a = null, b = null;
+  const spectrum = {};
+
+  for (let i=0;i<lines.length;i++){
+    const line = lines[i];
+    if (line.startsWith('CIE-Lab')){
+      if (i+1 < lines.length){
+        const parts = lines[i+1].split(/\s+/).filter(Boolean);
+        if (parts.length >= 3){
+          L = parseFloat(parts[0]);
+          a = parseFloat(parts[1]);
+          b = parseFloat(parts[2]);
+        }
+      }
+    } else if (line.startsWith('Spectral reflectance')){
+      for (let j=i+1;j<lines.length;j++){
+        const l2 = lines[j];
+        if (l2.startsWith('Data transmission')) break;
+        const m = l2.match(/^(\d{3})nm:(.+)%/);
+        if (m){
+          const wl = parseInt(m[1],10);
+          const val = parseFloat(m[2]);
+          if (!Number.isNaN(wl) && !Number.isNaN(val)){
+            spectrum[wl] = val;
+          }
+        }
+      }
+    }
+  }
+
+  return { L, a, b, spectrum, raw:textResp };
+}
+
+// Lab -> RGB for swatches (rough D65 conversion)
+function labToRgbCssForSwatch(L, a, b){
+  const refX = 95.047;
+  const refY = 100.0;
+  const refZ = 108.883;
+
+  let y = (L + 16) / 116;
+  let x = a / 500 + y;
+  let z = y - b / 200;
+
+  const eps = 0.008856;
+  const kappa = 903.3;
+
+  function fInv(t){
+    const t3 = t*t*t;
+    return t3 > eps ? t3 : (116 * t - 16) / kappa;
+  }
+
+  x = refX * fInv(x);
+  y = refY * fInv(y);
+  z = refZ * fInv(z);
+
+  x /= 100;
+  y /= 100;
+  z /= 100;
+
+  let r =  3.2406 * x - 1.5372 * y - 0.4986 * z;
+  let g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
+  let b2 = 0.0557 * x - 0.2040 * y + 1.0570 * z;
+
+  function gammaCorrect(c){
+    if (c <= 0.0031308) return 12.92 * c;
+    return 1.055 * Math.pow(c, 1/2.4) - 0.055;
+  }
+
+  function clamp01(v){ return Math.min(1, Math.max(0, v)); }
+
+  r = gammaCorrect(r);
+  g = gammaCorrect(g);
+  b2 = gammaCorrect(b2);
+
+  r = Math.round(clamp01(r) * 255);
+  g = Math.round(clamp01(g) * 255);
+  b2 = Math.round(clamp01(b2) * 255);
+
+  return `rgb(${r}, ${g}, ${b2})`;
+}
+
+function addInkCurveRecord(inkName, concentration, meas){
+  const rec = {
+    inkName: String(inkName || '').trim(),
+    concentration: Number(concentration),
+    L: meas.L,
+    a: meas.a,
+    b: meas.b,
+    spectrum: meas.spectrum,
+    ts: Date.now(),
+  };
+  INK_CURVES.push(rec);
+  saveInkCurves();
+  renderInkCurvesTable();
+  return rec;
+}
+
+function renderInkCurvesTable(){
+  const tbody = document.getElementById('inkCurvesTbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  INK_CURVES.forEach((rec, idx)=>{
+    const tr = document.createElement('tr');
+
+    const tdIndex = document.createElement('td');
+    tdIndex.textContent = String(idx+1);
+    tr.appendChild(tdIndex);
+
+    const tdSwatch = document.createElement('td');
+    const swatch = document.createElement('div');
+    swatch.style.width = '32px';
+    swatch.style.height = '16px';
+    swatch.style.borderRadius = '4px';
+    swatch.style.border = '1px solid #1f2933';
+    if (Number.isFinite(rec.L) && Number.isFinite(rec.a) && Number.isFinite(rec.b)){
+      swatch.style.backgroundColor = labToRgbCssForSwatch(rec.L, rec.a, rec.b);
+    } else {
+      swatch.style.backgroundColor = 'transparent';
+    }
+    tdSwatch.appendChild(swatch);
+    tr.appendChild(tdSwatch);
+
+    const tdName = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = rec.inkName || '';
+    nameInput.className = 'mono';
+    nameInput.addEventListener('change', ()=>{
+      rec.inkName = nameInput.value.trim();
+      saveInkCurves();
+    });
+    tdName.appendChild(nameInput);
+    tr.appendChild(tdName);
+
+    const tdConc = document.createElement('td');
+    const concInput = document.createElement('input');
+    concInput.type = 'number';
+    concInput.step = '0.01';
+    concInput.value = Number(rec.concentration || 0).toString();
+    concInput.className = 'mono';
+    concInput.addEventListener('change', ()=>{
+      const v = parseFloat(concInput.value);
+      rec.concentration = (v>0 ? v : 0);
+      saveInkCurves();
+    });
+    tdConc.appendChild(concInput);
+    tr.appendChild(tdConc);
+
+    const tdL = document.createElement('td');
+    tdL.textContent = Number.isFinite(rec.L) ? rec.L.toFixed(2) : '—';
+    tr.appendChild(tdL);
+
+    const tdA = document.createElement('td');
+    tdA.textContent = Number.isFinite(rec.a) ? rec.a.toFixed(2) : '—';
+    tr.appendChild(tdA);
+
+    const tdB = document.createElement('td');
+    tdB.textContent = Number.isFinite(rec.b) ? rec.b.toFixed(2) : '—';
+    tr.appendChild(tdB);
+
+    const tdActions = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', ()=>{
+      if (!confirm('Delete this measurement?')) return;
+      INK_CURVES.splice(idx,1);
+      saveInkCurves();
+      renderInkCurvesTable();
+    });
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function downloadInkCurvesCsv(){
+  if (!INK_CURVES.length){
+    alert('No measurements stored yet.');
+    return;
+  }
+  const wavelengths = [];
+  for (let wl=400; wl<=700; wl+=10) wavelengths.push(wl);
+
+  const header = ['InkName','Concentration','L','a','b'].concat(
+    wavelengths.map(wl=>'R'+wl)
+  );
+  const lines = [header.join(',')];
+
+  INK_CURVES.forEach(rec=>{
+    const row = [
+      rec.inkName,
+      rec.concentration,
+      rec.L,
+      rec.a,
+      rec.b,
+    ];
+    wavelengths.forEach(wl=>{
+      const v = rec.spectrum && Object.prototype.hasOwnProperty.call(rec.spectrum,wl)
+        ? rec.spectrum[wl]
+        : '';
+      row.push(v);
+    });
+    lines.push(row.join(','));
+  });
+
+  const blob = new Blob([lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ink_curves.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // ===== Compare tab logic + 3D viz =====
 function setSwatchFromFields(prefix){
   const L=parseFloat($('#'+prefix+'L').value), a=parseFloat($('#'+prefix+'a').value), b=parseFloat($('#'+prefix+'b').value);
@@ -1066,7 +1133,7 @@ document.addEventListener('input',(e)=>{
     if (/^(BL|Ba|Bb)$/.test(id)) { setSwatchFromFields('B'); computeCompareDE(); }
   }
 });
-$('#swapAB').addEventListener('click', ()=>{
+const swapABBtn = $('#swapAB'); if (swapABBtn) swapABBtn.addEventListener('click', ()=>{
   const AL=$('#AL').value, Aa=$('#Aa').value, Ab=$('#Ab').value;
   $('#AL').value=$('#BL').value; $('#Aa').value=$('#Ba').value; $('#Ab').value=$('#Bb').value;
   $('#BL').value=AL; $('#Ba').value=Aa; $('#Bb').value=Ab; setSwatchFromFields('A'); setSwatchFromFields('B'); computeCompareDE();
@@ -1175,6 +1242,154 @@ function drawLabScene(){
 }
 let rafId=null; function requestLabDraw(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
 
+
+// Spectro UI wiring (all tabs)
+const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
+const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch');
+const spectroConnectBtnCompare = document.getElementById('spectroConnectBtnCompare');
+const spectroMeasureBtn = document.getElementById('spectroMeasureBtn');
+const spectroExportBtn = document.getElementById('spectroExportBtn');
+const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
+const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
+const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
+
+[spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
+  if (!btn) return;
+  btn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+    }catch(_){}
+  });
+});
+
+if (spectroMeasureBtn){
+  spectroMeasureBtn.addEventListener('click', async ()=>{
+    const inkName = (document.getElementById('spectroInkName').value || '').trim();
+    const concStr = (document.getElementById('spectroConcentration').value || '').trim();
+    if (!inkName){
+      alert('Please enter an ink name.');
+      return;
+    }
+    const concentration = parseFloat(concStr);
+    if (!(concentration > 0)){
+      alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
+      return;
+    }
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const rec = addInkCurveRecord(inkName, concentration, meas);
+      const LInput = document.getElementById('L');
+      const aInput = document.getElementById('a');
+      const bInput = document.getElementById('b');
+      if (LInput && aInput && bInput){
+        LInput.value = rec.L;
+        aInput.value = rec.a;
+        bInput.value = rec.b;
+        updateTargetEcho();
+      }
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = `Saved: ${rec.inkName} @ ${rec.concentration} (${INK_CURVES.length} total)`;
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroExportBtn){
+  spectroExportBtn.addEventListener('click', downloadInkCurvesCsv);
+}
+
+if (spectroScanTargetBtn){
+  spectroScanTargetBtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const LInput = document.getElementById('L');
+      const aInput = document.getElementById('a');
+      const bInput = document.getElementById('b');
+      if (LInput && aInput && bInput){
+        LInput.value = meas.L;
+        aInput.value = meas.a;
+        bInput.value = meas.b;
+        updateTargetEcho();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroScanCompareABtn){
+  spectroScanCompareABtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const AL = document.getElementById('AL');
+      const Aa = document.getElementById('Aa');
+      const Ab = document.getElementById('Ab');
+      if (AL && Aa && Ab){
+        AL.value = meas.L;
+        Aa.value = meas.a;
+        Ab.value = meas.b;
+        setSwatchFromFields('A');
+        computeCompareDE();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroScanCompareBBtn){
+  spectroScanCompareBBtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const BL = document.getElementById('BL');
+      const Ba = document.getElementById('Ba');
+      const Bb = document.getElementById('Bb');
+      if (BL && Ba && Bb){
+        BL.value = meas.L;
+        Ba.value = meas.a;
+        Bb.value = meas.b;
+        setSwatchFromFields('B');
+        computeCompareDE();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
 // Compare tab datalists based on active library
 function refreshCompareDatalists(){
   const opts = COLOURS.map(c=>{
@@ -1270,58 +1485,6 @@ $('#libTemplateBtn').addEventListener('click', ()=>{
   a.remove();
   URL.revokeObjectURL(url);
 });
-// Spectro UI wiring
-const spectroConnectBtn = $('#spectroConnectBtn');
-const spectroMeasureBtn = $('#spectroMeasureBtn');
-const spectroExportBtn = $('#spectroExportBtn');
-
-if (spectroConnectBtn){
-  spectroConnectBtn.addEventListener('click', async ()=>{
-    try{
-      await spectroConnect();
-    }catch(_){}
-  });
-}
-if (spectroMeasureBtn){
-  spectroMeasureBtn.addEventListener('click', async ()=>{
-    const inkName = ($('#spectroInkName').value || '').trim();
-    const concStr = ($('#spectroConcentration').value || '').trim();
-    if (!inkName){
-      alert('Please enter an ink name.');
-      return;
-    }
-    const concentration = parseFloat(concStr);
-    if (!(concentration > 0)){
-      alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
-      return;
-    }
-    try{
-      await spectroConnect();
-      const raw = await spectroMeasureOnce();
-      const meas = parseSpectroMeasurement(raw);
-      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
-        alert('Got a response but could not parse L*a*b*. Check console.');
-        console.log('Raw spectro text:', raw);
-        return;
-      }
-      const rec = addInkCurveRecord(inkName, concentration, meas);
-      $('#L').value = rec.L;
-      $('#a').value = rec.a;
-      $('#b').value = rec.b;
-      updateTargetEcho();
-      const s = $('#spectroStatus');
-      if (s) s.textContent = `Saved: ${rec.inkName} @ ${rec.concentration} (${INK_CURVES.length} total)`;
-    }catch(err){
-      const s = $('#spectroStatus');
-      if (s) s.textContent = 'Error: ' + (err.message || err);
-    }
-  });
-}
-if (spectroExportBtn){
-  spectroExportBtn.addEventListener('click', downloadInkCurvesCsv);
-}
-
-
 
 // Compare tab quick-load
 $('#cmpALoad').addEventListener('click', ()=>{
