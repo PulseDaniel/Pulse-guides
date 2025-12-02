@@ -51,7 +51,7 @@
   .rem-btn{ width:32px; height:38px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer; }
   .add-row{ display:grid; grid-template-columns:1fr 120px auto; gap:8px; margin-top:8px; }
   .footer-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
-  .note{ font-size:.85rem; color:#9aa4b2; }
+  .note{ font-size:.85rem; color:#9aa2b3; }
   .mini{ font-size:.8rem; color:#9aa4b2; }
   .warn{ color:#fca5a5; }
   .ok{ color:#86efac; }
@@ -71,7 +71,7 @@
 <body>
 
   <div class="tabs" role="tablist" aria-label="Modes">
-    <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match & Predict</button>
+    <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnCompare" role="tab" aria-selected="false" aria-controls="tab-compare">Compare Colours</button>
     <button class="tabbtn" id="tabBtnLibraries" role="tab" aria-selected="false" aria-controls="tab-libraries">Colour Sets</button>
   </div>
@@ -282,6 +282,7 @@
 
       <div class="formula-box" id="spectroBox" style="margin-top:12px;">
         <h2>Device connection &amp; capture</h2>
+
         <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="spectroInkName">Ink name</label>
@@ -293,8 +294,7 @@
           </div>
         </div>
 
-        <!-- New metadata controls -->
-        <div class="row" style="margin-bottom:8px;">
+        <div class="row2" style="margin-bottom:8px;">
           <div>
             <label for="spectroBacking">Backing</label>
             <select id="spectroBacking">
@@ -303,18 +303,10 @@
             </select>
           </div>
           <div>
-            <label for="spectroGeometry">Geometry</label>
-            <select id="spectroGeometry">
-              <option value="SCI" selected>SCI (include gloss)</option>
-              <option value="SCE">SCE (exclude gloss)</option>
-            </select>
-          </div>
-          <div>
-            <label for="spectroAperture">Aperture</label>
-            <select id="spectroAperture">
-              <option value="8mm" selected>8 mm</option>
-              <option value="4mm">4 mm</option>
-              <option value="15mm">15 mm</option>
+            <label for="spectroAngle">Observer angle</label>
+            <select id="spectroAngle">
+              <option value="2" selected>2°</option>
+              <option value="10">10°</option>
             </select>
           </div>
         </div>
@@ -325,14 +317,29 @@
             <select id="spectroIlluminant">
               <option value="D50" selected>D50</option>
               <option value="D65">D65</option>
+              <option value="A">A</option>
             </select>
           </div>
           <div>
-            <label for="spectroObserver">Observer</label>
-            <select id="spectroObserver">
-              <option value="2" selected>2°</option>
-              <option value="10">10°</option>
+            <label for="spectroAperture">Aperture</label>
+            <select id="spectroAperture">
+              <option value="8mm" selected>8 mm</option>
+              <option value="4mm">4 mm</option>
             </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroGeometry">Geometry</label>
+            <select id="spectroGeometry">
+              <option value="SCI" selected>SCI</option>
+              <option value="SCE">SCE</option>
+            </select>
+          </div>
+          <div>
+            <label>Timestamp</label>
+            <input id="spectroTimestampPreview" type="text" readonly class="mono" placeholder="Set when measured">
           </div>
         </div>
 
@@ -350,8 +357,8 @@
       <div class="formula-box" style="margin-top:12px;">
         <h2>Stored ink curves</h2>
         <p class="mini" style="margin-bottom:6px;">
-          These rows are stored locally in this browser (localStorage). You can edit the ink name and concentration,
-          or delete rows. The CSV export uses these values together with the full spectral curve captured from the device.
+          These rows are stored locally in this browser (localStorage). You can edit the ink name, concentration and
+          metadata, or delete rows. The CSV export uses these values together with the full spectral curve.
         </p>
         <div style="max-height:260px; overflow:auto; border:1px solid #1f2933; border-radius:10px;">
           <table>
@@ -362,14 +369,14 @@
                 <th>Ink name</th>
                 <th>Conc</th>
                 <th>Backing</th>
-                <th>Geom</th>
-                <th>Ill</th>
-                <th>Obs</th>
+                <th>Angle</th>
+                <th>Illum</th>
                 <th>Aperture</th>
+                <th>Geom</th>
                 <th>L*</th>
                 <th>a*</th>
                 <th>b*</th>
-                <th>Measured</th>
+                <th>Timestamp</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -426,7 +433,8 @@ function labToXyz(L,a,b){
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
 function labToSrgb(L,a,b){
-  const {X,Y,Z}=labToXyz(L,a,b);
+  const xyz = labToXyz(L,a,b);
+  const X = xyz.X, Y = xyz.Y, Z = xyz.Z;
   let r =  3.2406*X -1.5372*Y -0.4986*Z;
   let g = -0.9689*X +1.8758*Y +0.0415*Z;
   let b2=  0.0557*X -0.2040*Y +1.0570*Z;
@@ -475,7 +483,7 @@ function loadInkCurves(){
     if (!raw){ INK_CURVES = []; return; }
     const arr = JSON.parse(raw);
     INK_CURVES = Array.isArray(arr) ? arr : [];
-  }catch{
+  }catch(e){
     INK_CURVES = [];
   }
 }
@@ -483,7 +491,7 @@ function loadInkCurves(){
 function saveInkCurves(){
   try{
     localStorage.setItem(INK_CURVES_KEY, JSON.stringify(INK_CURVES));
-  }catch{}
+  }catch(e){}
 }
 
 const LIB_KEY = 'ink_user_libraries_v1';
@@ -494,12 +502,21 @@ let activeLibraryId = LIB_BASE_ID;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
-function extractPmsNumber(name){ if(!name) return null; const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/); return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null; }
+function extractPmsNumber(name){
+  if(!name) return null;
+  const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
+}
 function updateTargetEcho(){
   const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(v=>Number.isNaN(v))){ $('#targetEcho').textContent='Target: –'; $('#targetSwatch').style.background='#0000'; return; }
+  if([L,a,b].some(v=>Number.isNaN(v))){
+    $('#targetEcho').textContent='Target: –';
+    $('#targetSwatch').style.background='#0000';
+    return;
+  }
   $('#targetEcho').textContent=`Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
-  const rgb=labToSrgb(L,a,b); $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  const rgb=labToSrgb(L,a,b);
+  $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
 }
 
 // Build formula index from DC_Formulas.json (Pantone library)
@@ -514,16 +531,34 @@ function buildFormulaIndex(){
   }
   const byColour=new Map();
   rows.forEach(r=>{
-    const cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name; if(!cname) return;
-    const items=[]; for (let i=1;i<=12;i++){ const ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i]; if(!ink) continue; const pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||''; items.push({ink,percent:pct}); }
-    const arr=byColour.get(cname)||[]; arr.push(...items); byColour.set(cname,arr); FORMULAS_NORM[normaliseName(cname)]=arr;
+    const cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name;
+    if(!cname) return;
+    const items=[];
+    for (let i=1;i<=12;i++){
+      const ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i];
+      if(!ink) continue;
+      const pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||'';
+      items.push({ink,percent:pct});
+    }
+    const arr=byColour.get(cname)||[];
+    arr.push(...items);
+    byColour.set(cname,arr);
+    FORMULAS_NORM[normaliseName(cname)]=arr;
   });
   (BASE_COLOURS||[]).forEach(c=>{
-    const name=c.name||c.Colour||c.color||'', norm=normaliseName(name);
-    if (byColour.has(name)) { COLOUR_TO_FORMULA[name]=norm; return; }
-    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; }
+    const name=c.name||c.Colour||c.color||'';
+    const norm=normaliseName(name);
+    if (byColour.has(name)){ COLOUR_TO_FORMULA[name]=norm; return; }
+    if (FORMULAS_NORM[norm]){ COLOUR_TO_FORMULA[name]=norm; return; }
     const p=extractPmsNumber(name);
-    if (p){ for (const key of byColour.keys()){ if ((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; } }
+    if (p){
+      for (const key of byColour.keys()){
+        if ((extractPmsNumber(key)||'')===p){
+          COLOUR_TO_FORMULA[name]=normaliseName(key);
+          break;
+        }
+      }
+    }
   });
 }
 
@@ -532,7 +567,7 @@ function saveLibraries(){
   try{
     const plain = userLibraries.map(l=>({id:l.id,name:l.name,colours:l.colours}));
     localStorage.setItem(LIB_KEY, JSON.stringify(plain));
-  }catch{}
+  }catch(e){}
 }
 function loadLibraries(){
   try{
@@ -541,20 +576,22 @@ function loadLibraries(){
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) { userLibraries = []; return; }
     userLibraries = arr.map(l=>({
-      id: String(l.id || crypto.randomUUID()),
+      id: String(l.id || (crypto && crypto.randomUUID ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2)))),
       name: String(l.name || 'Unnamed'),
       colours: Array.isArray(l.colours) ? l.colours.map(co=>({
         name: String(co.name || co.Colour || co.color || 'Untitled'),
         L: Number(co.L ?? co.Lstar ?? co['L*'] ?? 0),
         a: Number(co.a ?? co.astar ?? co['a*'] ?? 0),
-        b: Number(co.b ?? co.bstar ?? co['b*'] ?? 0),
+        b: Number(co.b ?? co.bstar ?? co['b*'] ?? 0)
       })) : []
     }));
-  }catch{ userLibraries = []; }
+  }catch(e){
+    userLibraries = [];
+  }
 }
 function libraryOptions(){
   const opts = [
-    {id: LIB_BASE_ID, label: 'Pantone (base)'},
+    {id: LIB_BASE_ID, label: 'Pantone (base)'}
   ];
   userLibraries.forEach(l => opts.push({id: l.id, label: l.name}));
   if (userLibraries.length) opts.push({id: LIB_ALL_ID, label: 'All libraries (combined)'});
@@ -568,12 +605,15 @@ function refreshLibrarySelects(){
     sel.innerHTML = '';
     opts.forEach(o=>{
       const opt = document.createElement('option');
-      opt.value = o.id; opt.textContent = o.label; sel.appendChild(opt);
+      opt.value = o.id;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
     });
     if (!opts.find(o=>o.id === activeLibraryId)) activeLibraryId = LIB_BASE_ID;
     sel.value = activeLibraryId;
   };
-  build(sel1); build(sel2);
+  build(sel1);
+  build(sel2);
   const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone (base)';
   $('#activeLibLabel').textContent = activeLabel;
   $('#cmpLibLabel').textContent = activeLabel;
@@ -639,7 +679,9 @@ function parseCsvColours(text){
     const parts = lines[i].split(',').map(x=>x.trim());
     if (parts.length <= Math.max(idxName,idxL,idxA,idxB)) continue;
     const name = parts[idxName] || `Row ${i+1}`;
-    const L = parseFloat(parts[idxL]), a = parseFloat(parts[idxA]), b = parseFloat(parts[idxB]);
+    const L = parseFloat(parts[idxL]);
+    const a = parseFloat(parts[idxA]);
+    const b = parseFloat(parts[idxB]);
     if ([L,a,b].some(v=>Number.isNaN(v))) continue;
     out.push({name, L, a, b});
   }
@@ -647,73 +689,177 @@ function parseCsvColours(text){
 }
 
 // ===== Matching / PMS / formulas =====
-function getTargetLab(){ const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value); if([L,a,b].some(v=>Number.isNaN(v))) return null; return {L,a,b}; }
+function getTargetLab(){
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))) return null;
+  return {L,a,b};
+}
 
 function findClosest(){
-  const target=getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-  const rows=COLOURS.map(c=>({raw:c,name:c.name||c.Colour||c.color||'—',L:c.L,a:c.a,b:c.b,de:deltaE2000({L:c.L,a:c.a,b:c.b},target)})).sort((a,b)=>a.de-b.de).slice(0,8);
-  const tbody=$('#resultsTbody'); tbody.innerHTML='';
+  const target=getTargetLab();
+  if(!target){
+    alert('Enter a valid colour first.');
+    return;
+  }
+  const rows=COLOURS.map(c=>({
+    raw:c,
+    name:c.name||c.Colour||c.color||'—',
+    L:c.L,
+    a:c.a,
+    b:c.b,
+    de:deltaE2000({L:c.L,a:c.a,b:c.b},target)
+  })).sort((a,b)=>a.de-b.de).slice(0,8);
+  const tbody=$('#resultsTbody');
+  tbody.innerHTML='';
   rows.forEach(r=>{
-    const tr=document.createElement('tr'); tr.className='result-row';
+    const tr=document.createElement('tr');
+    tr.className='result-row';
     const rgb=labToSrgb(r.L,r.a,r.b);
     tr.innerHTML=`<td>${r.name}</td>
       <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
       <td>${r.L.toFixed(2)}</td><td>${r.a.toFixed(2)}</td><td>${r.b.toFixed(2)}</td>
       <td>${r.de.toFixed(2)}</td>`;
     tr.addEventListener('click',()=>{
-      $('#L').value=r.L; $('#a').value=r.a; $('#b').value=r.b; updateTargetEcho(); showFormulaFor(r.name); _lastContextName = r.name;
+      $('#L').value=r.L;
+      $('#a').value=r.a;
+      $('#b').value=r.b;
+      updateTargetEcho();
+      showFormulaFor(r.name);
+      _lastContextName = r.name;
     });
     tbody.appendChild(tr);
   });
 }
 function showFormulaFor(colourName){
-  const panel=$('#formulaPanel'); let list=null; const bound=COLOUR_TO_FORMULA[colourName];
-  if(bound) list=FORMULAS_NORM[bound]; if(!list) list=FORMULAS_NORM[normaliseName(colourName)];
-  if(!list){ const want=extractPmsNumber(colourName); if(want){ for (const key in FORMULAS_NORM){ if ((extractPmsNumber(key)||'')===want){ list=FORMULAS_NORM[key]; break; } } } }
-  if(!list||!list.length){ panel.style.display='none'; return; }
+  const panel=$('#formulaPanel');
+  let list=null;
+  const bound=COLOUR_TO_FORMULA[colourName];
+  if(bound) list=FORMULAS_NORM[bound];
+  if(!list) list=FORMULAS_NORM[normaliseName(colourName)];
+  if(!list){
+    const want=extractPmsNumber(colourName);
+    if(want){
+      for (const key in FORMULAS_NORM){
+        if ((extractPmsNumber(key)||'')===want){
+          list=FORMULAS_NORM[key];
+          break;
+        }
+      }
+    }
+  }
+  if(!list||!list.length){
+    panel.style.display='none';
+    return;
+  }
   let html=`<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
-  list.forEach(item=>{ const name=item.ink||item.Ink||'Ink'; const pct=item.percent!==''?(item.percent+'%'):''; html+=`<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`; });
-  html+='</div>'; panel.innerHTML=html; panel.style.display='block';
+  list.forEach(item=>{
+    const name=item.ink||item.Ink||'Ink';
+    const pct=item.percent!==''?(item.percent+'%'):'';
+    html+=`<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`;
+  });
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.style.display='block';
 }
 function findByPms(){
-  const qRaw=($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
-  const q=qRaw.replace(/^PANTONE\s*/,''); const hits=COLOURS.filter(c=>{ const p=extractPmsNumber(c.name||c.Colour||c.color||''); return p && p.includes(q); });
-  const tbody=$('#resultsTbody'); tbody.innerHTML=''; if(!hits.length){ alert('No PMS match found'); return; }
+  const qRaw=($('#pms').value||'').trim().toUpperCase();
+  if(!qRaw){
+    alert('Enter a PMS number');
+    return;
+  }
+  const q=qRaw.replace(/^PANTONE\s*/,'');
+  const hits=COLOURS.filter(c=>{
+    const p=extractPmsNumber(c.name||c.Colour||c.color||'');
+    return p && p.includes(q);
+  });
+  const tbody=$('#resultsTbody');
+  tbody.innerHTML='';
+  if(!hits.length){
+    alert('No PMS match found');
+    return;
+  }
   hits.slice(0,8).forEach(c=>{
-    const rgb=labToSrgb(c.L,c.a,c.b); const tr=document.createElement('tr'); tr.className='result-row';
+    const rgb=labToSrgb(c.L,c.a,c.b);
+    const tr=document.createElement('tr');
+    tr.className='result-row';
     tr.innerHTML=`<td>${(c.name||c.Colour||c.color||'—')}</td>
       <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
       <td>${(+c.L).toFixed(2)}</td><td>${(+c.a).toFixed(2)}</td><td>${(+c.b).toFixed(2)}</td><td>—</td>`;
-    tr.addEventListener('click',()=>{ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); _lastContextName = c.name||c.Colour||c.color||''; });
+    tr.addEventListener('click',()=>{
+      $('#L').value=c.L;
+      $('#a').value=c.a;
+      $('#b').value=c.b;
+      updateTargetEcho();
+      showFormulaFor(c.name||c.Colour||c.color||'');
+      _lastContextName = c.name||c.Colour||c.color||'';
+    });
     tbody.appendChild(tr);
   });
-  const c0=hits[0]; $('#L').value=c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho(); _lastContextName = c0.name||c0.Colour||c0.color||'';
+  const c0=hits[0];
+  $('#L').value=c0.L;
+  $('#a').value=c0.a;
+  $('#b').value=c0.b;
+  updateTargetEcho();
+  _lastContextName = c0.name||c0.Colour||c0.color||'';
 }
 
 // Predictor / groups
 async function loadGroups(){
   try{
-    const r=await fetch(API_BASE+'/groups'); const j=await r.json();
-    const sel=$('#groupSelect'); (j.groups||[]).forEach(g=>{ const opt=document.createElement('option'); opt.value=g; opt.textContent=g; sel.appendChild(opt); });
-  }catch{}
+    const r=await fetch(API_BASE+'/groups');
+    const j=await r.json();
+    const sel=$('#groupSelect');
+    (j.groups||[]).forEach(g=>{
+      const opt=document.createElement('option');
+      opt.value=g;
+      opt.textContent=g;
+      sel.appendChild(opt);
+    });
+  }catch(e){}
 }
 async function loadInks(){
-  try{ const r=await fetch(API_BASE+'/inks'); const j=await r.json(); _allInks=(j.inks||[]).slice().sort(); }catch{ _allInks=[]; }
+  try{
+    const r=await fetch(API_BASE+'/inks');
+    const j=await r.json();
+    _allInks=(j.inks||[]).slice().sort();
+  }catch(e){
+    _allInks=[];
+  }
 }
-function formulaPairs(formula){ return Object.entries(formula||{}).filter(([_,v])=>+v>0).sort((a,b)=>b[1]-a[1]); }
+function formulaPairs(formula){
+  return Object.entries(formula||{})
+    .filter(([_,v])=>+v>0)
+    .sort((a,b)=>b[1]-a[1]);
+}
 
 async function suggestFormula(){
-  const btn=$('#suggestBtn'), msg=$('#predictMsg'), box=$('#suggestedFormula');
-  const t=getTargetLab(); if(!t){ alert('Enter a valid L*a*b* first.'); return; }
+  const btn=$('#suggestBtn');
+  const msg=$('#predictMsg');
+  const box=$('#suggestedFormula');
+  const t=getTargetLab();
+  if(!t){
+    alert('Enter a valid L*a*b* first.');
+    return;
+  }
 
-  btn.disabled=true; msg.textContent='Predicting…';
-  box.style.display='none'; box.innerHTML='';
+  btn.disabled=true;
+  msg.textContent='Predicting…';
+  box.style.display='none';
+  box.innerHTML='';
   $('#editRow').style.display='none';
 
   try{
-    const group=($('#groupSelect').value||''); const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true}; if(group) body.group=group;
-    const res=await fetch(API_BASE+'/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
+    const group=($('#groupSelect').value||'');
+    const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true};
+    if(group) body.group=group;
+    const res=await fetch(API_BASE+'/predict',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
     const data=await res.json();
     const formula = (data && typeof data.formula === 'object') ? data.formula : {};
     const pairs=formulaPairs(formula);
@@ -722,13 +868,16 @@ async function suggestFormula(){
     if (pairs.length === 0) {
       html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
     } else {
-      for (const [ink,pct] of pairs) html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+      for (const [ink,pct] of pairs){
+        html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+      }
     }
     html+='</div>';
-    box.innerHTML=html; box.style.display='block'; msg.textContent='';
+    box.innerHTML=html;
+    box.style.display='block';
+    msg.textContent='';
 
     _lastSuggestion={ target:t, formula, group: (group||null) };
-
     $('#editRow').style.display='flex';
   }catch(err){
     msg.textContent=String(err.message||err);
@@ -743,17 +892,26 @@ const modal = $('#editModal');
 const editList = $('#editList');
 let working = []; // [{ink, pct}]
 function contextLine(){
-  const t = _lastSuggestion?.target;
+  const t = _lastSuggestion && _lastSuggestion.target;
   if (!t) return '';
   const name = _lastContextName ? ` · ${_lastContextName}` : '';
   return `Target: L=${t.L.toFixed(2)} a=${t.a.toFixed(2)} b=${t.b.toFixed(2)}${name}`;
 }
 function openEdit(){
-  if(!_lastSuggestion || !(_lastSuggestion.formula)) { alert('No suggestion to edit yet.'); return; }
+  if(!_lastSuggestion || !(_lastSuggestion.formula)) {
+    alert('No suggestion to edit yet.');
+    return;
+  }
   working = formulaPairs(_lastSuggestion.formula).map(([ink,p])=>({ink,pct:+(+p).toFixed(2)}));
   renderEditList();
-  const sel = $('#addInkSel'); sel.innerHTML = '';
-  _allInks.forEach(name=>{ const opt=document.createElement('option'); opt.value=name; opt.textContent=name; sel.appendChild(opt); });
+  const sel = $('#addInkSel');
+  sel.innerHTML = '';
+  _allInks.forEach(name=>{
+    const opt=document.createElement('option');
+    opt.value=name;
+    opt.textContent=name;
+    sel.appendChild(opt);
+  });
   $('#addPct').value = '';
   $('#corrNote').value = '';
   $('#editContext').textContent = contextLine();
@@ -764,11 +922,34 @@ function closeEdit(){ modal.style.display='none'; }
 function renderEditList(){
   editList.innerHTML = '';
   working.forEach((row, idx)=>{
-    const wrap = document.createElement('div'); wrap.className='edit-row';
-    const nameInput = document.createElement('input'); nameInput.value=row.ink; nameInput.readOnly=true; nameInput.className='mono';
-    const pctInput = document.createElement('input'); pctInput.type='number'; pctInput.step='0.01'; pctInput.value=Number(row.pct).toFixed(2); pctInput.className='pct-input mono'; pctInput.addEventListener('input',()=>{ row.pct = +pctInput.value; updateTotals(); });
-    const del = document.createElement('button'); del.className='rem-btn'; del.innerHTML='✕'; del.title='Remove'; del.addEventListener('click',()=>{ working.splice(idx,1); renderEditList(); updateTotals(); });
-    wrap.appendChild(nameInput); wrap.appendChild(pctInput); wrap.appendChild(del); editList.appendChild(wrap);
+    const wrap = document.createElement('div');
+    wrap.className='edit-row';
+    const nameInput = document.createElement('input');
+    nameInput.value=row.ink;
+    nameInput.readOnly=true;
+    nameInput.className='mono';
+    const pctInput = document.createElement('input');
+    pctInput.type='number';
+    pctInput.step='0.01';
+    pctInput.value=Number(row.pct).toFixed(2);
+    pctInput.className='pct-input mono';
+    pctInput.addEventListener('input',()=>{
+      row.pct = +pctInput.value;
+      updateTotals();
+    });
+    const del = document.createElement('button');
+    del.className='rem-btn';
+    del.innerHTML='✕';
+    del.title='Remove';
+    del.addEventListener('click',()=>{
+      working.splice(idx,1);
+      renderEditList();
+      updateTotals();
+    });
+    wrap.appendChild(nameInput);
+    wrap.appendChild(pctInput);
+    wrap.appendChild(del);
+    editList.appendChild(wrap);
   });
 }
 function updateTotals(){
@@ -780,22 +961,29 @@ function updateTotals(){
 }
 function normalise(){
   const sum = working.reduce((s,r)=> s + (+r.pct||0), 0) || 1;
-  working.forEach(r=> r.pct = +(r.pct * 100 / sum).toFixed(2));
-  renderEditList(); updateTotals();
+  working.forEach(r=> { r.pct = +(r.pct * 100 / sum).toFixed(2); });
+  renderEditList();
+  updateTotals();
 }
 function addInk(){
-  const name = $('#addInkSel').value; let pct = +($('#addPct').value||0);
+  const name = $('#addInkSel').value;
+  let pct = +($('#addPct').value||0);
   if(!name || !(pct>0)) return;
   const found = working.find(r=> r.ink === name);
   if(found) found.pct = +(found.pct + pct).toFixed(2);
   else working.push({ink:name, pct:+pct.toFixed(2)});
-  $('#addPct').value=''; renderEditList(); updateTotals();
+  $('#addPct').value='';
+  renderEditList();
+  updateTotals();
 }
 async function saveCorrection(){
   if(!_lastSuggestion) return;
   const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
   if (!approx(sum,100,0.02)) normalise();
-  const corrected = {}; working.forEach(r=>{ if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2); });
+  const corrected = {};
+  working.forEach(r=>{
+    if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2);
+  });
   const payload = {
     target: _lastSuggestion.target,
     group: _lastSuggestion.group || null,
@@ -807,16 +995,19 @@ async function saveCorrection(){
   };
   try{
     const res = await fetch(API_BASE + '/log_correction', {
-      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
     });
-    if(!res.ok){ throw new Error(`API ${res.status}: ${await res.text()}`); }
+    if(!res.ok){
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
     alert('Saved correction. It will be available for the next training cycle.');
     closeEdit();
   }catch(err){
     alert('Error saving correction: ' + (err.message||err));
   }
 }
-
 
 // ===== Spectro (Web Serial) integration & ink curve table =====
 function setSpectroConnectedUI(connected){
@@ -869,7 +1060,7 @@ async function spectroConnect(){
       dataBits: 8,
       stopBits: 1,
       parity: 'none',
-      flowControl: 'none',
+      flowControl: 'none'
     });
     spectroPort = port;
     setSpectroConnectedUI(true);
@@ -918,7 +1109,9 @@ async function spectroMeasureOnce(){
 
   try{
     while (true){
-      const { value, done } = await reader.read();
+      const result = await reader.read();
+      const value = result.value;
+      const done = result.done;
       if (done) break;
       if (value){
         textResp += decoder.decode(value, { stream:true });
@@ -1016,25 +1209,41 @@ function labToRgbCssForSwatch(L, a, b){
   return `rgb(${r}, ${g}, ${b2})`;
 }
 
-function addInkCurveRecord(inkName, concentration, meas, meta){
+function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas){
+  const now = new Date();
   const rec = {
     inkName: String(inkName || '').trim(),
     concentration: Number(concentration),
-    backing: meta?.backing || 'white',
-    geometry: meta?.geometry || 'SCI',
-    illuminant: meta?.illuminant || 'D50',
-    observer: meta?.observer || '2',
-    aperture: meta?.aperture || '8mm',
+    backing: backing || 'white',
+    angle: angle || '2',
+    illuminant: illuminant || 'D50',
+    aperture: aperture || '8mm',
+    geometry: geometry || 'SCI',
     L: meas.L,
     a: meas.a,
     b: meas.b,
     spectrum: meas.spectrum,
-    ts: Date.now(),
+    ts: now.getTime(),
+    timestampISO: now.toISOString()
   };
   INK_CURVES.push(rec);
   saveInkCurves();
   renderInkCurvesTable();
   return rec;
+}
+
+function formatTimestamp(rec){
+  if (rec.timestampISO){
+    return rec.timestampISO;
+  }
+  if (rec.ts){
+    try{
+      return new Date(rec.ts).toISOString();
+    }catch(e){
+      return '';
+    }
+  }
+  return '';
 }
 
 function renderInkCurvesTable(){
@@ -1090,24 +1299,59 @@ function renderInkCurvesTable(){
     tr.appendChild(tdConc);
 
     const tdBacking = document.createElement('td');
-    tdBacking.textContent = rec.backing || 'white';
+    const backingSel = document.createElement('select');
+    backingSel.innerHTML = '<option value="white">White</option><option value="black">Black</option>';
+    backingSel.value = rec.backing || 'white';
+    backingSel.addEventListener('change', ()=>{
+      rec.backing = backingSel.value;
+      saveInkCurves();
+    });
+    tdBacking.appendChild(backingSel);
     tr.appendChild(tdBacking);
 
-    const tdGeom = document.createElement('td');
-    tdGeom.textContent = rec.geometry || 'SCI';
-    tr.appendChild(tdGeom);
+    const tdAngle = document.createElement('td');
+    const angleSel = document.createElement('select');
+    angleSel.innerHTML = '<option value="2">2°</option><option value="10">10°</option>';
+    angleSel.value = rec.angle || '2';
+    angleSel.addEventListener('change', ()=>{
+      rec.angle = angleSel.value;
+      saveInkCurves();
+    });
+    tdAngle.appendChild(angleSel);
+    tr.appendChild(tdAngle);
 
     const tdIll = document.createElement('td');
-    tdIll.textContent = rec.illuminant || 'D50';
+    const illSel = document.createElement('select');
+    illSel.innerHTML = '<option value="D50">D50</option><option value="D65">D65</option><option value="A">A</option>';
+    illSel.value = rec.illuminant || 'D50';
+    illSel.addEventListener('change', ()=>{
+      rec.illuminant = illSel.value;
+      saveInkCurves();
+    });
+    tdIll.appendChild(illSel);
     tr.appendChild(tdIll);
 
-    const tdObs = document.createElement('td');
-    tdObs.textContent = (rec.observer || '2') + '°';
-    tr.appendChild(tdObs);
-
     const tdAperture = document.createElement('td');
-    tdAperture.textContent = rec.aperture || '8mm';
+    const apSel = document.createElement('select');
+    apSel.innerHTML = '<option value="8mm">8 mm</option><option value="4mm">4 mm</option>';
+    apSel.value = rec.aperture || '8mm';
+    apSel.addEventListener('change', ()=>{
+      rec.aperture = apSel.value;
+      saveInkCurves();
+    });
+    tdAperture.appendChild(apSel);
     tr.appendChild(tdAperture);
+
+    const tdGeom = document.createElement('td');
+    const geomSel = document.createElement('select');
+    geomSel.innerHTML = '<option value="SCI">SCI</option><option value="SCE">SCE</option>';
+    geomSel.value = rec.geometry || 'SCI';
+    geomSel.addEventListener('change', ()=>{
+      rec.geometry = geomSel.value;
+      saveInkCurves();
+    });
+    tdGeom.appendChild(geomSel);
+    tr.appendChild(tdGeom);
 
     const tdL = document.createElement('td');
     tdL.textContent = Number.isFinite(rec.L) ? rec.L.toFixed(2) : '—';
@@ -1122,15 +1366,16 @@ function renderInkCurvesTable(){
     tr.appendChild(tdB);
 
     const tdTs = document.createElement('td');
-    if (rec.ts){
-      try{
-        tdTs.textContent = new Date(rec.ts).toLocaleString();
-      }catch{
-        tdTs.textContent = '';
-      }
-    } else {
-      tdTs.textContent = '';
-    }
+    const tsInput = document.createElement('input');
+    tsInput.type = 'text';
+    tsInput.className = 'mono';
+    tsInput.value = formatTimestamp(rec);
+    tsInput.addEventListener('change', ()=>{
+      const v = tsInput.value.trim();
+      rec.timestampISO = v || null;
+      saveInkCurves();
+    });
+    tdTs.appendChild(tsInput);
     tr.appendChild(tdTs);
 
     const tdActions = document.createElement('td');
@@ -1162,40 +1407,31 @@ function downloadInkCurvesCsv(){
     'InkName',
     'Concentration',
     'Backing',
-    'Geometry',
+    'Angle',
     'Illuminant',
-    'Observer',
     'Aperture',
+    'Geometry',
+    'TimestampISO',
     'L',
     'a',
-    'b',
-    'Timestamp'
-  ].concat(
-    wavelengths.map(wl=>'R'+wl)
-  );
+    'b'
+  ].concat(wavelengths.map(wl=>'R'+wl));
+
   const lines = [header.join(',')];
 
   INK_CURVES.forEach(rec=>{
-    let tsIso = '';
-    if (rec.ts){
-      try{
-        tsIso = new Date(rec.ts).toISOString();
-      }catch{
-        tsIso = '';
-      }
-    }
     const row = [
-      rec.inkName,
-      rec.concentration,
+      rec.inkName || '',
+      rec.concentration != null ? rec.concentration : '',
       rec.backing || '',
-      rec.geometry || '',
+      rec.angle || '',
       rec.illuminant || '',
-      rec.observer || '',
       rec.aperture || '',
-      rec.L,
-      rec.a,
-      rec.b,
-      tsIso,
+      rec.geometry || '',
+      formatTimestamp(rec),
+      rec.L != null ? rec.L : '',
+      rec.a != null ? rec.a : '',
+      rec.b != null ? rec.b : ''
     ];
     wavelengths.forEach(wl=>{
       const v = rec.spectrum && Object.prototype.hasOwnProperty.call(rec.spectrum,wl)
@@ -1219,8 +1455,11 @@ function downloadInkCurvesCsv(){
 
 // ===== Compare tab logic + 3D viz =====
 function setSwatchFromFields(prefix){
-  const L=parseFloat($('#'+prefix+'L').value), a=parseFloat($('#'+prefix+'a').value), b=parseFloat($('#'+prefix+'b').value);
-  if ([L,a,b].some(v=>Number.isNaN(v))) return; const rgb=labToSrgb(L,a,b);
+  const L=parseFloat($('#'+prefix+'L').value);
+  const a=parseFloat($('#'+prefix+'a').value);
+  const b=parseFloat($('#'+prefix+'b').value);
+  if ([L,a,b].some(v=>Number.isNaN(v))) return;
+  const rgb=labToSrgb(L,a,b);
   $('#swatch'+prefix).style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
   const legend = prefix === 'A' ? $('#legendA') : $('#legendB');
   legend.style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
@@ -1229,11 +1468,18 @@ function computeCompareDE(){
   const a={L:parseFloat($('#AL').value),a:parseFloat($('#Aa').value),b:parseFloat($('#Ab').value)};
   const b={L:parseFloat($('#BL').value),a:parseFloat($('#Ba').value),b:parseFloat($('#Bb').value)};
   if ([a.L,a.a,a.b,b.L,b.a,b.b].some(v=>Number.isNaN(v))){
-    $('#cmpNumbers').innerHTML=''; $('#cmpResult').style.display='none'; requestLabDraw(); return;
+    $('#cmpNumbers').innerHTML='';
+    $('#cmpResult').style.display='none';
+    requestLabDraw();
+    return;
   }
-  const de=deltaE2000(a,b), dL=(b.L-a.L), da=(b.a-a.a), db=(b.b-a.b);
-  $('#cmpNumbers').innerHTML=`<div class="two-col"><div><strong>ΔE2000:</strong> ${de.toFixed(2)}</div><div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)}</div></div>`;
-  $('#cmpResult').style.display='block'; requestLabDraw();
+  const de=deltaE2000(a,b);
+  const dL=(b.L-a.L), da=(b.a-a.a), db=(b.b-a.b);
+  $('#cmpNumbers').innerHTML=
+    `<div class="two-col"><div><strong>ΔE2000:</strong> ${de.toFixed(2)}</div>`+
+    `<div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)}</div></div>`;
+  $('#cmpResult').style.display='block';
+  requestLabDraw();
 }
 document.addEventListener('input',(e)=>{
   if (e.target && e.target.tagName==='INPUT' && e.target.type==='number'){
@@ -1242,33 +1488,77 @@ document.addEventListener('input',(e)=>{
     if (/^(BL|Ba|Bb)$/.test(id)) { setSwatchFromFields('B'); computeCompareDE(); }
   }
 });
-const swapABBtn = $('#swapAB'); if (swapABBtn) swapABBtn.addEventListener('click', ()=>{
-  const AL=$('#AL').value, Aa=$('#Aa').value, Ab=$('#Ab').value;
-  $('#AL').value=$('#BL').value; $('#Aa').value=$('#Ba').value; $('#Ab').value=$('#Bb').value;
-  $('#BL').value=AL; $('#Ba').value=Aa; $('#Bb').value=Ab; setSwatchFromFields('A'); setSwatchFromFields('B'); computeCompareDE();
-});
 
 // 3D LAB sphere with coloured panes
-const canvas=$('#labCanvas'), ctx=canvas.getContext('2d');
+const canvas=$('#labCanvas');
+const ctx=canvas.getContext('2d');
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
 let dragging=false,lastX=0,lastY=0;
-canvas.addEventListener('mousedown',e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
-window.addEventListener('mouseup',()=> dragging=false);
-window.addEventListener('mousemove',e=>{ if(!dragging) return; const dx=(e.clientX-lastX), dy=(e.clientY-lastY); lastX=e.clientX; lastY=e.clientY; rotY -= dx*0.005; rotX -= dy*0.005; requestLabDraw(); });
-canvas.addEventListener('wheel', e=>{ e.preventDefault(); const f=(e.deltaY>0)?0.9:1.1; scale3d=clamp(scale3d*f,80,1200); requestLabDraw(); }, {passive:false});
-$('#resetView').addEventListener('click', ()=>{ rotX=DEFAULT_VIEW.rx; rotY=DEFAULT_VIEW.ry; scale3d=DEFAULT_VIEW.s; requestLabDraw(); });
+canvas.addEventListener('mousedown',e=>{
+  dragging=true;
+  lastX=e.clientX;
+  lastY=e.clientY;
+});
+window.addEventListener('mouseup',()=>{ dragging=false; });
+window.addEventListener('mousemove',e=>{
+  if(!dragging) return;
+  const dx=(e.clientX-lastX);
+  const dy=(e.clientY-lastY);
+  lastX=e.clientX;
+  lastY=e.clientY;
+  rotY -= dx*0.005;
+  rotX -= dy*0.005;
+  requestLabDraw();
+});
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const f=(e.deltaY>0)?0.9:1.1;
+  scale3d=clamp(scale3d*f,80,1200);
+  requestLabDraw();
+},{passive:false});
+$('#resetView').addEventListener('click', ()=>{
+  rotX=DEFAULT_VIEW.rx;
+  rotY=DEFAULT_VIEW.ry;
+  scale3d=DEFAULT_VIEW.s;
+  requestLabDraw();
+});
 
-function normLab(L,a,b){ return { x:(a/128), y:((L-50)/50), z:(b/128) }; }
-function rot3(p){ const cX=Math.cos(rotX), sX=Math.sin(rotX), cY=Math.cos(rotY), sY=Math.sin(rotY); let y=p.y*cX - p.z*sX; let z=p.y*sX + p.z*cX; let x=p.x*cY + z*sY; z = -p.x*sY + z*cY; return {x,y,z}; }
-function proj(p){ const d=3; const z=p.z+3.5; const k=d/(z); return {u:canvas.width/2 + p.x*scale3d*k, v:canvas.height/2 - p.y*scale3d*k, k, z:p.z}; }
+function normLab(L,a,b){
+  return { x:(a/128), y:((L-50)/50), z:(b/128) };
+}
+function rot3(p){
+  const cX=Math.cos(rotX), sX=Math.sin(rotX), cY=Math.cos(rotY), sY=Math.sin(rotY);
+  let y=p.y*cX - p.z*sX;
+  let z=p.y*sX + p.z*cX;
+  let x=p.x*cY + z*sY;
+  z = -p.x*sY + z*cY;
+  return {x,y,z};
+}
+function proj(p){
+  const d=3;
+  const z=p.z+3.5;
+  const k=d/(z);
+  return {u:canvas.width/2 + p.x*scale3d*k, v:canvas.height/2 - p.y*scale3d*k, k:k, z:p.z};
+}
 
 function drawSpherePanes(){
-  const R=1.08, M=24, P=18, baseAlpha=0.20; const thetas=[...Array(M)].map((_,i)=>-Math.PI + i*(2*Math.PI/(M-1)));
+  const R=1.08, M=24, P=18, baseAlpha=0.20;
+  const thetas=[...Array(M)].map((_,i)=>-Math.PI + i*(2*Math.PI/(M-1)));
   const phis=[...Array(P)].map((_,j)=>-Math.PI/2 + j*((Math.PI)/(P-1)));
-  function objPoint(phi,theta){ return { x0:R*Math.cos(phi)*Math.cos(theta), y0:R*Math.sin(phi), z0:R*Math.cos(phi)*Math.sin(theta) }; }
-  function toScreen(o){ const pr=rot3({x:o.x0,y:o.y0,z:o.z0}); const sc=proj(pr); return {u:sc.u,v:sc.v,z:pr.z,k:sc.k}; }
-  function rgbaFromObj(o,a){ const L=o.y0*50+50, A=o.x0*128, B=o.z0*128; const rgb=labToSrgb(L,A,B); return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
+  function objPoint(phi,theta){
+    return { x0:R*Math.cos(phi)*Math.cos(theta), y0:R*Math.sin(phi), z0:R*Math.cos(phi)*Math.sin(theta) };
+  }
+  function toScreen(o){
+    const pr=rot3({x:o.x0,y:o.y0,z:o.z0});
+    const sc=proj(pr);
+    return {u:sc.u,v:sc.v,z:pr.z,k:sc.k};
+  }
+  function rgbaFromObj(o,a){
+    const L=o.y0*50+50, A=o.x0*128, B=o.z0*128;
+    const rgb=labToSrgb(L,A,B);
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
+  }
   const quads=[];
   for(let j=0,idx=0;j<P-1;j++){
     for(let i=0;i<M-1;i++,idx++){
@@ -1277,64 +1567,152 @@ function drawSpherePanes(){
       const ux=o10.x0-o00.x0, uy=o10.y0-o00.y0, uz=o10.z0-o00.z0;
       const vx=o01.x0-o00.x0, vy=o01.y0-o00.y0, vz=o01.z0-o00.z0;
       const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
-      const nRot=rot3({x:nx,y:ny,z:nz}); const nLen=Math.hypot(nRot.x,nRot.y,nRot.z)||1e-9; const nzCam=nRot.z/nLen;
+      const nRot=rot3({x:nx,y:ny,z:nz});
+      const nLen=Math.hypot(nRot.x,nRot.y,nRot.z)||1e-9;
+      const nzCam=nRot.z/nLen;
       if (nzCam < -0.15) continue;
-      const vis = (nzCam<=0)?0: (nzCam>=0.1?1:(nzCam/0.1)); const alpha=baseAlpha*(0.15+0.85*vis);
+      const vis = (nzCam<=0)?0: (nzCam>=0.1?1:(nzCam/0.1));
+      const alpha=baseAlpha*(0.15+0.85*vis);
       const s00=toScreen(o00), s10=toScreen(o10), s01=toScreen(o01), s11=toScreen(o11);
       const avgZ=(s00.z+s10.z+s01.z+s11.z)/4;
-      const oMid={ x0:(o00.x0+o10.x0+o01.x0+o11.x0)/4, y0:(o00.y0+o10.y0+o01.y0+o11.y0)/4, z0:(o00.z0+o10.z0+o01.z0+o11.z0)/4 };
+      const oMid={
+        x0:(o00.x0+o10.x0+o01.x0+o11.x0)/4,
+        y0:(o00.y0+o10.y0+o01.y0+o11.y0)/4,
+        z0:(o00.z0+o10.z0+o01.z0+o11.z0)/4
+      };
       const col=rgbaFromObj(oMid,alpha);
       const stableZ = avgZ + ((i*37 + j*101) % 113) * 1e-6;
       quads.push({stableZ, col, pts:[s00,s10,s11,s01]});
     }
   }
   quads.sort((a,b)=> a.stableZ - b.stableZ);
-  ctx.save(); ctx.lineWidth=0.6;
-  for(const q of quads){ ctx.fillStyle=q.col; ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.beginPath(); ctx.moveTo(q.pts[0].u,q.pts[0].v); for(let k=1;k<q.pts.length;k++) ctx.lineTo(q.pts[k].u,q.pts[k].v); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  ctx.save();
+  ctx.lineWidth=0.6;
+  for(const q of quads){
+    ctx.fillStyle=q.col;
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(q.pts[0].u,q.pts[0].v);
+    for(let k=1;k<q.pts.length;k++) ctx.lineTo(q.pts[k].u,q.pts[k].v);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
   ctx.restore();
 }
 function drawSphere(){
   const R=1.1, MER=28, PAR=20, STEP=Math.PI/64;
-  function tint(x0,y0,z0,a){ const L=y0*50+50,A=x0*128,B=z0*128; const rgb=labToSrgb(L,A,B); return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`; }
-  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0})); const rad=Math.hypot(edge.u+c.u*-1, edge.v+c.v*-1);
-  ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(c.u,c.v,rad,0,Math.PI*2); ctx.stroke();
+  function tint(x0,y0,z0,a){
+    const L=y0*50+50,A=x0*128,B=z0*128;
+    const rgb=labToSrgb(L,A,B);
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
+  }
+  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0}));
+  const rad=Math.hypot(edge.u-c.u, edge.v-c.v);
+  ctx.strokeStyle='rgba(255,255,255,0.28)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(c.u,c.v,rad,0,Math.PI*2);
+  ctx.stroke();
   for(let i=0;i<MER;i++){
-    const th=-Math.PI + i*(2*Math.PI/(MER-1)); let first=true,lastObj=null,lastScr=null;
+    const th=-Math.PI + i*(2*Math.PI/(MER-1));
+    let first=true,lastObj=null,lastScr=null;
     for(let t=-Math.PI/2;t<=Math.PI/2;t+=STEP){
       const x0=R*Math.cos(t)*Math.cos(th), y0=R*Math.sin(t), z0=R*Math.cos(t)*Math.sin(th);
       const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
-      if(!first){ const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2; ctx.strokeStyle=tint(mx0,my0,mz0,0.22); ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(lastScr.u,lastScr.v); ctx.lineTo(q.u,q.v); ctx.stroke(); }
-      first=false; lastObj={x:x0,y:y0,z:z0}; lastScr=q;
+      if(!first){
+        const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2;
+        ctx.strokeStyle=tint(mx0,my0,mz0,0.22);
+        ctx.lineWidth=1.6;
+        ctx.beginPath();
+        ctx.moveTo(lastScr.u,lastScr.v);
+        ctx.lineTo(q.u,q.v);
+        ctx.stroke();
+      }
+      first=false;
+      lastObj={x:x0,y:y0,z:z0};
+      lastScr=q;
     }
   }
   for(let j=0;j<PAR;j++){
-    const ph=-Math.PI/2 + j*(Math.PI/(PAR-1)); let first=true,lastObj=null,lastScr=null;
+    const ph=-Math.PI/2 + j*(Math.PI/(PAR-1));
+    let first=true,lastObj2=null,lastScr2=null;
     for(let t=-Math.PI;t<=Math.PI;t+=STEP){
       const x0=R*Math.cos(ph)*Math.cos(t), y0=R*Math.sin(ph), z0=R*Math.cos(ph)*Math.sin(t);
       const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
-      if(!first){ const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2; ctx.strokeStyle=tint(mx0,my0,mz0,0.22); ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(lastScr.u,lastScr.v); ctx.lineTo(q.u,q.v); ctx.stroke(); }
-      first=false; lastObj={x:x0,y:y0,z:z0}; lastScr=q;
+      if(!first){
+        const mx0=(lastObj2.x+x0)/2,my0=(lastObj2.y+y0)/2,mz0=(lastObj2.z+z0)/2;
+        ctx.strokeStyle=tint(mx0,my0,mz0,0.22);
+        ctx.lineWidth=1.6;
+        ctx.beginPath();
+        ctx.moveTo(lastScr2.u,lastScr2.v);
+        ctx.lineTo(q.u,q.v);
+        ctx.stroke();
+      }
+      first=false;
+      lastObj2={x:x0,y:y0,z:z0};
+      lastScr2=q;
     }
   }
 }
 function drawPointLab(L,a,b,label){
-  const p=proj(rot3(normLab(L,a,b))), rgb=labToSrgb(L,a,b), col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
-  ctx.fillStyle=col; ctx.strokeStyle='rgba(0,0,0,0.55)'; ctx.beginPath(); ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2); ctx.fill(); ctx.lineWidth=1; ctx.stroke();
-  ctx.fillStyle='#e5e7eb'; ctx.font='12px ui-sans-serif, system-ui'; ctx.fillText(label, p.u+8, p.v-8);
+  const p=proj(rot3(normLab(L,a,b)));
+  const rgb=labToSrgb(L,a,b);
+  const col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  ctx.fillStyle=col;
+  ctx.strokeStyle='rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2);
+  ctx.fill();
+  ctx.lineWidth=1;
+  ctx.stroke();
+  ctx.fillStyle='#e5e7eb';
+  ctx.font='12px ui-sans-serif, system-ui';
+  ctx.fillText(label, p.u+8, p.v-8);
   return p;
 }
 function drawLineLab(A,B){
-  const p1=proj(rot3(normLab(A.L,A.a,A.b))); const p2=proj(rot3(normLab(B.L,B.a,B.b)));
-  ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
+  const p1=proj(rot3(normLab(A.L,A.a,A.b)));
+  const p2=proj(rot3(normLab(B.L,B.a,B.b)));
+  ctx.strokeStyle='rgba(255,255,255,0.6)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(p1.u,p1.v);
+  ctx.lineTo(p2.u,p2.v);
+  ctx.stroke();
 }
 function drawAxes(){
-  const axes=[ {from:{L:50,a:-128,b:0},to:{L:50,a:128,b:0},label:'+a*'}, {from:{L:0,a:0,b:0},to:{L:100,a:0,b:0},label:'L*'}, {from:{L:50,a:0,b:-128},to:{L:50,a:0,b:128},label:'+b*'} ];
-  ctx.lineWidth=2.2; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.fillStyle='#e5e7eb'; ctx.font='12px ui-sans-serif, system-ui';
-  axes.forEach(ax=>{ const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b))); const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
-    ctx.beginPath(); ctx.moveTo(p1.u,p1.v); ctx.lineTo(p2.u,p2.v); ctx.stroke();
-    const T=6; for(let i=1;i<T;i++){ const t=i/T; const L=ax.from.L+(ax.to.L-ax.from.L)*t, a=ax.from.a+(ax.to.a-ax.from.a)*t, b=ax.from.b+(ax.to.b-ax.from.b)*t; const p=proj(rot3(normLab(L,a,b)));
-      const dirX=(p2.u-p1.u), dirV=(p2.v-p1.v), len=Math.hypot(dirX,dirV)||1, nx=-dirV/len, ny=dirX/len, tick=6*p.k;
-      ctx.beginPath(); ctx.moveTo(p.u-nx*tick,p.v-ny*tick); ctx.lineTo(p.u+nx*tick,p.v+ny*tick); ctx.stroke();
+  const axes=[
+    {from:{L:50,a:-128,b:0},to:{L:50,a:128,b:0},label:'+a*'},
+    {from:{L:0,a:0,b:0},to:{L:100,a:0,b:0},label:'L*'},
+    {from:{L:50,a:0,b:-128},to:{L:50,a:0,b:128},label:'+b*'}
+  ];
+  ctx.lineWidth=2.2;
+  ctx.strokeStyle='rgba(255,255,255,0.9)';
+  ctx.fillStyle='#e5e7eb';
+  ctx.font='12px ui-sans-serif, system-ui';
+  axes.forEach(ax=>{
+    const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b)));
+    const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
+    ctx.beginPath();
+    ctx.moveTo(p1.u,p1.v);
+    ctx.lineTo(p2.u,p2.v);
+    ctx.stroke();
+    const T=6;
+    for(let i=1;i<T;i++){
+      const t=i/T;
+      const L=ax.from.L+(ax.to.L-ax.from.L)*t;
+      const a=ax.from.a+(ax.to.a-ax.from.a)*t;
+      const b=ax.from.b+(ax.to.b-ax.from.b)*t;
+      const p=proj(rot3(normLab(L,a,b)));
+      const dirX=(p2.u-p1.u), dirV=(p2.v-p1.v);
+      const len=Math.hypot(dirX,dirV)||1;
+      const nx=-dirV/len, ny=dirX/len;
+      const tick=6*p.k;
+      ctx.beginPath();
+      ctx.moveTo(p.u-nx*tick,p.v-ny*tick);
+      ctx.lineTo(p.u+nx*tick,p.v+ny*tick);
+      ctx.stroke();
     }
     ctx.fillText(ax.label, p2.u+6, p2.v-6);
   });
@@ -1343,13 +1721,35 @@ function drawLabScene(){
   const a={L:parseFloat($('#AL').value), a:parseFloat($('#Aa').value), b:parseFloat($('#Ab').value)};
   const b={L:parseFloat($('#BL').value), a:parseFloat($('#Ba').value), b:parseFloat($('#Bb').value)};
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#0f1219'; ctx.fillRect(0,0,canvas.width,canvas.height);
-  drawSpherePanes(); drawSphere(); drawAxes();
-  const aValid=[a.L,a.a,a.b].every(Number.isFinite), bValid=[b.L,b.a,b.b].every(Number.isFinite);
-  if (aValid && bValid){ drawLineLab(a,b); drawPointLab(a.L,a.a,a.b,'A'); drawPointLab(b.L,b.a,b.b,'B'); const de=deltaE2000(a,b); ctx.fillStyle='#e5e7eb'; ctx.font='13px ui-sans-serif, system-ui'; ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18); }
-  else { ctx.fillStyle='#e5e7eb'; ctx.font='13px ui-sans-serif, system-ui'; ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18); }
+  ctx.fillStyle='#0f1219';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawSpherePanes();
+  drawSphere();
+  drawAxes();
+  const aValid=[a.L,a.a,a.b].every(Number.isFinite);
+  const bValid=[b.L,b.a,b.b].every(Number.isFinite);
+  if (aValid && bValid){
+    drawLineLab(a,b);
+    drawPointLab(a.L,a.a,a.b,'A');
+    drawPointLab(b.L,b.a,b.b,'B');
+    const de=deltaE2000(a,b);
+    ctx.fillStyle='#e5e7eb';
+    ctx.font='13px ui-sans-serif, system-ui';
+    ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18);
+  } else {
+    ctx.fillStyle='#e5e7eb';
+    ctx.font='13px ui-sans-serif, system-ui';
+    ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18);
+  }
 }
-let rafId=null; function requestLabDraw(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
+let rafId=null;
+function requestLabDraw(){
+  if(rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(()=>{
+    rafId=null;
+    drawLabScene();
+  });
+}
 
 // Spectro UI wiring (all tabs)
 const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
@@ -1366,7 +1766,7 @@ const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn')
   btn.addEventListener('click', async ()=>{
     try{
       await spectroConnect();
-    }catch(_){}
+    }catch(_e){}
   });
 });
 
@@ -1374,6 +1774,12 @@ if (spectroMeasureBtn){
   spectroMeasureBtn.addEventListener('click', async ()=>{
     const inkName = (document.getElementById('spectroInkName').value || '').trim();
     const concStr = (document.getElementById('spectroConcentration').value || '').trim();
+    const backing = (document.getElementById('spectroBacking').value || 'white');
+    const angle = (document.getElementById('spectroAngle').value || '2');
+    const illuminant = (document.getElementById('spectroIlluminant').value || 'D50');
+    const aperture = (document.getElementById('spectroAperture').value || '8mm');
+    const geometry = (document.getElementById('spectroGeometry').value || 'SCI');
+
     if (!inkName){
       alert('Please enter an ink name.');
       return;
@@ -1383,21 +1789,6 @@ if (spectroMeasureBtn){
       alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
       return;
     }
-
-    const backingEl = document.getElementById('spectroBacking');
-    const geometryEl = document.getElementById('spectroGeometry');
-    const illEl = document.getElementById('spectroIlluminant');
-    const obsEl = document.getElementById('spectroObserver');
-    const apEl = document.getElementById('spectroAperture');
-
-    const meta = {
-      backing: backingEl ? backingEl.value : 'white',
-      geometry: geometryEl ? geometryEl.value : 'SCI',
-      illuminant: illEl ? illEl.value : 'D50',
-      observer: obsEl ? obsEl.value : '2',
-      aperture: apEl ? apEl.value : '8mm',
-    };
-
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -1407,7 +1798,13 @@ if (spectroMeasureBtn){
         console.log('Raw spectro text:', raw);
         return;
       }
-      const rec = addInkCurveRecord(inkName, concentration, meas, meta);
+      const rec = addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas);
+
+      const tsPreview = document.getElementById('spectroTimestampPreview');
+      if (tsPreview){
+        tsPreview.value = rec.timestampISO || '';
+      }
+
       const LInput = document.getElementById('L');
       const aInput = document.getElementById('a');
       const bInput = document.getElementById('b');
@@ -1524,8 +1921,12 @@ function refreshCompareDatalists(){
 }
 
 // Tabs switching
-const tabBtnMatch=$('#tabBtnMatch'), tabBtnCompare=$('#tabBtnCompare'), tabBtnLibraries=$('#tabBtnLibraries');
-const tabMatch=$('#tab-match'), tabCompare=$('#tab-compare'), tabLibraries=$('#tab-libraries');
+const tabBtnMatch=$('#tabBtnMatch');
+const tabBtnCompare=$('#tabBtnCompare');
+const tabBtnLibraries=$('#tabBtnLibraries');
+const tabMatch=$('#tab-match');
+const tabCompare=$('#tab-compare');
+const tabLibraries=$('#tab-libraries');
 function showTab(which){
   tabMatch.hidden = which!=='match';
   tabCompare.hidden = which!=='compare';
@@ -1541,7 +1942,17 @@ tabBtnLibraries.addEventListener('click',()=>showTab('libraries'));
 
 // Wire up
 $('#findBtn').addEventListener('click', findClosest);
-$('#clearBtn').addEventListener('click', ()=>{ $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho(); $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none'; $('#suggestedFormula').style.display='none'; $('#predictMsg').textContent=''; $('#editRow').style.display='none'; });
+$('#clearBtn').addEventListener('click', ()=>{
+  $('#L').value='';
+  $('#a').value='';
+  $('#b').value='';
+  updateTargetEcho();
+  $('#resultsTbody').innerHTML='';
+  $('#formulaPanel').style.display='none';
+  $('#suggestedFormula').style.display='none';
+  $('#predictMsg').textContent='';
+  $('#editRow').style.display='none';
+});
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
@@ -1550,7 +1961,12 @@ $('#editFormulaBtn').addEventListener('click', openEdit);
 $('#cancelEdit').addEventListener('click', closeEdit);
 $('#normaliseBtn').addEventListener('click', normalise);
 $('#addInkBtn').addEventListener('click', addInk);
-$('#addPct').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addInk(); } });
+$('#addPct').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    addInk();
+  }
+});
 $('#saveCorrection').addEventListener('click', saveCorrection);
 
 // Library UI events
@@ -1567,17 +1983,28 @@ $('#cmpLibrarySelect').addEventListener('change', (e)=>{
 $('#libAddBtn').addEventListener('click', ()=>{
   const name = ($('#libName').value||'').trim();
   const file = $('#libFile').files[0];
-  if (!name){ alert('Please enter a library name.'); return; }
-  if (!file){ alert('Please choose a CSV file.'); return; }
+  if (!name){
+    alert('Please enter a library name.');
+    return;
+  }
+  if (!file){
+    alert('Please choose a CSV file.');
+    return;
+  }
   const reader = new FileReader();
   reader.onload = ()=>{
     try{
       const colours = parseCsvColours(reader.result);
-      if (!colours.length){ alert('No valid rows found (L/a/b empty?).'); return; }
-      const lib = { id: crypto.randomUUID(), name, colours };
+      if (!colours.length){
+        alert('No valid rows found (L/a/b empty?).');
+        return;
+      }
+      const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
+      const lib = { id:id, name:name, colours:colours };
       userLibraries.push(lib);
       saveLibraries();
-      $('#libName').value=''; $('#libFile').value='';
+      $('#libName').value='';
+      $('#libFile').value='';
       renderLibraryList();
       refreshLibrarySelects();
     }catch(err){
@@ -1610,20 +2037,39 @@ $('#libTemplateBtn').addEventListener('click', ()=>{
 
 // Compare tab quick-load
 $('#cmpALoad').addEventListener('click', ()=>{
-  const name=$('#cmpASelect').value; if(!name) return;
-  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name); if(!c) return;
-  $('#AL').value=c.L; $('#Aa').value=c.a; $('#Ab').value=c.b; setSwatchFromFields('A'); computeCompareDE();
+  const name=$('#cmpASelect').value;
+  if(!name) return;
+  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name);
+  if(!c) return;
+  $('#AL').value=c.L;
+  $('#Aa').value=c.a;
+  $('#Ab').value=c.b;
+  setSwatchFromFields('A');
+  computeCompareDE();
 });
 $('#cmpBLoad').addEventListener('click', ()=>{
-  const name=$('#cmpBSelect').value; if(!name) return;
-  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name); if(!c) return;
-  $('#BL').value=c.L; $('#Ba').value=c.a; $('#Bb').value=c.b; setSwatchFromFields('B'); computeCompareDE();
+  const name=$('#cmpBSelect').value;
+  if(!name) return;
+  const c=COLOURS.find(x=>(x.name||x.Colour||x.color||'')===name);
+  if(!c) return;
+  $('#BL').value=c.L;
+  $('#Ba').value=c.a;
+  $('#Bb').value=c.b;
+  setSwatchFromFields('B');
+  computeCompareDE();
 });
 
 // Data load
-Promise.all([ fetch('colours.json').then(r=>r.json()), fetch('DC_Formulas.json').then(r=>r.json()) ])
-.then(tuple=>{
-  BASE_COLOURS=tuple[0].map(c=>({name:c.name||c.Colour||c.color||'', L:c.L, a:c.a, b:c.b}));
+Promise.all([
+  fetch('colours.json').then(r=>r.json()),
+  fetch('DC_Formulas.json').then(r=>r.json())
+]).then(tuple=>{
+  BASE_COLOURS=tuple[0].map(c=>({
+    name:c.name||c.Colour||c.color||'',
+    L:c.L,
+    a:c.a,
+    b:c.b
+  }));
   COLOURS = BASE_COLOURS.slice();
   FORMULAS=tuple[1];
   buildFormulaIndex();
@@ -1631,13 +2077,16 @@ Promise.all([ fetch('colours.json').then(r=>r.json()), fetch('DC_Formulas.json')
   refreshLibrarySelects();
   refreshActiveColours();
   renderLibraryList();
-}).catch(err=>{ alert('Error loading JSON: '+err); });
+}).catch(err=>{
+  alert('Error loading JSON: '+err);
+});
 
 loadGroups();
 loadInks();
 loadInkCurves();
 renderInkCurvesTable();
 updateTargetEcho();
+requestLabDraw();
 
 // Self-test
 try{
@@ -1645,7 +2094,9 @@ try{
   console.assert(approx(deltaE2000(c,c),0),'ΔE00 identity');
   const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
   console.assert(approx(deltaE2000(c1,c2),deltaE2000(c2,c1),1e-9),'ΔE00 symmetry');
-}catch(e){ console.warn('Self-tests failed:', e); }
+}catch(e){
+  console.warn('Self-tests failed:', e);
+}
 
 })();
 </script>
