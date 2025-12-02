@@ -39,7 +39,7 @@
   .flex{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
   .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    .btn-connected{ background:#14532d; border-color:#22c55e; color:#bbf7d0; }
+  .btn-connected{ background:#14532d; border-color:#22c55e; color:#bbf7d0; }
   @media (max-width:900px){ .app{ grid-template-columns:1fr; } .two-col{ grid-template-columns:1fr; } }
 
   /* Modal editor */
@@ -92,7 +92,7 @@
           <div class="pill" id="refCountPill"><span id="countLabel">0</span> colours</div>
         </div>
 
-                <div class="row" style="margin-top:12px;">
+        <div class="row" style="margin-top:12px;">
           <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
           <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
           <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
@@ -101,7 +101,6 @@
           <button class="btn" id="spectroConnectBtnMatch">Connect device</button>
           <button class="btn" id="spectroScanTargetBtn">Scan into target</button>
         </div>
-
 
         <div class="row2" style="margin-top:12px;">
           <div>
@@ -178,7 +177,6 @@
         <span class="mini">Use the spectro to scan directly into A/B.</span>
       </div>
 
-
       <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
@@ -239,7 +237,6 @@
     </div>
   </section>
 
-  
   <!-- TAB: Colour Sets (libraries) -->
   <section id="tab-libraries" role="tabpanel" aria-labelledby="tabBtnLibraries" hidden>
     <div class="card" style="max-width:900px; margin:0 auto;">
@@ -295,6 +292,50 @@
             <input id="spectroConcentration" type="number" step="0.01" placeholder="0.10">
           </div>
         </div>
+
+        <!-- New metadata controls -->
+        <div class="row" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroBacking">Backing</label>
+            <select id="spectroBacking">
+              <option value="white" selected>White backing</option>
+              <option value="black">Black backing</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroGeometry">Geometry</label>
+            <select id="spectroGeometry">
+              <option value="SCI" selected>SCI (include gloss)</option>
+              <option value="SCE">SCE (exclude gloss)</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroAperture">Aperture</label>
+            <select id="spectroAperture">
+              <option value="8mm" selected>8 mm</option>
+              <option value="4mm">4 mm</option>
+              <option value="15mm">15 mm</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroIlluminant">Illuminant</label>
+            <select id="spectroIlluminant">
+              <option value="D50" selected>D50</option>
+              <option value="D65">D65</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroObserver">Observer</label>
+            <select id="spectroObserver">
+              <option value="2" selected>2°</option>
+              <option value="10">10°</option>
+            </select>
+          </div>
+        </div>
+
         <div class="flex">
           <button class="btn" id="spectroConnectBtn">Connect device</button>
           <button class="btn" id="spectroMeasureBtn">Measure &amp; store curve</button>
@@ -320,9 +361,15 @@
                 <th>Swatch</th>
                 <th>Ink name</th>
                 <th>Conc</th>
+                <th>Backing</th>
+                <th>Geom</th>
+                <th>Ill</th>
+                <th>Obs</th>
+                <th>Aperture</th>
                 <th>L*</th>
                 <th>a*</th>
                 <th>b*</th>
+                <th>Measured</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -334,7 +381,6 @@
       </div>
     </div>
   </section>
-
 
   <!-- Modal: Edit Formula -->
   <div class="modal-backdrop" id="editModal">
@@ -477,7 +523,7 @@ function buildFormulaIndex(){
     if (byColour.has(name)) { COLOUR_TO_FORMULA[name]=norm; return; }
     if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name]=norm; return; }
     const p=extractPmsNumber(name);
-    if (p){ for (const key of byColour.keys()){ if ((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; } } }
+    if (p){ for (const key of byColour.keys()){ if ((extractPmsNumber(key)||'')===p){ COLOUR_TO_FORMULA[name]=normaliseName(key); break; } }
   });
 }
 
@@ -970,10 +1016,15 @@ function labToRgbCssForSwatch(L, a, b){
   return `rgb(${r}, ${g}, ${b2})`;
 }
 
-function addInkCurveRecord(inkName, concentration, meas){
+function addInkCurveRecord(inkName, concentration, meas, meta){
   const rec = {
     inkName: String(inkName || '').trim(),
     concentration: Number(concentration),
+    backing: meta?.backing || 'white',
+    geometry: meta?.geometry || 'SCI',
+    illuminant: meta?.illuminant || 'D50',
+    observer: meta?.observer || '2',
+    aperture: meta?.aperture || '8mm',
     L: meas.L,
     a: meas.a,
     b: meas.b,
@@ -1038,6 +1089,26 @@ function renderInkCurvesTable(){
     tdConc.appendChild(concInput);
     tr.appendChild(tdConc);
 
+    const tdBacking = document.createElement('td');
+    tdBacking.textContent = rec.backing || 'white';
+    tr.appendChild(tdBacking);
+
+    const tdGeom = document.createElement('td');
+    tdGeom.textContent = rec.geometry || 'SCI';
+    tr.appendChild(tdGeom);
+
+    const tdIll = document.createElement('td');
+    tdIll.textContent = rec.illuminant || 'D50';
+    tr.appendChild(tdIll);
+
+    const tdObs = document.createElement('td');
+    tdObs.textContent = (rec.observer || '2') + '°';
+    tr.appendChild(tdObs);
+
+    const tdAperture = document.createElement('td');
+    tdAperture.textContent = rec.aperture || '8mm';
+    tr.appendChild(tdAperture);
+
     const tdL = document.createElement('td');
     tdL.textContent = Number.isFinite(rec.L) ? rec.L.toFixed(2) : '—';
     tr.appendChild(tdL);
@@ -1049,6 +1120,18 @@ function renderInkCurvesTable(){
     const tdB = document.createElement('td');
     tdB.textContent = Number.isFinite(rec.b) ? rec.b.toFixed(2) : '—';
     tr.appendChild(tdB);
+
+    const tdTs = document.createElement('td');
+    if (rec.ts){
+      try{
+        tdTs.textContent = new Date(rec.ts).toLocaleString();
+      }catch{
+        tdTs.textContent = '';
+      }
+    } else {
+      tdTs.textContent = '';
+    }
+    tr.appendChild(tdTs);
 
     const tdActions = document.createElement('td');
     const delBtn = document.createElement('button');
@@ -1075,18 +1158,44 @@ function downloadInkCurvesCsv(){
   const wavelengths = [];
   for (let wl=400; wl<=700; wl+=10) wavelengths.push(wl);
 
-  const header = ['InkName','Concentration','L','a','b'].concat(
+  const header = [
+    'InkName',
+    'Concentration',
+    'Backing',
+    'Geometry',
+    'Illuminant',
+    'Observer',
+    'Aperture',
+    'L',
+    'a',
+    'b',
+    'Timestamp'
+  ].concat(
     wavelengths.map(wl=>'R'+wl)
   );
   const lines = [header.join(',')];
 
   INK_CURVES.forEach(rec=>{
+    let tsIso = '';
+    if (rec.ts){
+      try{
+        tsIso = new Date(rec.ts).toISOString();
+      }catch{
+        tsIso = '';
+      }
+    }
     const row = [
       rec.inkName,
       rec.concentration,
+      rec.backing || '',
+      rec.geometry || '',
+      rec.illuminant || '',
+      rec.observer || '',
+      rec.aperture || '',
       rec.L,
       rec.a,
       rec.b,
+      tsIso,
     ];
     wavelengths.forEach(wl=>{
       const v = rec.spectrum && Object.prototype.hasOwnProperty.call(rec.spectrum,wl)
@@ -1242,7 +1351,6 @@ function drawLabScene(){
 }
 let rafId=null; function requestLabDraw(){ if(rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(()=>{ rafId=null; drawLabScene(); }); }
 
-
 // Spectro UI wiring (all tabs)
 const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
 const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch');
@@ -1275,6 +1383,21 @@ if (spectroMeasureBtn){
       alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
       return;
     }
+
+    const backingEl = document.getElementById('spectroBacking');
+    const geometryEl = document.getElementById('spectroGeometry');
+    const illEl = document.getElementById('spectroIlluminant');
+    const obsEl = document.getElementById('spectroObserver');
+    const apEl = document.getElementById('spectroAperture');
+
+    const meta = {
+      backing: backingEl ? backingEl.value : 'white',
+      geometry: geometryEl ? geometryEl.value : 'SCI',
+      illuminant: illEl ? illEl.value : 'D50',
+      observer: obsEl ? obsEl.value : '2',
+      aperture: apEl ? apEl.value : '8mm',
+    };
+
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -1284,7 +1407,7 @@ if (spectroMeasureBtn){
         console.log('Raw spectro text:', raw);
         return;
       }
-      const rec = addInkCurveRecord(inkName, concentration, meas);
+      const rec = addInkCurveRecord(inkName, concentration, meas, meta);
       const LInput = document.getElementById('L');
       const aInput = document.getElementById('a');
       const bInput = document.getElementById('b');
@@ -1457,7 +1580,6 @@ $('#libAddBtn').addEventListener('click', ()=>{
       $('#libName').value=''; $('#libFile').value='';
       renderLibraryList();
       refreshLibrarySelects();
-      // keep current library unless you want to auto-switch
     }catch(err){
       alert('Error parsing CSV: ' + (err.message||err));
     }
