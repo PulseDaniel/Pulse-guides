@@ -1,556 +1,2460 @@
-Working colourmatcher
-
-
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Ink Colour Matcher + Predictor</title>
-  <style>
-    :root { --gap: 12px; --radius: 14px; }
-    * { box-sizing: border-box; }
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; margin:0; padding:24px; background:#0b0c10; color:#e6e6e6; }
-    h1 { font-size: 1.25rem; margin: 0 0 8px; }
-    .app { max-width: 1200px; margin: 0 auto; display: grid; gap: var(--gap); grid-template-columns: 420px 1fr; align-items: start; }
-    .card { background:#111318; border:1px solid #22252e; border-radius: var(--radius); padding:16px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-    label { display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
-    input, select { width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
-    input::placeholder { color:#7b8496; }
-    .row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
-    .row2 { display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
-    .btn { cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
-    .btn:hover { filter:brightness(1.1); }
-    table { width:100%; border-collapse:collapse; }
-    th, td { text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric: tabular-nums; }
-    th { color:#9aa4b2; font-weight:600; }
-    .result-row { transition: background .2s; cursor:pointer; }
-    .result-row:hover { background: rgba(255,255,255,.05); }
-    .swatch { width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
-    .pill { font-size:.8rem; color:#98a2b3; }
-    .muted { color:#7b8496; font-size:.85rem; }
-    .formula-box { background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
-    .formula-box h2 { margin:0 0 8px; font-size:1rem; color:#ccc; }
-    .formula-grid { display:grid; grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 6px; align-items:center; }
-    .fg-ink { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .fg-pct { text-align:right; min-width:4ch; font-variant-numeric: tabular-nums; color:#cbd5e1; }
-    .stack { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .flex { display:flex; gap:8px; }
-    @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ink Colour Matcher + Predictor</title>
+<style>
+  :root{ --gap:12px; --radius:14px; }
+  *{ box-sizing:border-box; }
+  body{ font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0; padding:16px; background:#0b0c10; color:#e6e6e6; }
+  h1{ font-size:1.2rem; margin:0 0 8px; }
+  .tabs{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
+  .tabbtn{ cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
+  .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
+  .app{ max-width:1200px; margin:0 auto; display:grid; gap:var(--gap); grid-template-columns:420px 1fr; align-items:start; }
+  .card{ background:#111318; border:1px solid #22252e; border-radius:var(--radius); padding:16px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+  label{ display:block; font-size:.85rem; color:#98a2b3; margin-bottom:6px; }
+  input, select, textarea{ width:100%; padding:10px 12px; border-radius:10px; outline:none; background:#0e1015; border:1px solid #2a2f3a; color:#e6e6e6; }
+  input::placeholder{ color:#7b8496; }
+  textarea{ min-height:80px; resize:vertical; }
+  .row{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:var(--gap); }
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+  .btn{ cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
+  .btn:hover{ filter:brightness(1.08); }
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric:tabular-nums; }
+  th{ color:#9aa4b2; font-weight:600; }
+  .result-row{ transition:background .2s; cursor:pointer; }
+  .result-row:hover{ background:rgba(255,255,255,.05); }
+  .swatch{ width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
+  .pill{ font-size:.8rem; color:#98a2b3; }
+  .muted{ color:#7b8496; font-size:.85rem; }
+  .formula-box{ background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
+  .formula-box h2{ margin:0 0 8px; font-size:1rem; color:#ccc; }
+  .formula-grid{ display:grid; grid-template-columns:1fr auto; column-gap:12px; row-gap:6px; align-items:center; }
+  .fg-ink{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fg-pct{ text-align:right; min-width:4ch; font-variant-numeric:tabular-nums; color:#cbd5e1; }
+  .stack{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .flex{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
+  .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .btn-connected{ background:#14532d; border-color:#22c55e; color:#bbf7d0; }
+  @media (max-width:900px){ .app{ grid-template-columns:1fr; } .two-col{ grid-template-columns:1fr; } }
+
+  /* Modal editor */
+  .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal{ width:min(720px, 96vw); max-height:90vh; overflow:auto; background:#10121a; border:1px solid #2a2f3a; border-radius:14px; padding:16px; }
+  .modal h3{ margin:0 0 8px; }
+  .edit-row{ display:grid; grid-template-columns: 1fr 100px 32px; gap:8px; align-items:center; }
+  .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
+  .rem-btn{ width:32px; height:38px; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; border:1px solid #2a2f3a; background:#1a1f2b; cursor:pointer; }
+  .add-row{ display:grid; grid-template-columns:1fr 120px auto; gap:8px; margin-top:8px; }
+  .footer-row{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; flex-wrap:wrap; }
+  .note{ font-size:.85rem; color:#9aa2b3; }
+  .mini{ font-size:.8rem; color:#9aa4b2; }
+  .warn{ color:#fca5a5; }
+  .ok{ color:#86efac; }
+
+  /* Compare canvas wrapper */
+  .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
+  .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
+  .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
+
+  /* Libraries */
+  .lib-list{ margin-top:8px; border-top:1px dashed #2a2f3a; padding-top:8px; }
+  .lib-item{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.9rem; }
+  .lib-item-name{ font-weight:600; }
+  .lib-badge{ font-size:.75rem; color:#9aa4b2; }
+
+  .de-pass{ color:#86efac; font-weight:800; }
+  .de-fail{ color:#fca5a5; font-weight:800; }
+  .de-neutral{ color:#e5e7eb; font-weight:800; }
+  .wide{ max-width:1400px; margin:0 auto; }
+
+
+  /* Fixed logo overlay (doesn't affect layout) */
+  #pulseLogo{ position:fixed; top:12px; left:auto; height:44px; width:auto; z-index:999; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); opacity:.92; pointer-events:none; }
+  @media (max-width: 520px){ #pulseLogo{ height:34px; top:10px; left:auto; } }
+
+
+  .nowrap{ white-space:nowrap; }
+  .hide{ display:none !important; }
+</style>
 </head>
 <body>
-  <div class="app">
-    <!-- Left Column: Target + Controls -->
-    <div class="card">
-      <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
-        <h1>Ink Colour Matcher</h1>
-        <div class="pill">
-          <span id="countLabel">0</span> reference colours
+
+  <img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
+
+  <div class="tabs" role="tablist" aria-label="Modes">
+    <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
+    <button class="tabbtn" id="tabBtnCompare" role="tab" aria-selected="false" aria-controls="tab-compare">Compare Colours</button>
+    <button class="tabbtn" id="tabBtnLibraries" role="tab" aria-selected="false" aria-controls="tab-libraries">Colour Sets</button>
+    <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
+</div>
+
+  <!-- TAB: Match & Predict -->
+  <section id="tab-match" role="tabpanel" aria-labelledby="tabBtnMatch">
+    <div class="app">
+      <div class="card">
+        <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
+          <div>
+            <h1>Ink Colour Matcher</h1>
+            <div class="pill">Active library: <span id="activeLibLabel">Pantone (base)</span></div>
+          </div>
+          <div style="min-width:200px;">
+            <label for="librarySelect">Colour library</label>
+            <select id="librarySelect"></select>
+          </div>
+          <div class="pill" id="refCountPill"><span id="countLabel">0</span> colours</div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
+          <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
+          <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
+        </div>
+        <div class="flex" style="margin-top:12px; gap:8px;">
+          <button class="btn" id="spectroConnectBtnMatch">Connect device</button>
+          <button class="btn" id="spectroScanTargetBtn">Scan into target</button>
+        </div>
+
+        <div class="row2" style="margin-top:12px;">
+          <div>
+            <label for="pms">Search by PMS (number only)</label>
+            <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+          </div>
+          <div style="align-self:end;">
+            <button class="btn" id="pmsBtn">Find PMS</button>
+          </div>
+        </div>
+
+        <div class="flex" style="margin-top:12px;">
+          <button class="btn" id="findBtn">Find closest match</button>
+          <button class="btn" id="clearBtn">Clear</button>
+          <span class="muted" id="statusMsg" aria-live="polite"></span>
+        </div>
+
+        <div class="formula-box" id="predictorBox">
+          <h2>Suggest Formula</h2>
+          <div class="row2" style="margin-bottom:8px;">
+            <div>
+              <label for="groupSelect">Colour group (optional)</label>
+              <select id="groupSelect"><option value="">— none —</option></select>
+            </div>
+            <div></div>
+          </div>
+          <div class="flex">
+            <button class="btn" id="suggestBtn">Suggest Formula</button>
+            <div id="predictMsg" class="muted" style="align-self:center;"></div>
+          </div>
+          <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
+          <div class="flex" id="editRow" style="display:none; margin-top:8px;">
+            <button class="btn" id="editFormulaBtn">Edit formula</button>
+            <span class="mini">Adjust, add/remove inks, then save correction to training log.</span>
+          </div>
         </div>
       </div>
 
-      <div class="row" style="margin-top:12px;">
-        <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
-        <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
-        <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+          <h1>Closest Matches</h1>
+          <div class="stack" style="align-items:center;">
+            <div class="swatch" id="targetSwatch" title="Target"></div>
+            <div class="muted" id="targetEcho">Target: –</div>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th>Colour</th><th>Swatch</th><th>L*</th><th>a*</th><th>b*</th><th>Distance</th></tr>
+          </thead>
+          <tbody id="resultsTbody"></tbody>
+        </table>
+        <div id="formulaPanel" class="formula-box" style="display:none;"></div>
       </div>
+    </div>
+  </section>
+
+  <!-- TAB: Compare Colours -->
+  <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
+    <div class="card" style="max-width:800px; margin:0 auto;">
+      <div class="flex" style="justify-content:space-between;">
+        <div>
+          <h1>Compare Colours (ΔE2000)</h1>
+          <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
+        </div>
+        <div style="min-width:220px;">
+          <label for="cmpLibrarySelect">Colour library</label>
+          <select id="cmpLibrarySelect"></select>
+        </div>
+      </div>
+
+      
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="cmpJobRefTop">Job reference</label>
+          <input id="cmpJobRefTop" type="text" placeholder="e.g. JOB-12345">
+        </div>
+</div>
+
+<div class="flex" style="margin-top:8px;">
+        <button class="btn" id="spectroConnectBtnCompare">Connect device</button>
+        <span class="mini">Use the spectro to scan directly into A/B.</span>
+      </div>
+
+      <div class="two-col" style="margin-top:12px;">
+        <div>
+          <div class="row2">
+            <div>
+              <label for="cmpASelect" class="nowrap">Pick Standard (from active library)</label>
+              <input list="cmpListA" id="cmpASelect" placeholder="Type to search…">
+              <datalist id="cmpListA"></datalist>
+            </div>
+            <div style="align-self:end;"><button class="btn" id="cmpALoad" class="btn hide">Load A</button></div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01"></div>
+            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01"></div>
+            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01"></div>
+          </div>
+          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
+          <div class="flex" style="margin-top:8px;">
+            <button class="btn" id="spectroScanCompareABtn">Scan into Standard</button>
+          </div>
+        </div>
+        <div>
+          <div class="row2">
+            <div>
+              <label for="cmpBSelect" class="nowrap">Pick Batch (from active library)</label>
+              <input list="cmpListB" id="cmpBSelect" placeholder="Type to search…">
+              <datalist id="cmpListB"></datalist>
+            </div>
+            <div style="align-self:end;"><button class="btn" id="cmpBLoad" class="btn hide">Load B</button></div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <div><label for="BL" class="nowrap">Batch: L*</label><input id="BL" type="number" step="0.01"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input id="Ba" type="number" step="0.01"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input id="Bb" type="number" step="0.01"></div>
+          </div>
+          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
+          <div class="flex" style="margin-top:8px;"><button class="btn" id="spectroScanCompareBBtn">Scan into Batch</button></div>
+        </div>
+      </div>
+
+      <div class="formula-box" id="cmpResult" style="display:none; margin-top:12px;">
+        <h2 style="margin-bottom:6px;">Result</h2>
+        <div id="cmpNumbers" style="font-size:1.05rem;"></div>
+        <div class="muted" style="margin-top:6px;">
+          <small>Guideline: ΔE00 &lt; 1.0 ≈ barely perceptible • &lt; 2.0 ≈ good • 2–3.5 borderline • &gt; 3.5 poor</small>
+        </div>
+      
+      <div class="formula-box" id="cmpSaveBox" style="margin-top:12px;">
+        <h2 style="margin-bottom:6px;">Save this comparison</h2>
+        <div class="row">
+          <div>
+            <label for="cmpJobRef">Job reference</label>
+            <input id="cmpJobRef" type="text" placeholder="e.g. JOB-12345">
+          </div>
+<div style="align-self:end;">
+            <button class="btn" id="cmpSaveBtn">Save result</button>
+          </div>
+        </div>
+        <div class="mini" id="cmpSaveMsg" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="formula-box" id="cmpLogBox" style="margin-top:12px;">
+        <div class="flex" style="justify-content:space-between; align-items:center;">
+          <h2 style="margin:0;">Saved comparisons (local)</h2>
+          <div class="flex">
+            <button class="btn" id="cmpExportLogBtn">Download CSV</button>
+            <button class="btn" id="cmpClearLogBtn">Clear</button>
+          </div>
+        </div>
+        <div style="max-height:260px; overflow:auto; border:1px solid #1f2933; border-radius:10px; margin-top:10px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Job</th>
+                                <th>A (L*a*b*)</th>
+                <th>B (L*a*b*)</th>
+                <th>ΔE2000</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="cmpLogTbody"></tbody>
+          </table>
+        </div>
+        <div class="mini" style="margin-top:6px;">This simulates saving to MongoDB for demos. Later you can swap the save handler to a Node-RED endpoint.</div>
+      </div>
+
+</div>
+
+      <div class="canvasWrap">
+        <div class="legend">
+          <span class="nowrap">Standard:</span><span id="legendA" class="dot"></span>
+          <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot"></span>
+          <span style="margin-left:auto;"></span>
+          <button class="btn" id="resetView">Reset view</button>
+          <span style="font-size:.8rem; opacity:.8;">Drag to rotate • Scroll to zoom</span>
+        </div>
+        <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB: Colour Sets (libraries) -->
+  <section id="tab-libraries" role="tabpanel" aria-labelledby="tabBtnLibraries" hidden>
+    <div class="card" style="max-width:900px; margin:0 auto;">
+      <h1>Colour Sets (Libraries)</h1>
+      <p class="muted">
+        Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
+        in the <strong>Match &amp; Predict</strong> and <strong>Compare Colours</strong> tabs.
+      </p>
+      <p class="muted" style="margin-top:6px;">
+        <strong>CSV format:</strong> first row as headers. Required columns: <code>Name</code>, <code>L</code>,
+        <code>a</code>, <code>b</code> (or <code>L*</code>, <code>a*</code>, <code>b*</code>).
+      </p>
 
       <div class="row2" style="margin-top:12px;">
         <div>
-          <label for="pms">Search by PMS (number only)</label>
-          <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+          <label for="libName">Library name</label>
+          <input id="libName" type="text" placeholder="e.g. Customer ACME Spot Colours">
         </div>
-        <div style="align-self:end;">
-          <button class="btn" id="pmsBtn">Find PMS</button>
+        <div>
+          <label for="libFile">CSV file</label>
+          <input id="libFile" type="file" accept=".csv,text/csv">
         </div>
       </div>
 
       <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="findBtn">Find Closest</button>
-        <button class="btn" id="clearBtn">Clear</button>
-        <span class="muted" id="statusMsg" aria-live="polite"></span>
-      </div>
-<!-- Predictor Controls -->
-      <div class="formula-box" id="predictorBox">
-        <h2>Suggest Formula (uses over‑white only)</h2>
-        <div class="row2" style="margin-bottom:8px;">
-          <div>
-            <label for="maxInks">Max inks in recipe</label>
-            <input id="maxInks" type="number" min="2" max="8" step="1" value="5"/>
-          </div>
-        </div>
-        <div class="flex">
-          <button class="btn" id="suggestBtn">Suggest Formula</button>
-          <div id="predictMsg" class="muted" style="align-self:center;"></div>
-        </div>
-        <div id="suggestedFormula" class="formula-box" style="display:none;"></div>
+        <button class="btn" id="libAddBtn">Add library</button>
+        <button class="btn" id="libTemplateBtn">Download example CSV</button>
+        <span class="mini">Files stay local to this browser (saved in localStorage).</span>
       </div>
 
+      <div class="lib-list" id="libList">
+        <!-- Populated in JS -->
+      </div>
     </div>
 
-    <!-- Right Column: Results -->
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-        <h1>Closest Matches</h1>
-        <div class="stack" style="align-items:center;">
-          <div class="swatch" id="targetSwatch" title="Target"></div>
-          <div class="muted" id="targetEcho">Target: –</div>
+    <!-- Spectro capture lives ONLY on this tab -->
+    <div class="card" style="max-width:1600px; margin:16px auto 0;">
+      <h1>Capture Ink Curves from Spectro</h1>
+      <p class="muted">
+        Connect the SKZ-SY3060, measure a patch, and store the full 400–700&nbsp;nm reflectance curve along with
+        the ink name and concentration for later Kubelka–Munk modelling.
+      </p>
+
+      <div class="formula-box" id="spectroBox" style="margin-top:12px;">
+        <h2>Device connection &amp; capture</h2>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroInkName">Ink name</label>
+            <input id="spectroInkName" type="text" placeholder="e.g. Red Base">
+          </div>
+          <div>
+            <label for="spectroConcentration">Concentration %</label>
+            <input id="spectroConcentration" type="number" step="0.01" placeholder="0.10">
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroBacking">Backing</label>
+            <select id="spectroBacking">
+              <option value="white" selected>White backing</option>
+              <option value="black">Black backing</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroAngle">Observer angle</label>
+            <select id="spectroAngle">
+              <option value="2" selected>2°</option>
+              <option value="10">10°</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroIlluminant">Illuminant</label>
+            <select id="spectroIlluminant">
+              <option value="D50" selected>D50</option>
+              <option value="D65">D65</option>
+              <option value="A">A</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroAperture">Aperture</label>
+            <select id="spectroAperture">
+              <option value="8mm" selected>8 mm</option>
+              <option value="4mm">4 mm</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroGeometry">Geometry</label>
+            <select id="spectroGeometry">
+              <option value="SCI" selected>SCI</option>
+              <option value="SCE">SCE</option>
+            </select>
+          </div>
+          <div>
+            <label>Timestamp</label>
+            <input id="spectroTimestampPreview" type="text" readonly class="mono" placeholder="Set when measured">
+          </div>
+        </div>
+
+        <div class="flex">
+          <button class="btn" id="spectroConnectBtn">Connect device</button>
+          <button class="btn" id="spectroMeasureBtn">Measure &amp; store curve</button>
+          <button class="btn" id="spectroExportBtn">Download CSV</button>
+          <span class="mini" id="spectroStatus" style="margin-left:auto;"></span>
+        </div>
+        <div class="mini" style="margin-top:6px;">
+          
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Colour</th>
-            <th>Swatch</th>
-            <th>L*</th>
-            <th>a*</th>
-            <th>b*</th>
-            <th>Distance</th>
-          </tr>
-        </thead>
-        <tbody id="resultsTbody"></tbody>
-      </table>
-      <div id="formulaPanel" class="formula-box" style="display:none;"></div>
+
+      <div class="formula-box" style="margin-top:12px;">
+        <h2>Stored ink curves</h2>
+        <p class="mini" style="margin-bottom:6px;">
+          These rows are stored locally in this browser (localStorage). You can edit the ink name, concentration and
+          metadata, or delete rows. The CSV export uses these values together with the full spectral curve.
+        </p>
+        <div style="max-height:260px; overflow:auto; border:1px solid #1f2933; border-radius:10px;">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Swatch</th>
+                <th>Ink name</th>
+                <th>Conc</th>
+                <th>Backing</th>
+                <th>Angle</th>
+                <th>Illum</th>
+                <th>Aperture</th>
+                <th>Geom</th>
+                <th>L*</th>
+                <th>a*</th>
+                <th>b*</th>
+                <th>Timestamp</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inkCurvesTbody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <!-- TAB: Settings -->
+  <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
+    <div class="card wide">
+      <h1>Settings</h1>
+      <p class="muted">
+        These settings are saved locally in this browser (simulating customer-specific preferences).
+      </p>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="setDeltaEThreshold">ΔE2000 pass/fail threshold</label>
+          <input id="setDeltaEThreshold" type="number" step="0.1" min="0" placeholder="2.0">
+          <div class="mini" style="margin-top:6px;">Used to colour the Compare result and decide Pass/Fail.</div>
+        </div>
+        <div>
+          <label for="setAutoSaveCompare">Auto-save compare results</label>
+          <select id="setAutoSaveCompare">
+            <option value="1">On</option>
+            <option value="0">Off</option>
+          </select>
+          <div class="mini" style="margin-top:6px;">If on, each time you calculate ΔE it will be logged automatically (requires Job reference).</div>
+        </div>
+      </div>
+
+      <div class="flex" style="margin-top:12px;">
+        <button class="btn" id="saveSettingsBtn">Save settings</button>
+        <button class="btn" id="resetSettingsBtn">Reset to defaults</button>
+        <span class="mini" id="settingsStatus" style="margin-left:auto;"></span>
+      </div>
+    </div>
+  </section>
+
+<!-- Modal: Edit Formula -->
+  <div class="modal-backdrop" id="editModal">
+    <div class="modal">
+      <h3>Edit formula</h3>
+      <div class="mini" id="editContext"></div>
+      <div id="editList" style="margin-top:8px; display:grid; gap:6px;"></div>
+      <div class="add-row">
+        <select id="addInkSel"></select>
+        <input id="addPct" type="number" step="0.01" placeholder="% add" class="pct-input mono">
+        <button class="btn" id="addInkBtn">Add ink</button>
+      </div>
+      <div class="two-col" style="margin-top:8px;">
+        <div class="note">Total: <span id="totalPct">0.00</span>% — <span id="totalState" class="warn">needs normalising</span></div>
+        <div class="flex" style="justify-content:flex-end;">
+          <button class="btn" id="normaliseBtn">Normalise to 100%</button>
+        </div>
+      </div>
+      <div style="margin-top:8px;">
+        <label for="corrNote">Optional note</label>
+        <textarea id="corrNote" placeholder="e.g., +1.5% black to drop L*, swapped Yellow→Orange bias, etc."></textarea>
+      </div>
+      <div class="footer-row">
+        <button class="btn" id="cancelEdit">Cancel</button>
+        <button class="btn" id="saveCorrection">Save correction</button>
+      </div>
     </div>
   </div>
 
 <script>
 (function(){
 'use strict';
-// ===== Utilities =====
 function $(sel){ return document.querySelector(sel); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 
-// D65 reference white (2°)
+const API_BASE = 'https://ink-predict-api.onrender.com'; // <- your Render URL
+
+// ===== Colour math =====
 function labToXyz(L,a,b){
-  var Yn=1, Xn=0.95047, Zn=1.08883;
-  var fy=(L+16)/116;
-  var fx=function(f){ return f>0.206893?f*f*f:(f-16/116)/7.787; };
+  const Yn=1, Xn=0.95047, Zn=1.08883, fy=(L+16)/116;
+  const fx=f=> f>0.206893?f*f*f:(f-16/116)/7.787;
   return { X: fx((a/500)+fy)*Xn, Y: fx(fy)*Yn, Z: fx(fy-(b/200))*Zn };
 }
-function xyzToLab(X,Y,Z){
-  var Xn=0.95047, Yn=1, Zn=1.08883;
-  var f=function(t){ return t>0.008856?Math.cbrt(t):(7.787*t+16/116); };
-  var L = 116*f(Y/Yn)-16;
-  var a = 500*(f(X/Xn)-f(Y/Yn));
-  var b = 200*(f(Y/Yn)-f(Z/Zn));
-  return {L:L,a:a,b:b};
-}
 function labToSrgb(L,a,b){
-  // Lab (D65) -> XYZ (D65) -> sRGB
-  var xyz = labToXyz(L,a,b);
-  var X=xyz.X, Y=xyz.Y, Z=xyz.Z;
-  var r =  3.2406*X -1.5372*Y -0.4986*Z;
-  var g = -0.9689*X +1.8758*Y +0.0415*Z;
-  var b2=  0.0557*X -0.2040*Y +1.0570*Z;
-  var lin=[r,g,b2].map(function(v){ return v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055; });
+  const xyz = labToXyz(L,a,b);
+  const X = xyz.X, Y = xyz.Y, Z = xyz.Z;
+  let r =  3.2406*X -1.5372*Y -0.4986*Z;
+  let g = -0.9689*X +1.8758*Y +0.0415*Z;
+  let b2=  0.0557*X -0.2040*Y +1.0570*Z;
+  const lin=[r,g,b2].map(v=> v<=0.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-0.055);
   r=clamp(Math.round(lin[0]*255),0,255);
   g=clamp(Math.round(lin[1]*255),0,255);
   b2=clamp(Math.round(lin[2]*255),0,255);
-  return {r:r,g:g,b:b2};
+  return { r, g, b: b2 };
 }
-
-// ΔE2000 (kL=kC=kH=1)
-function hp(x,y){ var h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
-function deltaE2000(l1,l2){
-  var L1=l1.L,a1=l1.a,b1=l1.b, L2=l2.L,a2=l2.a,b2=l2.b;
-  var deg2rad=Math.PI/180;
-  var avgLp=(L1+L2)/2;
-  var C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
-  var G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
-  var a1p=(1+G)*a1, a2p=(1+G)*a2;
-  var C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
-  var h1p=hp(a1p,b1), h2p=hp(a2p,b2);
-  var avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
-  var T = 1 - 0.17*Math.cos((avgHp-30)*deg2rad) + 0.24*Math.cos((2*avgHp)*deg2rad)
-          + 0.32*Math.cos((3*avgHp+6)*deg2rad) - 0.20*Math.cos((4*avgHp-63)*deg2rad);
-  var dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
-  var dLp = L2 - L1;
-  var dCp = C2p - C1p;
-  var dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*deg2rad)/2);
-  var Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2));
-  var Sc = 1 + 0.045*avgCp;
-  var Sh = 1 + 0.015*avgCp*T;
-  var Rt = -2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)))
-          * Math.sin( (60*Math.exp(-Math.pow((avgHp-275)/25,2))) * deg2rad );
+function hp(x,y){ const h=Math.atan2(y,x)*180/Math.PI; return (h>=0?h:h+360); }
+function deltaE2000(c1,c2){
+  const L1=c1.L,a1=c1.a,b1=c1.b, L2=c2.L,a2=c2.a,b2=c2.b, d2r=Math.PI/180;
+  const avgLp=(L1+L2)/2, C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2), avgC=(C1+C2)/2;
+  const G=0.5*(1-Math.sqrt(Math.pow(avgC,7)/(Math.pow(avgC,7)+Math.pow(25,7))));
+  const a1p=(1+G)*a1, a2p=(1+G)*a2, C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2), avgCp=(C1p+C2p)/2;
+  const h1p=hp(a1p,b1), h2p=hp(a2p,b2), avgHp = Math.abs(h1p-h2p)>180 ? (h1p+h2p+360)/2 : (h1p+h2p)/2;
+  const T = 1 - 0.17*Math.cos((avgHp-30)*d2r) + 0.24*Math.cos((2*avgHp)*d2r) + 0.32*Math.cos((3*avgHp+6)*d2r) - 0.20*Math.cos((4*avgHp-63)*d2r);
+  let dHp = h2p - h1p; if (dHp>180) dHp-=360; if (dHp<-180) dHp+=360;
+  const dLp = L2 - L1, dCp = C2p - C1p, dHp_rad = 2*Math.sqrt(C1p*C2p)*Math.sin((dHp*d2r)/2);
+  const Sl = 1 + (0.015*Math.pow(avgLp-50,2))/Math.sqrt(20 + Math.pow(avgLp-50,2)), Sc = 1 + 0.045*avgCp;
+  const Sh = 1 + 0.015*avgCp*T;
+  const Rc=2*Math.sqrt(Math.pow(avgCp,7)/(Math.pow(avgCp,7)+Math.pow(25,7)));
+  const Rt=-Rc*Math.sin(2*(30*Math.exp(-Math.pow((avgHp-275)/25,2)))*d2r);
   return Math.sqrt(Math.pow(dLp/Sl,2) + Math.pow(dCp/Sc,2) + Math.pow(dHp_rad/Sh,2) + Rt*(dCp/Sc)*(dHp_rad/Sh));
 }
 
 // ===== State =====
-var COLOURS = [];// from colours.json
-var FORMULAS = {};// from DC_Formulas.json (can be workbook-style)
-var ASSORTMENT = {};// from assortment_colour_data.json { ink: {white:[{conc,L,a,b}], black:[...]}}
+let BASE_COLOURS = [];   // built-in Pantone set
+let COLOURS = [];        // active library view
+let FORMULAS = {};
+let FORMULAS_NORM = {};
+let COLOUR_TO_FORMULA = {};
+let _lastSuggestion = null;
+let _lastContextName = null;
+let _allInks = [];
 
-// Name & PMS helpers
+// ===== Spectro capture state =====
+let spectroPort = null;
+let spectroConnected = false;
+const INK_CURVES_KEY = 'ink_curves_v1';
+let INK_CURVES = [];
+
+// ===== Compare logging (simulated DB via localStorage) =====
+const CMP_LOG_KEY = 'compare_log_v1';
+const SETTINGS_KEY = 'ink_system_settings_v1';
+let CMP_LOG = [];
+let SETTINGS = {
+  deltaEThreshold: 2.0,
+  autoSaveCompare: false,
+};
+
+function makeJobId(){
+  try{
+    if (crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  }catch(_){}
+  return String(Date.now()) + '-' + Math.floor(Math.random()*1e9).toString(36);
+}
+
+let CURRENT_JOB_ID = makeJobId();
+
+function setJobIdUI(){ /* job id is stored internally */ }
+
+function setJobRefUI(v){
+  const a = document.getElementById('cmpJobRef');
+  const b = document.getElementById('cmpJobRefTop');
+  if (a && a.value !== v) a.value = v;
+  if (b && b.value !== v) b.value = v;
+}
+
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const j = JSON.parse(raw);
+    if (j && typeof j === 'object'){
+      if (Number.isFinite(+j.deltaEThreshold)) SETTINGS.deltaEThreshold = +j.deltaEThreshold;
+      if (j.autoSaveCompare === true || j.autoSaveCompare === false) SETTINGS.autoSaveCompare = j.autoSaveCompare;
+    }
+  }catch{}
+}
+function saveSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify(SETTINGS)); }catch{}
+}
+function applySettingsToUI(){
+  const thr = document.getElementById('setDeltaEThreshold');
+  const auto = document.getElementById('setAutoSaveCompare');
+  if (thr) thr.value = String(SETTINGS.deltaEThreshold);
+  if (auto) auto.value = SETTINGS.autoSaveCompare ? '1' : '0';
+}
+function readSettingsFromUI(){
+  const thr = document.getElementById('setDeltaEThreshold');
+  const auto = document.getElementById('setAutoSaveCompare');
+  const v = thr ? parseFloat(thr.value) : NaN;
+  if (Number.isFinite(v) && v >= 0) SETTINGS.deltaEThreshold = v;
+  SETTINGS.autoSaveCompare = (auto && auto.value === '1') ? true : false;
+}
+
+function loadCompareLog(){
+  try{
+    const raw = localStorage.getItem(CMP_LOG_KEY);
+    if (!raw){ CMP_LOG = []; return; }
+    const arr = JSON.parse(raw);
+    CMP_LOG = Array.isArray(arr) ? arr : [];
+  }catch{ CMP_LOG = []; }
+}
+function saveCompareLog(){
+  try{ localStorage.setItem(CMP_LOG_KEY, JSON.stringify(CMP_LOG)); }catch{}
+}
+function fmtLab(o){
+  return `L ${(+o.L).toFixed(2)} a ${(+o.a).toFixed(2)} b ${(+o.b).toFixed(2)}`;
+}
+function isoToNice(ts){
+  const d = new Date(ts);
+  // local time, demo-friendly
+  return d.toLocaleString(undefined, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+function renderCompareLog(){
+  const tb = document.getElementById('cmpLogTbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  if (!CMP_LOG.length){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="7" class="muted">No saved comparisons yet.</td>';
+    tb.appendChild(tr);
+    return;
+  }
+  // newest first
+  const rows = CMP_LOG.slice().sort((a,b)=> (b.ts||0)-(a.ts||0));
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+    const pass = Number.isFinite(+r.deltaE) ? (+r.deltaE < SETTINGS.deltaEThreshold) : null;
+    const cls = (pass===true) ? 'de-pass' : (pass===false ? 'de-fail' : 'de-neutral');
+    const resTxt = (pass===true) ? 'PASS' : (pass===false ? 'FAIL' : '—');
+    tr.innerHTML = `
+      <td>${isoToNice(r.ts)}</td>
+      <td class="mono">${(r.jobRef||'').replace(/</g,'&lt;')}</td>
+      <td class="mono">${fmtLab(r.A)}</td>
+      <td class="mono">${fmtLab(r.B)}</td>
+      <td class="${cls}">${(+r.deltaE).toFixed(2)}</td>
+      <td class="${cls}">${resTxt}</td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+function exportCompareLogCsv(){
+  if (!CMP_LOG.length){ alert('No saved comparisons yet.'); return; }
+  const header = ['Date','JobRef','A_L','A_a','A_b','B_L','B_a','B_b','DeltaE2000','Threshold','Result'];
+  const lines = [header.join(',')];
+  const thr = SETTINGS.deltaEThreshold;
+  const rows = CMP_LOG.slice().sort((a,b)=> (a.ts||0)-(b.ts||0));
+  rows.forEach(r=>{
+    const pass = (+r.deltaE < thr);
+    lines.push([
+      new Date(r.ts).toISOString(),
+      String(r.jobRef||'').replaceAll(',',' '),
+      String(r.jobId||'').replaceAll(',',' '),
+      r.A.L, r.A.a, r.A.b,
+      r.B.L, r.B.a, r.B.b,
+      r.deltaE,
+      thr,
+      pass ? 'PASS' : 'FAIL'
+    ].join(','));
+  });
+  const blob = new Blob([lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'colour_compare_log.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function getCompareAB(){
+  const A={L:parseFloat(document.getElementById('AL').value), a:parseFloat(document.getElementById('Aa').value), b:parseFloat(document.getElementById('Ab').value)};
+  const B={L:parseFloat(document.getElementById('BL').value), a:parseFloat(document.getElementById('Ba').value), b:parseFloat(document.getElementById('Bb').value)};
+  if ([A.L,A.a,A.b,B.L,B.a,B.b].some(v=>Number.isNaN(v))) return null;
+  return {A,B};
+}
+function saveCurrentComparison(opts){
+  const ab = getCompareAB();
+  if (!ab) return { ok:false, msg:'Enter valid L*a*b* for both A and B first.' };
+  const jobRef = (document.getElementById('cmpJobRef')?.value || '').trim();
+  if (!jobRef) return { ok:false, msg:'Please enter a Job reference before saving.' };
+  const deltaE = deltaE2000({L:ab.A.L,a:ab.A.a,b:ab.A.b},{L:ab.B.L,a:ab.B.a,b:ab.B.b});
+  const rec = { ts: Date.now(), jobRef, jobId: CURRENT_JOB_ID, A: ab.A, B: ab.B, deltaE: +deltaE.toFixed(4) };
+  CMP_LOG.push(rec);
+  saveCompareLog();
+  renderCompareLog();
+  CURRENT_JOB_ID = makeJobId();
+  setJobIdUI();
+  return { ok:true, msg: (opts && opts.silent) ? '' : 'Saved.' };
+}
+
+
+function loadInkCurves(){
+  try{
+    const raw = localStorage.getItem(INK_CURVES_KEY);
+    if (!raw){ INK_CURVES = []; return; }
+    const arr = JSON.parse(raw);
+    INK_CURVES = Array.isArray(arr) ? arr : [];
+  }catch(e){
+    INK_CURVES = [];
+  }
+}
+
+function saveInkCurves(){
+  try{
+    localStorage.setItem(INK_CURVES_KEY, JSON.stringify(INK_CURVES));
+  }catch(e){}
+}
+
+const LIB_KEY = 'ink_user_libraries_v1';
+const LIB_BASE_ID = 'base';
+const LIB_ALL_ID = 'all';
+let userLibraries = []; // [{id,name,colours:[]}]
+let activeLibraryId = LIB_BASE_ID;
+
+// Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
 function extractPmsNumber(name){
-  if(!name) return null; var m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
+  if(!name) return null;
+  const m = String(name).toUpperCase().match(/PANTONE\s*([0-9A-Z]+(?:[\- ]?[0-9A-Z]+)*)/);
   return m? m[1].replace(/\s+/g,'').replace(/^\-/,''): null;
 }
+function updateTargetEcho(){
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))){
+    $('#targetEcho').textContent='Target: –';
+    $('#targetSwatch').style.background='#0000';
+    return;
+  }
+  $('#targetEcho').textContent=`Target: L ${L.toFixed(2)} a ${a.toFixed(2)} b ${b.toFixed(2)}`;
+  const rgb=labToSrgb(L,a,b);
+  $('#targetSwatch').style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+}
 
-var FORMULAS_NORM = {};
-var COLOUR_TO_FORMULA = {};
+// Build formula index from DC_Formulas.json (Pantone library)
 function buildFormulaIndex(){
-  var rows = [];
-  FORMULAS_NORM = {};
-  COLOUR_TO_FORMULA = {};
-  // Flatten workbook-style DC_Formulas
-  if (Array.isArray(FORMULAS)) {
-    rows.push.apply(rows, FORMULAS);
-  } else if (FORMULAS && typeof FORMULAS === 'object') {
-    Object.keys(FORMULAS).forEach(function(k){
-      if (Array.isArray(FORMULAS[k])) rows.push.apply(rows, FORMULAS[k]);
-      else if (FORMULAS[k] && typeof FORMULAS[k] === 'object' && Array.isArray(FORMULAS[k].rows)) {
-        rows.push.apply(rows, FORMULAS[k].rows);
-      }
+  const rows=[]; FORMULAS_NORM={}; COLOUR_TO_FORMULA={};
+  if (Array.isArray(FORMULAS)) rows.push(...FORMULAS);
+  else if (FORMULAS && typeof FORMULAS==='object'){
+    Object.keys(FORMULAS).forEach(k=>{
+      if (Array.isArray(FORMULAS[k])) rows.push(...FORMULAS[k]);
+      else if (FORMULAS[k] && typeof FORMULAS[k]==='object' && Array.isArray(FORMULAS[k].rows)) rows.push(...FORMULAS[k].rows);
     });
   }
-  // Build per-colour arrays of inks
-  var byColour = new Map();
-  rows.forEach(function(r){
-    var cname = r.Colour || r.colour || r.Color || r.color || r.NAME || r.Name;
-    if (!cname) return;
-    var items = [];
-    for (var i = 1; i <= 12; i++) {
-      var ink = r['Ingredient '+i] || r['Ink '+i] || r['INGREDIENT '+i] || r['ingredient '+i];
-      if (!ink) continue;
-      var pct = r['%'+i] || r[i+'%'] || r['% '+i] || r['Percent '+i] || r['Percent'+i] || r['%'] || '';
-      items.push({ ink: ink, percent: pct });
+  const byColour=new Map();
+  rows.forEach(r=>{
+    const cname=r.Colour||r.colour||r.Color||r.color||r.NAME||r.Name;
+    if(!cname) return;
+    const items=[];
+    for (let i=1;i<=12;i++){
+      const ink=r['Ingredient '+i]||r['Ink '+i]||r['INGREDIENT '+i]||r['ingredient '+i];
+      if(!ink) continue;
+      const pct=r['%'+i]||r[i+'%']||r['% '+i]||r['Percent '+i]||r['Percent'+i]||r['%']||'';
+      items.push({ink,percent:pct});
     }
-    var arr = byColour.get(cname) || [];
-    arr.push.apply(arr, items);
-    byColour.set(cname, arr);
-    FORMULAS_NORM[normaliseName(cname)] = arr;
+    const arr=byColour.get(cname)||[];
+    arr.push(...items);
+    byColour.set(cname,arr);
+    FORMULAS_NORM[normaliseName(cname)]=arr;
   });
-  // Pre-bind colour names to best formula key
-  (COLOURS || []).forEach(function(c){
-    var name = c.name || c.Colour || c.color || '';
-    var norm = normaliseName(name);
-    if (byColour.has(name)) { COLOUR_TO_FORMULA[name] = norm; return; }
-    if (FORMULAS_NORM[norm]) { COLOUR_TO_FORMULA[name] = norm; return; }
-    var p = extractPmsNumber(name);
-    if (p) {
-      byColour.keys();
-      for (var key of byColour.keys()){
-        if ((extractPmsNumber(key)||'') === p) { COLOUR_TO_FORMULA[name] = normaliseName(key); break; }
+  (BASE_COLOURS||[]).forEach(c=>{
+    const name=c.name||c.Colour||c.color||'';
+    const norm=normaliseName(name);
+    if (byColour.has(name)){ COLOUR_TO_FORMULA[name]=norm; return; }
+    if (FORMULAS_NORM[norm]){ COLOUR_TO_FORMULA[name]=norm; return; }
+    const p=extractPmsNumber(name);
+    if (p){
+      for (const key of byColour.keys()){
+        if ((extractPmsNumber(key)||'')===p){
+          COLOUR_TO_FORMULA[name]=normaliseName(key);
+          break;
+        }
       }
     }
   });
 }
 
-// ===== UI helpers =====
-function updateTargetEcho(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })){
-    $('#targetEcho').textContent = 'Target: –'; $('#targetSwatch').style.background = '#0000'; return;
+// Library handling
+function saveLibraries(){
+  try{
+    const plain = userLibraries.map(l=>({id:l.id,name:l.name,colours:l.colours}));
+    localStorage.setItem(LIB_KEY, JSON.stringify(plain));
+  }catch(e){}
+}
+function loadLibraries(){
+  try{
+    const raw = localStorage.getItem(LIB_KEY);
+    if (!raw) { userLibraries = []; return; }
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) { userLibraries = []; return; }
+    userLibraries = arr.map(l=>({
+      id: String(l.id || (crypto && crypto.randomUUID ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2)))),
+      name: String(l.name || 'Unnamed'),
+      colours: Array.isArray(l.colours) ? l.colours.map(co=>({
+        name: String(co.name || co.Colour || co.color || 'Untitled'),
+        L: Number(co.L ?? co.Lstar ?? co['L*'] ?? 0),
+        a: Number(co.a ?? co.astar ?? co['a*'] ?? 0),
+        b: Number(co.b ?? co.bstar ?? co['b*'] ?? 0)
+      })) : []
+    }));
+  }catch(e){
+    userLibraries = [];
   }
-  $('#targetEcho').textContent = 'Target: L '+L.toFixed(2)+' a '+a.toFixed(2)+' b '+b.toFixed(2);
-  var rgb = labToSrgb(L,a,b); $('#targetSwatch').style.background = 'rgb('+rgb.r+','+rgb.g+','+rgb.b+')';
+}
+function libraryOptions(){
+  const opts = [
+    {id: LIB_BASE_ID, label: 'Pantone (base)'}
+  ];
+  userLibraries.forEach(l => opts.push({id: l.id, label: l.name}));
+  if (userLibraries.length) opts.push({id: LIB_ALL_ID, label: 'All libraries (combined)'});
+  return opts;
+}
+function refreshLibrarySelects(){
+  const opts = libraryOptions();
+  const sel1 = $('#librarySelect');
+  const sel2 = $('#cmpLibrarySelect');
+  const build = (sel)=>{
+    sel.innerHTML = '';
+    opts.forEach(o=>{
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+    if (!opts.find(o=>o.id === activeLibraryId)) activeLibraryId = LIB_BASE_ID;
+    sel.value = activeLibraryId;
+  };
+  build(sel1);
+  build(sel2);
+  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone (base)';
+  $('#activeLibLabel').textContent = activeLabel;
+  $('#cmpLibLabel').textContent = activeLabel;
+}
+function getActiveColours(){
+  if (activeLibraryId === LIB_BASE_ID) return BASE_COLOURS;
+  if (activeLibraryId === LIB_ALL_ID){
+    let all = [...BASE_COLOURS];
+    userLibraries.forEach(l => { all = all.concat(l.colours); });
+    return all;
+  }
+  const lib = userLibraries.find(l=>l.id === activeLibraryId);
+  return lib ? lib.colours : BASE_COLOURS;
+}
+function refreshActiveColours(){
+  COLOURS = getActiveColours();
+  $('#countLabel').textContent = COLOURS.length;
+  $('#resultsTbody').innerHTML = '';
+  $('#formulaPanel').style.display = 'none';
+  refreshCompareDatalists();
+}
+function renderLibraryList(){
+  const wrap = $('#libList');
+  if (!userLibraries.length){
+    wrap.innerHTML = '<div class="muted">No custom libraries yet. Add one above.</div>';
+    return;
+  }
+  let html = '<h3 style="margin-top:8px;">Your libraries</h3>';
+  userLibraries.forEach(l=>{
+    html += `<div class="lib-item">
+      <div>
+        <div class="lib-item-name">${l.name}</div>
+        <div class="lib-badge">${l.colours.length} colours</div>
+      </div>
+      <button class="btn" data-del-lib="${l.id}">Delete</button>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-del-lib]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-del-lib');
+      userLibraries = userLibraries.filter(l=>l.id !== id);
+      saveLibraries();
+      refreshLibrarySelects();
+      refreshActiveColours();
+      renderLibraryList();
+    });
+  });
 }
 
-// ===== Matching =====
+// parse CSV into colours
+function parseCsvColours(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+  if (!lines.length) return [];
+  const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const idxName = header.findIndex(h=>['name','colour','color'].includes(h));
+  const idxL = header.findIndex(h=>['l','l*','lstar'].includes(h));
+  const idxA = header.findIndex(h=>['a','a*','astar'].includes(h));
+  const idxB = header.findIndex(h=>['b','b*','bstar'].includes(h));
+  if (idxName<0 || idxL<0 || idxA<0 || idxB<0) throw new Error('CSV must have columns: Name, L, a, b');
+  const out = [];
+  for (let i=1;i<lines.length;i++){
+    const parts = lines[i].split(',').map(x=>x.trim());
+    if (parts.length <= Math.max(idxName,idxL,idxA,idxB)) continue;
+    const name = parts[idxName] || `Row ${i+1}`;
+    const L = parseFloat(parts[idxL]);
+    const a = parseFloat(parts[idxA]);
+    const b = parseFloat(parts[idxB]);
+    if ([L,a,b].some(v=>Number.isNaN(v))) continue;
+    out.push({name, L, a, b});
+  }
+  return out;
+}
+
+// ===== Matching / PMS / formulas =====
 function getTargetLab(){
-  var L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
-  if([L,a,b].some(function(v){ return Number.isNaN(v); })) return null; return {L:L,a:a,b:b};
+  const L=parseFloat($('#L').value), a=parseFloat($('#a').value), b=parseFloat($('#b').value);
+  if([L,a,b].some(v=>Number.isNaN(v))) return null;
+  return {L,a,b};
 }
-function findClosest(){
-  var target = getTargetLab(); if(!target){ alert('Enter a valid colour first.'); return; }
-  var rows = COLOURS.map(function(c){ return {
-    raw: c,
-    name: c.name || c.Colour || c.color || '—',
-    L:c.L, a:c.a, b:c.b,
-    de: deltaE2000({L:c.L,a:c.a,b:c.b}, target)
-  }; }).sort(function(a,b){ return a.de-b.de; }).slice(0,8); // limit to 8 for a compact list
 
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  rows.forEach(function(r){
-    var tr=document.createElement('tr'); tr.className='result-row';
-    var rgb=labToSrgb(r.L,r.a,r.b);
-    tr.innerHTML = '\n      <td>'+r.name+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+r.L.toFixed(2)+'</td>\n      <td>'+r.a.toFixed(2)+'</td>\n      <td>'+r.b.toFixed(2)+'</td>\n      <td>'+r.de.toFixed(2)+'</td>';
-    tr.addEventListener('click', function(){ showFormulaFor(r.name); });
+function findClosest(){
+  const target=getTargetLab();
+  if(!target){
+    alert('Enter a valid colour first.');
+    return;
+  }
+  const rows=COLOURS.map(c=>({
+    raw:c,
+    name:c.name||c.Colour||c.color||'—',
+    L:c.L,
+    a:c.a,
+    b:c.b,
+    de:deltaE2000({L:c.L,a:c.a,b:c.b},target)
+  })).sort((a,b)=>a.de-b.de).slice(0,8);
+  const tbody=$('#resultsTbody');
+  tbody.innerHTML='';
+  rows.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.className='result-row';
+    const rgb=labToSrgb(r.L,r.a,r.b);
+    tr.innerHTML=`<td>${r.name}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${r.L.toFixed(2)}</td><td>${r.a.toFixed(2)}</td><td>${r.b.toFixed(2)}</td>
+      <td>${r.de.toFixed(2)}</td>`;
+    tr.addEventListener('click',()=>{
+      $('#L').value=r.L;
+      $('#a').value=r.a;
+      $('#b').value=r.b;
+      updateTargetEcho();
+      showFormulaFor(r.name);
+      _lastContextName = r.name;
+    });
     tbody.appendChild(tr);
   });
 }
-
 function showFormulaFor(colourName){
-  var panel = $('#formulaPanel');
-  var list = null;
-  var bound = COLOUR_TO_FORMULA[colourName];
-  if(bound) list = FORMULAS_NORM[bound];
-  if(!list) list = FORMULAS_NORM[normaliseName(colourName)];
+  const panel=$('#formulaPanel');
+  let list=null;
+  const bound=COLOUR_TO_FORMULA[colourName];
+  if(bound) list=FORMULAS_NORM[bound];
+  if(!list) list=FORMULAS_NORM[normaliseName(colourName)];
   if(!list){
-    var want = extractPmsNumber(colourName);
+    const want=extractPmsNumber(colourName);
     if(want){
-      for (var key in FORMULAS_NORM){
-        if ((extractPmsNumber(key)||'') === want){ list = FORMULAS_NORM[key]; break; }
+      for (const key in FORMULAS_NORM){
+        if ((extractPmsNumber(key)||'')===want){
+          list=FORMULAS_NORM[key];
+          break;
+        }
       }
     }
   }
-  if(!list || !list.length){ panel.style.display='none'; return; }
-  var html = '<h2>Existing Formula: '+colourName+'</h2><div class="formula-grid">';
-  list.forEach(function(item){
-    var name = item.ink || item.Ink || 'Ink';
-    var pct = item.percent!==''? (item.percent+'%') : '';
-    html += '<div class="fg-ink">'+name+'</div><div class="fg-pct">'+pct+'</div>';
+  if(!list||!list.length){
+    panel.style.display='none';
+    return;
+  }
+  let html=`<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
+  list.forEach(item=>{
+    const name=item.ink||item.Ink||'Ink';
+    const pct=item.percent!==''?(item.percent+'%'):'';
+    html+=`<div class="fg-ink">${name}</div><div class="fg-pct">${pct}</div>`;
   });
-  html += '</div>';
-  panel.innerHTML = html; panel.style.display='block';
+  html+='</div>';
+  panel.innerHTML=html;
+  panel.style.display='block';
 }
-
-// ===== PMS Search =====
 function findByPms(){
-  var qRaw = ($('#pms').value||'').trim().toUpperCase(); if(!qRaw){ alert('Enter a PMS number'); return; }
-  var q = qRaw.replace(/^PANTONE\s*/,'');
-  var hits = COLOURS.filter(function(c){
-    var p = extractPmsNumber(c.name||c.Colour||c.color||'');
+  const qRaw=($('#pms').value||'').trim().toUpperCase();
+  if(!qRaw){
+    alert('Enter a PMS number');
+    return;
+  }
+  const q=qRaw.replace(/^PANTONE\s*/,'');
+  const hits=COLOURS.filter(c=>{
+    const p=extractPmsNumber(c.name||c.Colour||c.color||'');
     return p && p.includes(q);
   });
-  var tbody = $('#resultsTbody'); tbody.innerHTML='';
-  if(!hits.length){ alert('No PMS match found'); return; }
-  hits.slice(0,8).forEach(function(c){ // also limit to 8 here
-    var rgb=labToSrgb(c.L,c.a,c.b);
-    var tr=document.createElement('tr'); tr.className='result-row';
-    tr.innerHTML = '\n      <td>'+(c.name||c.Colour||c.color||'—')+'</td>\n      <td><div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div></td>\n      <td>'+(+c.L).toFixed(2)+'</td>\n      <td>'+(+c.a).toFixed(2)+'</td>\n      <td>'+(+c.b).toFixed(2)+'</td>\n      <td>—</td>';
-    tr.addEventListener('click', function(){ $('#L').value=c.L; $('#a').value=c.a; $('#b').value=c.b; updateTargetEcho(); showFormulaFor(c.name||c.Colour||c.color||''); });
+  const tbody=$('#resultsTbody');
+  tbody.innerHTML='';
+  if(!hits.length){
+    alert('No PMS match found');
+    return;
+  }
+  hits.slice(0,8).forEach(c=>{
+    const rgb=labToSrgb(c.L,c.a,c.b);
+    const tr=document.createElement('tr');
+    tr.className='result-row';
+    tr.innerHTML=`<td>${(c.name||c.Colour||c.color||'—')}</td>
+      <td><div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})"></div></td>
+      <td>${(+c.L).toFixed(2)}</td><td>${(+c.a).toFixed(2)}</td><td>${(+c.b).toFixed(2)}</td><td>—</td>`;
+    tr.addEventListener('click',()=>{
+      $('#L').value=c.L;
+      $('#a').value=c.a;
+      $('#b').value=c.b;
+      updateTargetEcho();
+      showFormulaFor(c.name||c.Colour||c.color||'');
+      _lastContextName = c.name||c.Colour||c.color||'';
+    });
     tbody.appendChild(tr);
   });
-  var c0 = hits[0]; $('#L').value = c0.L; $('#a').value=c0.a; $('#b').value=c0.b; updateTargetEcho();
+  const c0=hits[0];
+  $('#L').value=c0.L;
+  $('#a').value=c0.a;
+  $('#b').value=c0.b;
+  updateTargetEcho();
+  _lastContextName = c0.name||c0.Colour||c0.color||'';
 }
 
-// ===== Predictor (white‑only basis, raw XYZ in D65) =====
-function buildWhiteBasis(){
-  // Build basis using ONLY over-white measurements at each concentration.
-  // IMPORTANT: keep raw XYZ magnitude (no column normalisation) so lightness is preserved.
-  var basis = []; // {name, ink, conc, vec:[X,Y,Z]}
-  Object.keys(ASSORTMENT).forEach(function(ink){
-    var W = (ASSORTMENT[ink].white||[]);
-    if (!W.length) return;
-    W.slice().sort(function(a,b){ return a.conc-b.conc; }).forEach(function(entry){
-      var xyz = labToXyz(entry.L, entry.a, entry.b); // D65
-      basis.push({ name: ink+'@'+entry.conc+'%', ink: ink, conc: entry.conc, vec:[xyz.X, xyz.Y, xyz.Z] });
-    });
-  });
-  return basis;
-}
-
-// Frank–Wolfe with exact line search on f(w) = ||A w - y||^2, with simplex constraints (w>=0, sum w=1)
-function fwSimplex(A, y, iters, seed){
-  if (iters==null) iters=2000;
-  var N = A[0].length;
-  var w = new Array(N).fill(0);
-  if (seed && seed.length===N){
-    var s0 = seed.reduce(function(a,b){return a+b;},0);
-    if (s0>0) w = seed.map(function(v){ return Math.max(0,v)/s0; }); else w[0]=1;
-  } else {
-    w[0]=1;
-  }
-  function matVec(A, v){
-    return [
-      A[0].reduce(function(s,aj,j){return s+aj*v[j];},0),
-      A[1].reduce(function(s,aj,j){return s+aj*v[j];},0),
-      A[2].reduce(function(s,aj,j){return s+aj*v[j];},0)
-    ];
-  }
-  var Aw = matVec(A, w);
-  for (var t=0;t<iters;t++){
-    var r = [Aw[0]-y[0], Aw[1]-y[1], Aw[2]-y[2]];
-    var bestK=0, bestVal=Infinity;
-    for (var k=0;k<N;k++){
-      var gk = 2*(A[0][k]*r[0] + A[1][k]*r[1] + A[2][k]*r[2]);
-      if (gk < bestVal){ bestVal=gk; bestK=k; }
-    }
-    var v = [ A[0][bestK]-Aw[0], A[1][bestK]-Aw[1], A[2][bestK]-Aw[2] ];
-    var num = -(r[0]*v[0] + r[1]*v[1] + r[2]*v[2]);
-    var den = Math.max(1e-12, v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
-    var gamma = num/den; if (!Number.isFinite(gamma)) gamma=0; gamma=Math.max(0, Math.min(1, gamma));
-    for (var j=0;j<N;j++){ w[j] = (1-gamma)*w[j] + gamma*(j===bestK?1:0); }
-    Aw = [ (1-gamma)*Aw[0] + gamma*A[0][bestK], (1-gamma)*Aw[1] + gamma*A[1][bestK], (1-gamma)*Aw[2] + gamma*A[2][bestK] ];
-    var res2 = r[0]*r[0]+r[1]*r[1]+r[2]*r[2];
-    if (res2 < 1e-10) break;
-  }
-  var s = w.reduce(function(a,b){return a+b;},0) || 1; w = w.map(function(v){ return Math.max(0,v)/s; });
-  return w;
-}
-
-function suggestFormula(){
-  var targetLab = getTargetLab(); if(!targetLab){ alert('Enter a valid colour first.'); return; }
-  var basis = buildWhiteBasis(); if(basis.length===0){ alert('No basis inks available'); return; }
-  var maxInks = clamp(parseInt($('#maxInks').value||'5',10),2,8);
-
-  // Target in raw XYZ (D65)
-  var t = labToXyz(targetLab.L, targetLab.a, targetLab.b);
-  var y = [t.X, t.Y, t.Z];
-
-  // Design matrix A (3 x N)
-  var A=[[],[],[]]; basis.forEach(function(b){ A[0].push(b.vec[0]); A[1].push(b.vec[1]); A[2].push(b.vec[2]); });
-
-  // Seed: favour extender columns if present
-  var seed = new Array(basis.length).fill(0);
-  for (var j=0;j<basis.length;j++){
-    var ink = String(basis[j].ink||'').toUpperCase();
-    if (ink.indexOf('EXTENDER')>-1 || /\bDC21-00[12]\b/.test(ink)) seed[j] = 1;
-  }
-  var seedSum = seed.reduce(function(a,b){return a+b;},0);
-  if (seedSum === 0) seed[0] = 1; else seed = seed.map(function(v){ return v/seedSum; });
-
-  // Simplex-constrained quadratic fit
-  var w = fwSimplex(A, y, 2000, seed);
-
-  // Second pass: among all zero-error mixes, push weight onto Extender while keeping A w = y
-  w = maximizeExtender(A, y, w, function(idx){
-    var ink = String(basis[idx].ink||'').toUpperCase();
-    return (ink.indexOf('EXTENDER')>-1) || (/DC21-00[12]/.test(ink));
-  });
-
-  // Predicted mix directly from column weights (no re-averaging)
-  var mixXYZ = [0,0,0];
-  for(var j2=0;j2<basis.length;j2++){
-    mixXYZ[0] += w[j2]*basis[j2].vec[0];
-    mixXYZ[1] += w[j2]*basis[j2].vec[1];
-    mixXYZ[2] += w[j2]*basis[j2].vec[2];
-  }
-  var mixLab = xyzToLab(mixXYZ[0], mixXYZ[1], mixXYZ[2]);
-  var dE = deltaE2000(mixLab, targetLab);
-  var rgb = labToSrgb(mixLab.L, mixLab.a, mixLab.b);
-
-  // Collapse weights by ink for display, then keep top-k inks
-  var byInk = new Map();
-  for(var jj=0;jj<basis.length;jj++){
-    if(w[jj] <= 1e-9) continue;
-    byInk.set(basis[jj].ink, (byInk.get(basis[jj].ink)||0) + w[jj]);
-  }
-  var merged = Array.from(byInk.entries()).map(function(pair){ return {ink:pair[0], weight:pair[1]}; })
-                    .sort(function(a,b){ return b.weight-a.weight; })
-                    .slice(0, maxInks);
-  var dispSum = merged.reduce(function(a,b){return a+b.weight;},0)||1; // renormalise for pretty %s
-  merged.forEach(function(p){ p.weight = p.weight/dispSum; });
-
-  var html = '<h2>Suggested Formula</h2>';
-  html += '<div class="stack" style="align-items:center;">'
-    + '<div class="swatch" style="background: rgb('+rgb.r+','+rgb.g+','+rgb.b+')"></div>'
-    + '<div class="muted">Predicted: L '+mixLab.L.toFixed(2)+' a '+mixLab.a.toFixed(2)+' b '+mixLab.b.toFixed(2)+' · ΔE00: <strong>'+dE.toFixed(2)+'</strong></div>'
-    + '</div>';
-  html += '<div class="formula-grid">' + merged.map(function(p){ return '<div class="fg-ink">'+p.ink+'</div><div class="fg-pct">'+(p.weight*100).toFixed(1)+'%</div>'; }).join('') + '</div>';
-  var box = $('#suggestedFormula'); box.innerHTML = html; box.style.display='block';
-}
-
-// ===== Extender maximiser (keep colour, maximise extender) =====
-function maximizeExtender(A, y, w0, isExt){
+// Predictor / groups
+async function loadGroups(){
   try{
-    // Build candidate index set: top-8 by weight, plus any extender columns
-    var N = w0.length;
-    var idx = Array.from({length:N}, function(_,i){return i;});
-    idx.sort(function(i,j){ return w0[j]-w0[i]; });
-    var cand = idx.slice(0,8);
-    for (var i=0;i<N;i++){ if (isExt(i) && cand.indexOf(i)===-1) cand.push(i); }
-
-    function combos(arr, k){
-      var res=[]; var n=arr.length;
-      function rec(st, path){ if(path.length===k){ res.push(path.slice()); return; } for(var t=st;t<n;t++){ path.push(arr[t]); rec(t+1, path); path.pop(); } }
-      rec(0,[]); return res;
-    }
-    function solve4x4(M, b){ // naive Gaussian elimination (4x4)
-      var A = [M[0].slice(), M[1].slice(), M[2].slice(), M[3].slice()];
-      var x = b.slice();
-      for(var i=0;i<4;i++){
-        // pivot
-        var piv=i, maxv=Math.abs(A[i][i]);
-        for(var r=i+1;r<4;r++){ var v=Math.abs(A[r][i]); if(v>maxv){maxv=v; piv=r;} }
-        if(maxv<1e-12) return null;
-        if(piv!==i){ var tmp=A[i]; A[i]=A[piv]; A[piv]=tmp; var tb=x[i]; x[i]=x[piv]; x[piv]=tb; }
-        // normalize
-        var div=A[i][i]; for(var c=i;c<4;c++) A[i][c]/=div; x[i]/=div;
-        // eliminate
-        for(var r2=0;r2<4;r2++){ if(r2===i) continue; var f=A[r2][i]; if(Math.abs(f)<1e-12) continue; for(var c2=i;c2<4;c2++) A[r2][c2]-=f*A[i][c2]; x[r2]-=f*x[i]; }
-      }
-      return x; // solution
-    }
-    var best = {w:w0, extShare:-1};
-    var target = [y[0], y[1], y[2], 1];
-    var sets = combos(cand, 4);
-    for(var s=0;s<sets.length;s++){
-      var S = sets[s];
-      // must include at least one extender col
-      var okExt=false; for(var q=0;q<S.length;q++){ if(isExt(S[q])) { okExt=true; break; } }
-      if(!okExt) continue;
-      var M = [[],[],[],[]];
-      for(var j=0;j<4;j++){ M[0][j]=A[0][S[j]]; M[1][j]=A[1][S[j]]; M[2][j]=A[2][S[j]]; M[3][j]=1; }
-      var x = solve4x4(M, target);
-      if(!x) continue;
-      // feasibility: nonnegative and close residual
-      var neg=false; for(var j2=0;j2<4;j2++){ if(x[j2]<-1e-9){ neg=true; break; } }
-      if(neg) continue;
-      // compute residual exactly
-      var Ax=[0,0,0];
-      for(var j3=0;j3<4;j3++){ Ax[0]+=A[0][S[j3]]*x[j3]; Ax[1]+=A[1][S[j3]]*x[j3]; Ax[2]+=A[2][S[j3]]*x[j3]; }
-      var r0=Ax[0]-y[0], r1=Ax[1]-y[1], r2=Ax[2]-y[2];
-      if((r0*r0+r1*r1+r2*r2)>1e-8) continue;
-      var sumx = x.reduce(function(a,b){return a+b;},0);
-      if(Math.abs(sumx-1)>1e-6) continue; // preserve convex
-      var ext = 0; for(var j4=0;j4<4;j4++){ if(isExt(S[j4])) ext+=x[j4]; }
-      if(ext > best.extShare){
-        var wNew = new Array(A[0].length).fill(0);
-        for(var j5=0;j5<4;j5++) wNew[S[j5]] = Math.max(0,x[j5]);
-        best = {w:wNew, extShare:ext};
-      }
-    }
-    return (best.extShare>=0)? best.w : w0;
-  }catch(e){ console.warn('maximizeExtender failed', e); return w0; }
+    const r=await fetch(API_BASE+'/groups');
+    const j=await r.json();
+    const sel=$('#groupSelect');
+    (j.groups||[]).forEach(g=>{
+      const opt=document.createElement('option');
+      opt.value=g;
+      opt.textContent=g;
+      sel.appendChild(opt);
+    });
+  }catch(e){}
+}
+async function loadInks(){
+  try{
+    const r=await fetch(API_BASE+'/inks');
+    const j=await r.json();
+    _allInks=(j.inks||[]).slice().sort();
+  }catch(e){
+    _allInks=[];
+  }
+}
+function formulaPairs(formula){
+  return Object.entries(formula||{})
+    .filter(([_,v])=>+v>0)
+    .sort((a,b)=>b[1]-a[1]);
 }
 
-// ===== Wire up =====
+async function suggestFormula(){
+  const btn=$('#suggestBtn');
+  const msg=$('#predictMsg');
+  const box=$('#suggestedFormula');
+  const t=getTargetLab();
+  if(!t){
+    alert('Enter a valid L*a*b* first.');
+    return;
+  }
+
+  btn.disabled=true;
+  msg.textContent='Predicting…';
+  box.style.display='none';
+  box.innerHTML='';
+  $('#editRow').style.display='none';
+
+  try{
+    const group=($('#groupSelect').value||'');
+    const body={L:t.L,a:t.a,b:t.b,lock_neighbours:true};
+    if(group) body.group=group;
+    const res=await fetch(API_BASE+'/predict',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    if(!res.ok){
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+    const data=await res.json();
+    const formula = (data && typeof data.formula === 'object') ? data.formula : {};
+    const pairs=formulaPairs(formula);
+
+    let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
+    if (pairs.length === 0) {
+      html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
+    } else {
+      for (const [ink,pct] of pairs){
+        html+=`<div class="fg-ink">${ink}</div><div class="fg-pct">${(+pct).toFixed(2)}%</div>`;
+      }
+    }
+    html+='</div>';
+    box.innerHTML=html;
+    box.style.display='block';
+    msg.textContent='';
+
+    _lastSuggestion={ target:t, formula, group: (group||null) };
+    $('#editRow').style.display='flex';
+  }catch(err){
+    msg.textContent=String(err.message||err);
+    $('#editRow').style.display='none';
+  } finally {
+    btn.disabled=false;
+  }
+}
+
+// ===== Edit modal / logging =====
+const modal = $('#editModal');
+const editList = $('#editList');
+let working = []; // [{ink, pct}]
+function contextLine(){
+  const t = _lastSuggestion && _lastSuggestion.target;
+  if (!t) return '';
+  const name = _lastContextName ? ` · ${_lastContextName}` : '';
+  return `Target: L=${t.L.toFixed(2)} a=${t.a.toFixed(2)} b=${t.b.toFixed(2)}${name}`;
+}
+function openEdit(){
+  if(!_lastSuggestion || !(_lastSuggestion.formula)) {
+    alert('No suggestion to edit yet.');
+    return;
+  }
+  working = formulaPairs(_lastSuggestion.formula).map(([ink,p])=>({ink,pct:+(+p).toFixed(2)}));
+  renderEditList();
+  const sel = $('#addInkSel');
+  sel.innerHTML = '';
+  _allInks.forEach(name=>{
+    const opt=document.createElement('option');
+    opt.value=name;
+    opt.textContent=name;
+    sel.appendChild(opt);
+  });
+  $('#addPct').value = '';
+  $('#corrNote').value = '';
+  $('#editContext').textContent = contextLine();
+  modal.style.display='flex';
+  updateTotals();
+}
+function closeEdit(){ modal.style.display='none'; }
+function renderEditList(){
+  editList.innerHTML = '';
+  working.forEach((row, idx)=>{
+    const wrap = document.createElement('div');
+    wrap.className='edit-row';
+    const nameInput = document.createElement('input');
+    nameInput.value=row.ink;
+    nameInput.readOnly=true;
+    nameInput.className='mono';
+    const pctInput = document.createElement('input');
+    pctInput.type='number';
+    pctInput.step='0.01';
+    pctInput.value=Number(row.pct).toFixed(2);
+    pctInput.className='pct-input mono';
+    pctInput.addEventListener('input',()=>{
+      row.pct = +pctInput.value;
+      updateTotals();
+    });
+    const del = document.createElement('button');
+    del.className='rem-btn';
+    del.innerHTML='✕';
+    del.title='Remove';
+    del.addEventListener('click',()=>{
+      working.splice(idx,1);
+      renderEditList();
+      updateTotals();
+    });
+    wrap.appendChild(nameInput);
+    wrap.appendChild(pctInput);
+    wrap.appendChild(del);
+    editList.appendChild(wrap);
+  });
+}
+function updateTotals(){
+  const total = working.reduce((s,r)=> s + (+r.pct||0), 0);
+  $('#totalPct').textContent = total.toFixed(2);
+  const good = approx(total,100,0.01);
+  $('#totalState').textContent = good ? 'normalised' : 'needs normalising';
+  $('#totalState').className = good ? 'ok' : 'warn';
+}
+function normalise(){
+  const sum = working.reduce((s,r)=> s + (+r.pct||0), 0) || 1;
+  working.forEach(r=> { r.pct = +(r.pct * 100 / sum).toFixed(2); });
+  renderEditList();
+  updateTotals();
+}
+function addInk(){
+  const name = $('#addInkSel').value;
+  let pct = +($('#addPct').value||0);
+  if(!name || !(pct>0)) return;
+  const found = working.find(r=> r.ink === name);
+  if(found) found.pct = +(found.pct + pct).toFixed(2);
+  else working.push({ink:name, pct:+pct.toFixed(2)});
+  $('#addPct').value='';
+  renderEditList();
+  updateTotals();
+}
+async function saveCorrection(){
+  if(!_lastSuggestion) return;
+  const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
+  if (!approx(sum,100,0.02)) normalise();
+  const corrected = {};
+  working.forEach(r=>{
+    if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2);
+  });
+  const payload = {
+    target: _lastSuggestion.target,
+    group: _lastSuggestion.group || null,
+    original: _lastSuggestion.formula,
+    corrected,
+    context_name: _lastContextName || null,
+    note: ($('#corrNote').value||'').trim() || null,
+    measured: null
+  };
+  try{
+    const res = await fetch(API_BASE + '/log_correction', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if(!res.ok){
+      throw new Error(`API ${res.status}: ${await res.text()}`);
+    }
+    alert('Saved correction. It will be available for the next training cycle.');
+    closeEdit();
+  }catch(err){
+    alert('Error saving correction: ' + (err.message||err));
+  }
+}
+
+// ===== Spectro (Web Serial) integration & ink curve table =====
+function setSpectroConnectedUI(connected){
+  spectroConnected = !!connected;
+  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare'];
+  ids.forEach(id=>{
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    if (connected){
+      btn.textContent = 'Connected';
+      btn.classList.add('btn-connected');
+    } else {
+      btn.textContent = 'Connect device';
+      btn.classList.remove('btn-connected');
+    }
+  });
+  const statusEl = document.getElementById('spectroStatus');
+  if (statusEl){
+    if (connected && !statusEl.textContent) statusEl.textContent = 'Connected.';
+    if (!connected && statusEl.textContent === 'Connected.') statusEl.textContent = '';
+  }
+}
+
+async function spectroEnsureSupported(){
+  if (!('serial' in navigator)){
+    throw new Error('Web Serial not supported. Use Chrome/Edge over HTTPS.');
+  }
+}
+
+async function spectroConnect(){
+  const statusEl = document.getElementById('spectroStatus');
+  try{
+    await spectroEnsureSupported();
+  }catch(err){
+    if (statusEl) statusEl.textContent = err.message || String(err);
+    throw err;
+  }
+
+  if (spectroPort && spectroPort.readable && spectroPort.writable){
+    setSpectroConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Already connected.';
+    return spectroPort;
+  }
+
+  try{
+    if (statusEl) statusEl.textContent = 'Select device…';
+    const port = await navigator.serial.requestPort();
+    await port.open({
+      baudRate: 115200,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'none',
+      flowControl: 'none'
+    });
+    spectroPort = port;
+    setSpectroConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Connected.';
+
+    if (navigator.serial && typeof navigator.serial.addEventListener === 'function'){
+      navigator.serial.addEventListener('disconnect', (event)=>{
+        if (event.target === spectroPort){
+          spectroPort = null;
+          setSpectroConnectedUI(false);
+          const s = document.getElementById('spectroStatus');
+          if (s) s.textContent = 'Device disconnected.';
+        }
+      });
+    }
+
+    return port;
+  }catch(err){
+    if (statusEl) statusEl.textContent = 'Connect failed: ' + (err.message || err);
+    setSpectroConnectedUI(false);
+    throw err;
+  }
+}
+
+async function spectroMeasureOnce(){
+  const statusEl = document.getElementById('spectroStatus');
+  if (!spectroPort){
+    await spectroConnect();
+  }
+  const port = spectroPort;
+  if (!port || !port.readable || !port.writable){
+    setSpectroConnectedUI(false);
+    throw new Error('Port is not open.');
+  }
+
+  if (statusEl) statusEl.textContent = 'Measuring…';
+
+  const encoder = new TextEncoder();
+  const writer = port.writable.getWriter();
+  await writer.write(encoder.encode('SA_001_measureData\r\n'));
+  writer.releaseLock();
+
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
+  let textResp = '';
+
+  try{
+    while (true){
+      const result = await reader.read();
+      const value = result.value;
+      const done = result.done;
+      if (done) break;
+      if (value){
+        textResp += decoder.decode(value, { stream:true });
+        if (textResp.includes('Data transmission has been successfully completed.')) break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (statusEl) statusEl.textContent = 'Measurement received.';
+  return textResp;
+}
+
+function parseSpectroMeasurement(textResp){
+  const lines = textResp.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let L = null, a = null, b = null;
+  const spectrum = {};
+
+  for (let i=0;i<lines.length;i++){
+    const line = lines[i];
+    if (line.startsWith('CIE-Lab')){
+      if (i+1 < lines.length){
+        const parts = lines[i+1].split(/\s+/).filter(Boolean);
+        if (parts.length >= 3){
+          L = parseFloat(parts[0]);
+          a = parseFloat(parts[1]);
+          b = parseFloat(parts[2]);
+        }
+      }
+    } else if (line.startsWith('Spectral reflectance')){
+      for (let j=i+1;j<lines.length;j++){
+        const l2 = lines[j];
+        if (l2.startsWith('Data transmission')) break;
+        const m = l2.match(/^(\d{3})nm:(.+)%/);
+        if (m){
+          const wl = parseInt(m[1],10);
+          const val = parseFloat(m[2]);
+          if (!Number.isNaN(wl) && !Number.isNaN(val)){
+            spectrum[wl] = val;
+          }
+        }
+      }
+    }
+  }
+
+  return { L, a, b, spectrum, raw:textResp };
+}
+
+// Lab -> RGB for swatches (rough D65 conversion)
+function labToRgbCssForSwatch(L, a, b){
+  const refX = 95.047;
+  const refY = 100.0;
+  const refZ = 108.883;
+
+  let y = (L + 16) / 116;
+  let x = a / 500 + y;
+  let z = y - b / 200;
+
+  const eps = 0.008856;
+  const kappa = 903.3;
+
+  function fInv(t){
+    const t3 = t*t*t;
+    return t3 > eps ? t3 : (116 * t - 16) / kappa;
+  }
+
+  x = refX * fInv(x);
+  y = refY * fInv(y);
+  z = refZ * fInv(z);
+
+  x /= 100;
+  y /= 100;
+  z /= 100;
+
+  let r =  3.2406 * x - 1.5372 * y - 0.4986 * z;
+  let g = -0.9689 * x + 1.8758 * y + 0.0415 * z;
+  let b2 = 0.0557 * x - 0.2040 * y + 1.0570 * z;
+
+  function gammaCorrect(c){
+    if (c <= 0.0031308) return 12.92 * c;
+    return 1.055 * Math.pow(c, 1/2.4) - 0.055;
+  }
+
+  function clamp01(v){ return Math.min(1, Math.max(0, v)); }
+
+  r = gammaCorrect(r);
+  g = gammaCorrect(g);
+  b2 = gammaCorrect(b2);
+
+  r = Math.round(clamp01(r) * 255);
+  g = Math.round(clamp01(g) * 255);
+  b2 = Math.round(clamp01(b2) * 255);
+
+  return `rgb(${r}, ${g}, ${b2})`;
+}
+
+function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas){
+  const now = new Date();
+  const rec = {
+    inkName: String(inkName || '').trim(),
+    concentration: Number(concentration),
+    backing: backing || 'white',
+    angle: angle || '2',
+    illuminant: illuminant || 'D50',
+    aperture: aperture || '8mm',
+    geometry: geometry || 'SCI',
+    L: meas.L,
+    a: meas.a,
+    b: meas.b,
+    spectrum: meas.spectrum,
+    ts: now.getTime(),
+    timestampISO: now.toISOString()
+  };
+  INK_CURVES.push(rec);
+  saveInkCurves();
+  renderInkCurvesTable();
+  return rec;
+}
+
+function formatTimestamp(rec){
+  if (rec.timestampISO){
+    return rec.timestampISO;
+  }
+  if (rec.ts){
+    try{
+      return new Date(rec.ts).toISOString();
+    }catch(e){
+      return '';
+    }
+  }
+  return '';
+}
+
+function renderInkCurvesTable(){
+  const tbody = document.getElementById('inkCurvesTbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  INK_CURVES.forEach((rec, idx)=>{
+    const tr = document.createElement('tr');
+
+    const tdIndex = document.createElement('td');
+    tdIndex.textContent = String(idx+1);
+    tr.appendChild(tdIndex);
+
+    const tdSwatch = document.createElement('td');
+    const swatch = document.createElement('div');
+    swatch.style.width = '32px';
+    swatch.style.height = '16px';
+    swatch.style.borderRadius = '4px';
+    swatch.style.border = '1px solid #1f2933';
+    if (Number.isFinite(rec.L) && Number.isFinite(rec.a) && Number.isFinite(rec.b)){
+      swatch.style.backgroundColor = labToRgbCssForSwatch(rec.L, rec.a, rec.b);
+    } else {
+      swatch.style.backgroundColor = 'transparent';
+    }
+    tdSwatch.appendChild(swatch);
+    tr.appendChild(tdSwatch);
+
+    const tdName = document.createElement('td');
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.value = rec.inkName || '';
+    nameInput.className = 'mono';
+    nameInput.addEventListener('change', ()=>{
+      rec.inkName = nameInput.value.trim();
+      saveInkCurves();
+    });
+    tdName.appendChild(nameInput);
+    tr.appendChild(tdName);
+
+    const tdConc = document.createElement('td');
+    const concInput = document.createElement('input');
+    concInput.type = 'number';
+    concInput.step = '0.01';
+    concInput.value = Number(rec.concentration || 0).toString();
+    concInput.className = 'mono';
+    concInput.addEventListener('change', ()=>{
+      const v = parseFloat(concInput.value);
+      rec.concentration = (v>0 ? v : 0);
+      saveInkCurves();
+    });
+    tdConc.appendChild(concInput);
+    tr.appendChild(tdConc);
+
+    const tdBacking = document.createElement('td');
+    const backingSel = document.createElement('select');
+    backingSel.innerHTML = '<option value="white">White</option><option value="black">Black</option>';
+    backingSel.value = rec.backing || 'white';
+    backingSel.addEventListener('change', ()=>{
+      rec.backing = backingSel.value;
+      saveInkCurves();
+    });
+    tdBacking.appendChild(backingSel);
+    tr.appendChild(tdBacking);
+
+    const tdAngle = document.createElement('td');
+    const angleSel = document.createElement('select');
+    angleSel.innerHTML = '<option value="2">2°</option><option value="10">10°</option>';
+    angleSel.value = rec.angle || '2';
+    angleSel.addEventListener('change', ()=>{
+      rec.angle = angleSel.value;
+      saveInkCurves();
+    });
+    tdAngle.appendChild(angleSel);
+    tr.appendChild(tdAngle);
+
+    const tdIll = document.createElement('td');
+    const illSel = document.createElement('select');
+    illSel.innerHTML = '<option value="D50">D50</option><option value="D65">D65</option><option value="A">A</option>';
+    illSel.value = rec.illuminant || 'D50';
+    illSel.addEventListener('change', ()=>{
+      rec.illuminant = illSel.value;
+      saveInkCurves();
+    });
+    tdIll.appendChild(illSel);
+    tr.appendChild(tdIll);
+
+    const tdAperture = document.createElement('td');
+    const apSel = document.createElement('select');
+    apSel.innerHTML = '<option value="8mm">8 mm</option><option value="4mm">4 mm</option>';
+    apSel.value = rec.aperture || '8mm';
+    apSel.addEventListener('change', ()=>{
+      rec.aperture = apSel.value;
+      saveInkCurves();
+    });
+    tdAperture.appendChild(apSel);
+    tr.appendChild(tdAperture);
+
+    const tdGeom = document.createElement('td');
+    const geomSel = document.createElement('select');
+    geomSel.innerHTML = '<option value="SCI">SCI</option><option value="SCE">SCE</option>';
+    geomSel.value = rec.geometry || 'SCI';
+    geomSel.addEventListener('change', ()=>{
+      rec.geometry = geomSel.value;
+      saveInkCurves();
+    });
+    tdGeom.appendChild(geomSel);
+    tr.appendChild(tdGeom);
+
+    const tdL = document.createElement('td');
+    tdL.textContent = Number.isFinite(rec.L) ? rec.L.toFixed(2) : '—';
+    tr.appendChild(tdL);
+
+    const tdA = document.createElement('td');
+    tdA.textContent = Number.isFinite(rec.a) ? rec.a.toFixed(2) : '—';
+    tr.appendChild(tdA);
+
+    const tdB = document.createElement('td');
+    tdB.textContent = Number.isFinite(rec.b) ? rec.b.toFixed(2) : '—';
+    tr.appendChild(tdB);
+
+    const tdTs = document.createElement('td');
+    const tsInput = document.createElement('input');
+    tsInput.type = 'text';
+    tsInput.className = 'mono';
+    tsInput.value = formatTimestamp(rec);
+    tsInput.addEventListener('change', ()=>{
+      const v = tsInput.value.trim();
+      rec.timestampISO = v || null;
+      saveInkCurves();
+    });
+    tdTs.appendChild(tsInput);
+    tr.appendChild(tdTs);
+
+    const tdActions = document.createElement('td');
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', ()=>{
+      if (!confirm('Delete this measurement?')) return;
+      INK_CURVES.splice(idx,1);
+      saveInkCurves();
+      renderInkCurvesTable();
+    });
+    tdActions.appendChild(delBtn);
+    tr.appendChild(tdActions);
+
+    tbody.appendChild(tr);
+  });
+}
+
+function downloadInkCurvesCsv(){
+  if (!INK_CURVES.length){
+    alert('No measurements stored yet.');
+    return;
+  }
+  const wavelengths = [];
+  for (let wl=400; wl<=700; wl+=10) wavelengths.push(wl);
+
+  const header = [
+    'InkName',
+    'Concentration',
+    'Backing',
+    'Angle',
+    'Illuminant',
+    'Aperture',
+    'Geometry',
+    'TimestampISO',
+    'L',
+    'a',
+    'b'
+  ].concat(wavelengths.map(wl=>'R'+wl));
+
+  const lines = [header.join(',')];
+
+  INK_CURVES.forEach(rec=>{
+    const row = [
+      rec.inkName || '',
+      rec.concentration != null ? rec.concentration : '',
+      rec.backing || '',
+      rec.angle || '',
+      rec.illuminant || '',
+      rec.aperture || '',
+      rec.geometry || '',
+      formatTimestamp(rec),
+      rec.L != null ? rec.L : '',
+      rec.a != null ? rec.a : '',
+      rec.b != null ? rec.b : ''
+    ];
+    wavelengths.forEach(wl=>{
+      const v = rec.spectrum && Object.prototype.hasOwnProperty.call(rec.spectrum,wl)
+        ? rec.spectrum[wl]
+        : '';
+      row.push(v);
+    });
+    lines.push(row.join(','));
+  });
+
+  const blob = new Blob([lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ink_curves.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ===== Compare tab logic + 3D viz =====
+function setSwatchFromFields(prefix){
+  const L=parseFloat($('#'+prefix+'L').value);
+  const a=parseFloat($('#'+prefix+'a').value);
+  const b=parseFloat($('#'+prefix+'b').value);
+  if ([L,a,b].some(v=>Number.isNaN(v))) return;
+  const rgb=labToSrgb(L,a,b);
+  $('#swatch'+prefix).style.background=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  const legend = prefix === 'A' ? $('#legendA') : $('#legendB');
+  legend.style.background = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+}
+function computeCompareDE(){
+  const a={L:parseFloat($('#AL').value),a:parseFloat($('#Aa').value),b:parseFloat($('#Ab').value)};
+  const b={L:parseFloat($('#BL').value),a:parseFloat($('#Ba').value),b:parseFloat($('#Bb').value)};
+  if ([a.L,a.a,a.b,b.L,b.a,b.b].some(v=>Number.isNaN(v))){
+    $('#cmpNumbers').innerHTML=''; $('#cmpResult').style.display='none'; requestLabDraw(); return;
+  }
+  const de=deltaE2000(a,b), dL=(b.L-a.L), da=(b.a-a.a), db=(b.b-a.b);
+  const thr = (SETTINGS && Number.isFinite(SETTINGS.deltaEThreshold)) ? SETTINGS.deltaEThreshold : 2.0;
+  const pass = de < thr;
+  const cls = pass ? 'de-pass' : 'de-fail';
+  const resTxt = pass ? 'PASS' : 'FAIL';
+
+  $('#cmpNumbers').innerHTML=
+    `<div class="two-col">
+      <div><strong>ΔE2000:</strong> <span class="${cls}">${de.toFixed(2)}</span> <span class="${cls}" style="margin-left:8px;">${resTxt}</span></div>
+      <div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)} &nbsp; <span class="mini">(threshold: ${thr.toFixed(1)})</span></div>
+    </div>`;
+  $('#cmpResult').style.display='block';
+  requestLabDraw();
+
+  // Optional auto-save (demo-friendly)
+  if (SETTINGS && SETTINGS.autoSaveCompare){
+    const jobRef = ($('#cmpJobRef').value||'').trim();
+    if (jobRef){
+      saveCurrentComparison({silent:true});
+    }
+  }
+}
+document.addEventListener('input',(e)=>{
+  if (e.target && e.target.tagName==='INPUT' && e.target.type==='number'){
+    const id=e.target.id||'';
+    if (/^(AL|Aa|Ab)$/.test(id)) { setSwatchFromFields('A'); computeCompareDE(); }
+    if (/^(BL|Ba|Bb)$/.test(id)) { setSwatchFromFields('B'); computeCompareDE(); }
+  }
+});
+
+// 3D LAB sphere with coloured panes
+const canvas=$('#labCanvas');
+const ctx=canvas.getContext('2d');
+const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
+let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
+let dragging=false,lastX=0,lastY=0;
+canvas.addEventListener('mousedown',e=>{
+  dragging=true;
+  lastX=e.clientX;
+  lastY=e.clientY;
+});
+window.addEventListener('mouseup',()=>{ dragging=false; });
+window.addEventListener('mousemove',e=>{
+  if(!dragging) return;
+  const dx=(e.clientX-lastX);
+  const dy=(e.clientY-lastY);
+  lastX=e.clientX;
+  lastY=e.clientY;
+  rotY -= dx*0.005;
+  rotX -= dy*0.005;
+  requestLabDraw();
+});
+canvas.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const f=(e.deltaY>0)?0.9:1.1;
+  scale3d=clamp(scale3d*f,80,1200);
+  requestLabDraw();
+},{passive:false});
+$('#resetView').addEventListener('click', ()=>{
+  rotX=DEFAULT_VIEW.rx;
+  rotY=DEFAULT_VIEW.ry;
+  scale3d=DEFAULT_VIEW.s;
+  requestLabDraw();
+});
+
+function normLab(L,a,b){
+  return { x:(a/128), y:((L-50)/50), z:(b/128) };
+}
+function rot3(p){
+  const cX=Math.cos(rotX), sX=Math.sin(rotX), cY=Math.cos(rotY), sY=Math.sin(rotY);
+  let y=p.y*cX - p.z*sX;
+  let z=p.y*sX + p.z*cX;
+  let x=p.x*cY + z*sY;
+  z = -p.x*sY + z*cY;
+  return {x,y,z};
+}
+function proj(p){
+  const d=3;
+  const z=p.z+3.5;
+  const k=d/(z);
+  return {u:canvas.width/2 + p.x*scale3d*k, v:canvas.height/2 - p.y*scale3d*k, k:k, z:p.z};
+}
+
+function drawSpherePanes(){
+  const R=1.08, M=24, P=18, baseAlpha=0.20;
+  const thetas=[...Array(M)].map((_,i)=>-Math.PI + i*(2*Math.PI/(M-1)));
+  const phis=[...Array(P)].map((_,j)=>-Math.PI/2 + j*((Math.PI)/(P-1)));
+  function objPoint(phi,theta){
+    return { x0:R*Math.cos(phi)*Math.cos(theta), y0:R*Math.sin(phi), z0:R*Math.cos(phi)*Math.sin(theta) };
+  }
+  function toScreen(o){
+    const pr=rot3({x:o.x0,y:o.y0,z:o.z0});
+    const sc=proj(pr);
+    return {u:sc.u,v:sc.v,z:pr.z,k:sc.k};
+  }
+  function rgbaFromObj(o,a){
+    const L=o.y0*50+50, A=o.x0*128, B=o.z0*128;
+    const rgb=labToSrgb(L,A,B);
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
+  }
+  const quads=[];
+  for(let j=0,idx=0;j<P-1;j++){
+    for(let i=0;i<M-1;i++,idx++){
+      const o00=objPoint(phis[j],thetas[i]), o10=objPoint(phis[j],thetas[i+1]);
+      const o01=objPoint(phis[j+1],thetas[i]), o11=objPoint(phis[j+1],thetas[i+1]);
+      const ux=o10.x0-o00.x0, uy=o10.y0-o00.y0, uz=o10.z0-o00.z0;
+      const vx=o01.x0-o00.x0, vy=o01.y0-o00.y0, vz=o01.z0-o00.z0;
+      const nx=uy*vz-uz*vy, ny=uz*vx-ux*vz, nz=ux*vy-uy*vx;
+      const nRot=rot3({x:nx,y:ny,z:nz});
+      const nLen=Math.hypot(nRot.x,nRot.y,nRot.z)||1e-9;
+      const nzCam=nRot.z/nLen;
+      if (nzCam < -0.15) continue;
+      const vis = (nzCam<=0)?0: (nzCam>=0.1?1:(nzCam/0.1));
+      const alpha=baseAlpha*(0.15+0.85*vis);
+      const s00=toScreen(o00), s10=toScreen(o10), s01=toScreen(o01), s11=toScreen(o11);
+      const avgZ=(s00.z+s10.z+s01.z+s11.z)/4;
+      const oMid={
+        x0:(o00.x0+o10.x0+o01.x0+o11.x0)/4,
+        y0:(o00.y0+o10.y0+o01.y0+o11.y0)/4,
+        z0:(o00.z0+o10.z0+o01.z0+o11.z0)/4
+      };
+      const col=rgbaFromObj(oMid,alpha);
+      const stableZ = avgZ + ((i*37 + j*101) % 113) * 1e-6;
+      quads.push({stableZ, col, pts:[s00,s10,s11,s01]});
+    }
+  }
+  quads.sort((a,b)=> a.stableZ - b.stableZ);
+  ctx.save();
+  ctx.lineWidth=0.6;
+  for(const q of quads){
+    ctx.fillStyle=q.col;
+    ctx.strokeStyle='rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.moveTo(q.pts[0].u,q.pts[0].v);
+    for(let k=1;k<q.pts.length;k++) ctx.lineTo(q.pts[k].u,q.pts[k].v);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+function drawSphere(){
+  const R=1.1, MER=28, PAR=20, STEP=Math.PI/64;
+  function tint(x0,y0,z0,a){
+    const L=y0*50+50,A=x0*128,B=z0*128;
+    const rgb=labToSrgb(L,A,B);
+    return `rgba(${rgb.r},${rgb.g},${rgb.b},${a})`;
+  }
+  const c=proj(rot3({x:0,y:0,z:0})), edge=proj(rot3({x:R,y:0,z:0}));
+  const rad=Math.hypot(edge.u-c.u, edge.v-c.v);
+  ctx.strokeStyle='rgba(255,255,255,0.28)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(c.u,c.v,rad,0,Math.PI*2);
+  ctx.stroke();
+  for(let i=0;i<MER;i++){
+    const th=-Math.PI + i*(2*Math.PI/(MER-1));
+    let first=true,lastObj=null,lastScr=null;
+    for(let t=-Math.PI/2;t<=Math.PI/2;t+=STEP){
+      const x0=R*Math.cos(t)*Math.cos(th), y0=R*Math.sin(t), z0=R*Math.cos(t)*Math.sin(th);
+      const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
+      if(!first){
+        const mx0=(lastObj.x+x0)/2,my0=(lastObj.y+y0)/2,mz0=(lastObj.z+z0)/2;
+        ctx.strokeStyle=tint(mx0,my0,mz0,0.22);
+        ctx.lineWidth=1.6;
+        ctx.beginPath();
+        ctx.moveTo(lastScr.u,lastScr.v);
+        ctx.lineTo(q.u,q.v);
+        ctx.stroke();
+      }
+      first=false;
+      lastObj={x:x0,y:y0,z:z0};
+      lastScr=q;
+    }
+  }
+  for(let j=0;j<PAR;j++){
+    const ph=-Math.PI/2 + j*(Math.PI/(PAR-1));
+    let first=true,lastObj2=null,lastScr2=null;
+    for(let t=-Math.PI;t<=Math.PI;t+=STEP){
+      const x0=R*Math.cos(ph)*Math.cos(t), y0=R*Math.sin(ph), z0=R*Math.cos(ph)*Math.sin(t);
+      const p=rot3({x:x0,y:y0,z:z0}), q=proj(p);
+      if(!first){
+        const mx0=(lastObj2.x+x0)/2,my0=(lastObj2.y+y0)/2,mz0=(lastObj2.z+z0)/2;
+        ctx.strokeStyle=tint(mx0,my0,mz0,0.22);
+        ctx.lineWidth=1.6;
+        ctx.beginPath();
+        ctx.moveTo(lastScr2.u,lastScr2.v);
+        ctx.lineTo(q.u,q.v);
+        ctx.stroke();
+      }
+      first=false;
+      lastObj2={x:x0,y:y0,z:z0};
+      lastScr2=q;
+    }
+  }
+}
+function drawPointLab(L,a,b,label){
+  const p=proj(rot3(normLab(L,a,b)));
+  const rgb=labToSrgb(L,a,b);
+  const col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
+  ctx.fillStyle=col;
+  ctx.strokeStyle='rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2);
+  ctx.fill();
+  ctx.lineWidth=1;
+  ctx.stroke();
+  ctx.fillStyle='#e5e7eb';
+  ctx.font='12px ui-sans-serif, system-ui';
+  ctx.fillText(label, p.u+8, p.v-8);
+  return p;
+}
+function drawLineLab(A,B){
+  const p1=proj(rot3(normLab(A.L,A.a,A.b)));
+  const p2=proj(rot3(normLab(B.L,B.a,B.b)));
+  ctx.strokeStyle='rgba(255,255,255,0.6)';
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(p1.u,p1.v);
+  ctx.lineTo(p2.u,p2.v);
+  ctx.stroke();
+}
+function drawAxes(){
+  const axes=[
+    {from:{L:50,a:-128,b:0},to:{L:50,a:128,b:0},label:'+a*'},
+    {from:{L:0,a:0,b:0},to:{L:100,a:0,b:0},label:'L*'},
+    {from:{L:50,a:0,b:-128},to:{L:50,a:0,b:128},label:'+b*'}
+  ];
+  ctx.lineWidth=2.2;
+  ctx.strokeStyle='rgba(255,255,255,0.9)';
+  ctx.fillStyle='#e5e7eb';
+  ctx.font='12px ui-sans-serif, system-ui';
+  axes.forEach(ax=>{
+    const p1=proj(rot3(normLab(ax.from.L,ax.from.a,ax.from.b)));
+    const p2=proj(rot3(normLab(ax.to.L,ax.to.a,ax.to.b)));
+    ctx.beginPath();
+    ctx.moveTo(p1.u,p1.v);
+    ctx.lineTo(p2.u,p2.v);
+    ctx.stroke();
+    const T=6;
+    for(let i=1;i<T;i++){
+      const t=i/T;
+      const L=ax.from.L+(ax.to.L-ax.from.L)*t;
+      const a=ax.from.a+(ax.to.a-ax.from.a)*t;
+      const b=ax.from.b+(ax.to.b-ax.from.b)*t;
+      const p=proj(rot3(normLab(L,a,b)));
+      const dirX=(p2.u-p1.u), dirV=(p2.v-p1.v);
+      const len=Math.hypot(dirX,dirV)||1;
+      const nx=-dirV/len, ny=dirX/len;
+      const tick=6*p.k;
+      ctx.beginPath();
+      ctx.moveTo(p.u-nx*tick,p.v-ny*tick);
+      ctx.lineTo(p.u+nx*tick,p.v+ny*tick);
+      ctx.stroke();
+    }
+    ctx.fillText(ax.label, p2.u+6, p2.v-6);
+  });
+}
+function drawLabScene(){
+  const a={L:parseFloat($('#AL').value), a:parseFloat($('#Aa').value), b:parseFloat($('#Ab').value)};
+  const b={L:parseFloat($('#BL').value), a:parseFloat($('#Ba').value), b:parseFloat($('#Bb').value)};
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#0f1219';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  drawSpherePanes();
+  drawSphere();
+  drawAxes();
+  const aValid=[a.L,a.a,a.b].every(Number.isFinite);
+  const bValid=[b.L,b.a,b.b].every(Number.isFinite);
+  if (aValid && bValid){
+    drawLineLab(a,b);
+    drawPointLab(a.L,a.a,a.b,'Std');
+    drawPointLab(b.L,b.a,b.b,'Batch');
+    const de=deltaE2000(a,b);
+    ctx.fillStyle='#e5e7eb';
+    ctx.font='13px ui-sans-serif, system-ui';
+    ctx.fillText('ΔE2000: '+de.toFixed(2), 12, 18);
+  } else {
+    ctx.fillStyle='#e5e7eb';
+    ctx.font='13px ui-sans-serif, system-ui';
+    ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18);
+  }
+}
+let rafId=null;
+function requestLabDraw(){
+  if(rafId) cancelAnimationFrame(rafId);
+  rafId = requestAnimationFrame(()=>{
+    rafId=null;
+    drawLabScene();
+  });
+}
+
+// Spectro UI wiring (all tabs)
+const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
+const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch');
+const spectroConnectBtnCompare = document.getElementById('spectroConnectBtnCompare');
+const spectroMeasureBtn = document.getElementById('spectroMeasureBtn');
+const spectroExportBtn = document.getElementById('spectroExportBtn');
+const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
+const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
+const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
+
+[spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
+  if (!btn) return;
+  btn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+    }catch(_e){}
+  });
+});
+
+if (spectroMeasureBtn){
+  spectroMeasureBtn.addEventListener('click', async ()=>{
+    const inkName = (document.getElementById('spectroInkName').value || '').trim();
+    const concStr = (document.getElementById('spectroConcentration').value || '').trim();
+    const backing = (document.getElementById('spectroBacking').value || 'white');
+    const angle = (document.getElementById('spectroAngle').value || '2');
+    const illuminant = (document.getElementById('spectroIlluminant').value || 'D50');
+    const aperture = (document.getElementById('spectroAperture').value || '8mm');
+    const geometry = (document.getElementById('spectroGeometry').value || 'SCI');
+
+    if (!inkName){
+      alert('Please enter an ink name.');
+      return;
+    }
+    const concentration = parseFloat(concStr);
+    if (!(concentration > 0)){
+      alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
+      return;
+    }
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const rec = addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas);
+
+      const tsPreview = document.getElementById('spectroTimestampPreview');
+      if (tsPreview){
+        tsPreview.value = rec.timestampISO || '';
+      }
+
+      const LInput = document.getElementById('L');
+      const aInput = document.getElementById('a');
+      const bInput = document.getElementById('b');
+      if (LInput && aInput && bInput){
+        LInput.value = rec.L;
+        aInput.value = rec.a;
+        bInput.value = rec.b;
+        updateTargetEcho();
+      }
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = `Saved: ${rec.inkName} @ ${rec.concentration} (${INK_CURVES.length} total)`;
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroExportBtn){
+  spectroExportBtn.addEventListener('click', downloadInkCurvesCsv);
+}
+
+if (spectroScanTargetBtn){
+  spectroScanTargetBtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const LInput = document.getElementById('L');
+      const aInput = document.getElementById('a');
+      const bInput = document.getElementById('b');
+      if (LInput && aInput && bInput){
+        LInput.value = meas.L;
+        aInput.value = meas.a;
+        bInput.value = meas.b;
+        updateTargetEcho();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroScanCompareABtn){
+  spectroScanCompareABtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const AL = document.getElementById('AL');
+      const Aa = document.getElementById('Aa');
+      const Ab = document.getElementById('Ab');
+      if (AL && Aa && Ab){
+        AL.value = meas.L;
+        Aa.value = meas.a;
+        Ab.value = meas.b;
+        setSwatchFromFields('A');
+        computeCompareDE();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+if (spectroScanCompareBBtn){
+  spectroScanCompareBBtn.addEventListener('click', async ()=>{
+    try{
+      await spectroConnect();
+      const raw = await spectroMeasureOnce();
+      const meas = parseSpectroMeasurement(raw);
+      if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+        alert('Got a response but could not parse L*a*b*. Check console.');
+        console.log('Raw spectro text:', raw);
+        return;
+      }
+      const BL = document.getElementById('BL');
+      const Ba = document.getElementById('Ba');
+      const Bb = document.getElementById('Bb');
+      if (BL && Ba && Bb){
+        BL.value = meas.L;
+        Ba.value = meas.a;
+        Bb.value = meas.b;
+        setSwatchFromFields('B');
+        computeCompareDE();
+      }
+    }catch(err){
+      const s = document.getElementById('spectroStatus');
+      if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+// Compare tab datalists based on active library
+function refreshCompareDatalists(){
+  const opts = COLOURS.map(c=>{
+    const name = (c.name||c.Colour||c.color||'').trim();
+    return name ? `<option value="${name}">` : '';
+  }).join('');
+  $('#cmpListA').innerHTML = opts;
+  $('#cmpListB').innerHTML = opts;
+}
+
+// Tabs switching
+const tabBtnMatch=$('#tabBtnMatch');
+const tabBtnCompare=$('#tabBtnCompare');
+const tabBtnLibraries=$('#tabBtnLibraries');
+const tabBtnSettings=$('#tabBtnSettings');
+const tabMatch=$('#tab-match');
+const tabCompare=$('#tab-compare');
+const tabLibraries=$('#tab-libraries');
+const tabSettings=$('#tab-settings');
+function showTab(which){
+  tabMatch.hidden = which!=='match';
+  tabCompare.hidden = which!=='compare';
+  tabLibraries.hidden = which!=='libraries';
+  tabSettings.hidden = which!=='settings';
+  tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
+  tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
+  tabBtnLibraries.setAttribute('aria-selected', which==='libraries' ? 'true':'false');
+  tabBtnSettings.setAttribute('aria-selected', which==='settings' ? 'true':'false');
+  if (which === 'compare') requestLabDraw();
+}
+tabBtnMatch.addEventListener('click',()=>showTab('match'));
+tabBtnCompare.addEventListener('click',()=>showTab('compare'));
+tabBtnLibraries.addEventListener('click',()=>showTab('libraries'));
+if (tabBtnSettings) tabBtnSettings.addEventListener('click',()=>showTab('settings'));
+
+// Wire up
 $('#findBtn').addEventListener('click', findClosest);
-$('#clearBtn').addEventListener('click', function(){
-  $('#L').value=''; $('#a').value=''; $('#b').value=''; updateTargetEcho();
-  $('#resultsTbody').innerHTML=''; $('#formulaPanel').style.display='none';
+$('#clearBtn').addEventListener('click', ()=>{
+  $('#L').value='';
+  $('#a').value='';
+  $('#b').value='';
+  updateTargetEcho();
+  $('#resultsTbody').innerHTML='';
+  $('#formulaPanel').style.display='none';
   $('#suggestedFormula').style.display='none';
+  $('#predictMsg').textContent='';
+  $('#editRow').style.display='none';
 });
 $('#suggestBtn').addEventListener('click', suggestFormula);
 $('#pmsBtn').addEventListener('click', findByPms);
-['L','a','b'].forEach(function(id){ $('#'+id).addEventListener('input', updateTargetEcho); });
+['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
 
-// ===== Load JSON =====
-Promise.all([
-  fetch('colours.json').then(function(r){ return r.json(); }),
-  fetch('DC_Formulas.json').then(function(r){ return r.json(); }),
-  fetch('assortment_colour_data.json').then(function(r){ return r.json(); })
-]).then(function(tuple){
-  var colours = tuple[0], formulas = tuple[1], assortment = tuple[2];
-  COLOURS = colours; FORMULAS = formulas; ASSORTMENT = assortment;
-  buildFormulaIndex();
-  $('#countLabel').textContent = COLOURS.length;
-}).catch(function(err){ alert('Error loading JSON: '+err); });
+$('#editFormulaBtn').addEventListener('click', openEdit);
+$('#cancelEdit').addEventListener('click', closeEdit);
+$('#normaliseBtn').addEventListener('click', normalise);
+$('#addInkBtn').addEventListener('click', addInk);
+$('#addPct').addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    addInk();
+  }
+});
+$('#saveCorrection').addEventListener('click', saveCorrection);
 
-updateTargetEcho();
+// Library UI events
+$('#librarySelect').addEventListener('change', (e)=>{
+  activeLibraryId = e.target.value || LIB_BASE_ID;
+  refreshLibrarySelects();
+  refreshActiveColours();
+});
+$('#cmpLibrarySelect').addEventListener('change', (e)=>{
+  activeLibraryId = e.target.value || LIB_BASE_ID;
+  refreshLibrarySelects();
+  refreshActiveColours();
+});
+$('#libAddBtn').addEventListener('click', ()=>{
+  const name = ($('#libName').value||'').trim();
+  const file = $('#libFile').files[0];
+  if (!name){
+    alert('Please enter a library name.');
+    return;
+  }
+  if (!file){
+    alert('Please choose a CSV file.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const colours = parseCsvColours(reader.result);
+      if (!colours.length){
+        alert('No valid rows found (L/a/b empty?).');
+        return;
+      }
+      const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
+      const lib = { id:id, name:name, colours:colours };
+      userLibraries.push(lib);
+      saveLibraries();
+      $('#libName').value='';
+      $('#libFile').value='';
+      renderLibraryList();
+      refreshLibrarySelects();
+    }catch(err){
+      alert('Error parsing CSV: ' + (err.message||err));
+    }
+  };
+  reader.onerror = ()=> alert('Error reading file.');
+  reader.readAsText(file);
+});
 
-// ===== Self-tests =====
-function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
-function runSelfTests(){
-  // ΔE should be 0 for identical colours
-  var c = {L:50,a:0,b:0};
-  console.assert(approx(deltaE2000(c,c), 0), 'ΔE00(identity) != 0');
+// Download example CSV
+$('#libTemplateBtn').addEventListener('click', ()=>{
+  const csv = [
+    'Name,L,a,b',
+    'Custom Red 1,50.00,70.00,50.00',
+    'Custom Green 1,55.00,-40.00,40.00',
+    'Custom Blue 1,45.00,20.00,-50.00',
+    'Warm Grey-ish,70.00,2.00,5.00'
+  ].join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'colour_library_template.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
 
-  // Symmetry
-  var c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
-  console.assert(approx(deltaE2000(c1,c2), deltaE2000(c2,c1), 1e-9), 'ΔE00 not symmetric');
+// Compare tab quick-load
 
-  // Lab -> XYZ -> Lab round-trip (D65)
-  var t={L:70,a:20,b:30};
-  var xyz = labToXyz(t.L,t.a,t.b);
-  var back = xyzToLab(xyz.X, xyz.Y, xyz.Z);
-  console.assert(approx(t.L, back.L, 1e-2) && approx(t.a, back.a, 1e-2) && approx(t.b, back.b, 1e-2), 'Lab/XYZ round-trip drift (D65)');
+// Compare tab quick-load (auto-load on pick/scan)
+function loadCompareByName(which, name){
+	name = (name || '').trim();
+	if(!name) return false;
+	const c = COLOURS.find(x => (x.name||x.Colour||x.color||'') === name);
+	if(!c) return false;
 
-  // Simplex solver exact fit on convex hull: pick from two vertices
-  // columns at (1,0,0) and (0,1,0), target is (0.25, 0.75, 0)
-  var Atest = [[1,0],[0,1],[0,0]]; var ytest=[0.25,0.75,0];
-  var wtest = fwSimplex(Atest, ytest, 2000, [0.5,0.5]);
-  var err = Math.hypot(Atest[0][0]*wtest[0]+Atest[0][1]*wtest[1]-0.25,
-                       Atest[1][0]*wtest[0]+Atest[1][1]*wtest[1]-0.75,
-                       0);
-  console.assert(err < 1e-6 && approx(wtest[0]+wtest[1],1,1e-9) && wtest.every(function(v){ return v>=-1e-9; }), 'FW simplex exact convex combo failed');
+	if(which === 'A'){
+		$('#AL').value = c.L; $('#Aa').value = c.a; $('#Ab').value = c.b;
+		setSwatchFromFields('A');
+	} else {
+		$('#BL').value = c.L; $('#Ba').value = c.a; $('#Bb').value = c.b;
+		setSwatchFromFields('B');
+	}
+	computeCompareDE();
+	return true;
 }
-try { runSelfTests(); } catch(e){ console.warn('Self-tests failed:', e); }
+
+function debounce(fn, ms){
+	let t=null;
+	return (...args)=>{
+		if(t) clearTimeout(t);
+		t=setTimeout(()=>fn(...args), ms);
+	};
+}
+
+const _autoLoadA = debounce(()=>{ loadCompareByName('A', $('#cmpASelect').value); }, 150);
+const _autoLoadB = debounce(()=>{ loadCompareByName('B', $('#cmpBSelect').value); }, 150);
+
+$('#cmpASelect').addEventListener('input', _autoLoadA);
+$('#cmpASelect').addEventListener('change', _autoLoadA);
+$('#cmpBSelect').addEventListener('input', _autoLoadB);
+$('#cmpBSelect').addEventListener('change', _autoLoadB);
+
+// Keep hidden buttons functional (in case you unhide them later)
+$('#cmpALoad').addEventListener('click', ()=> loadCompareByName('A', $('#cmpASelect').value));
+$('#cmpBLoad').addEventListener('click', ()=> loadCompareByName('B', $('#cmpBSelect').value));
+
+
+// Compare save/log UI
+const cmpSaveBtn = document.getElementById('cmpSaveBtn');
+if (cmpSaveBtn){
+  cmpSaveBtn.addEventListener('click', ()=>{
+    const out = saveCurrentComparison();
+    const msg = document.getElementById('cmpSaveMsg');
+    if (msg){
+      msg.textContent = out.msg || '';
+      msg.className = out.ok ? 'mini ok' : 'mini warn';
+    }
+  });
+}
+
+// Job ref/id UI sync for Compare tab
+const cmpJobRefTopEl = document.getElementById('cmpJobRefTop');
+const cmpJobRefEl = document.getElementById('cmpJobRef');
+if (cmpJobRefTopEl){
+  cmpJobRefTopEl.addEventListener('input', ()=> setJobRefUI(cmpJobRefTopEl.value));
+}
+if (cmpJobRefEl){
+  cmpJobRefEl.addEventListener('input', ()=> setJobRefUI(cmpJobRefEl.value));
+}
+
+setJobIdUI();
+
+const cmpClearLogBtn = document.getElementById('cmpClearLogBtn');
+if (cmpClearLogBtn){
+  cmpClearLogBtn.addEventListener('click', ()=>{
+    if (!confirm('Clear all saved comparisons?')) return;
+    CMP_LOG = [];
+    saveCompareLog();
+    renderCompareLog();
+  });
+}
+const cmpExportLogBtn = document.getElementById('cmpExportLogBtn');
+if (cmpExportLogBtn){
+  cmpExportLogBtn.addEventListener('click', exportCompareLogCsv);
+}
+
+// Settings UI
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+if (saveSettingsBtn){
+  saveSettingsBtn.addEventListener('click', ()=>{
+    readSettingsFromUI();
+    saveSettings();
+    renderCompareLog();
+    computeCompareDE();
+    const s = document.getElementById('settingsStatus');
+    if (s) s.textContent = 'Saved.';
+    setTimeout(()=>{ const s2=document.getElementById('settingsStatus'); if (s2) s2.textContent=''; }, 1500);
+  });
+}
+const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+if (resetSettingsBtn){
+  resetSettingsBtn.addEventListener('click', ()=>{
+    SETTINGS = { deltaEThreshold: 2.0, autoSaveCompare: false };
+    saveSettings();
+    applySettingsToUI();
+    renderCompareLog();
+    computeCompareDE();
+    const s = document.getElementById('settingsStatus');
+    if (s) s.textContent = 'Reset to defaults.';
+    setTimeout(()=>{ const s2=document.getElementById('settingsStatus'); if (s2) s2.textContent=''; }, 1500);
+  });
+}
+// Data load
+Promise.all([
+  fetch('colours.json').then(r=>r.json()),
+  fetch('DC_Formulas.json').then(r=>r.json())
+]).then(tuple=>{
+  BASE_COLOURS=tuple[0].map(c=>({
+    name:c.name||c.Colour||c.color||'',
+    L:c.L,
+    a:c.a,
+    b:c.b
+  }));
+  COLOURS = BASE_COLOURS.slice();
+  FORMULAS=tuple[1];
+  buildFormulaIndex();
+  loadLibraries();
+  refreshLibrarySelects();
+  refreshActiveColours();
+  renderLibraryList();
+}).catch(err=>{
+  alert('Error loading JSON: '+err);
+});
+
+loadGroups();
+loadInks();
+loadInkCurves();
+loadSettings();
+applySettingsToUI();
+loadCompareLog();
+renderCompareLog();
+
+renderInkCurvesTable();
+updateTargetEcho();
+requestLabDraw();
+
+// Self-test
+try{
+  const c={L:50,a:0,b:0};
+  console.assert(approx(deltaE2000(c,c),0),'ΔE00 identity');
+  const c1={L:60,a:10,b:-5}, c2={L:55,a:-3,b:9};
+  console.assert(approx(deltaE2000(c1,c2),deltaE2000(c2,c1),1e-9),'ΔE00 symmetry');
+}catch(e){
+  console.warn('Self-tests failed:', e);
+}
+
 })();
 </script>
 </body>
