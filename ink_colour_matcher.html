@@ -9,7 +9,79 @@
   *{ box-sizing:border-box; }
   body{ font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0; padding:16px; background:#0b0c10; color:#e6e6e6; }
   h1{ font-size:1.2rem; margin:0 0 8px; }
-  .tabs{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
+  
+  /* App bar + segmented tabs (pro app shell) */
+  .appbar{
+    position:sticky;
+    top:0;
+    z-index:60;
+    max-width:1200px;
+    margin:0 auto 14px;
+    padding:10px 12px;
+    background:#0d1016;
+    border:1px solid #22252e;
+    border-radius:18px;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+    backdrop-filter:saturate(1.2) blur(6px);
+  }
+  .appbar-inner{
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .app-title{
+    font-weight:800;
+    letter-spacing:.2px;
+    color:#e6e6e6;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    white-space:nowrap;
+  }
+  .app-title .tag{
+    font-size:.8rem;
+    color:#9aa4b2;
+    font-weight:700;
+    border:1px solid #242938;
+    background:#0f1219;
+    padding:6px 10px;
+    border-radius:999px;
+  }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    margin:0;
+    flex-wrap:wrap;
+    justify-content:flex-start;
+    width:auto;
+    padding:0;
+    background:transparent;
+    border:none;
+    border-radius:0;
+  }
+  .tabbtn{
+    cursor:pointer;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid transparent;
+    background:transparent;
+    color:#cbd5e1;
+    font-weight:800;
+  }
+  .tabbtn:hover{ background:rgba(255,255,255,.06); }
+  .tabbtn[aria-selected="true"]{
+    background:#141824;
+    border-color:#2a2f3a;
+    color:#e6e6e6;
+  }
+  @media (max-width:900px){
+    .appbar-inner{ justify-content:center; }
+    .app-title{ width:100%; justify-content:center; }
+  }
+
   .tabbtn{ cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
   .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
   .app{ max-width:1200px; margin:0 auto; display:grid; gap:var(--gap); grid-template-columns:420px 1fr; align-items:start; }
@@ -45,6 +117,9 @@
   /* Modal editor */
   .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:50; }
   .modal{ width:min(720px, 96vw); max-height:90vh; overflow:auto; background:#10121a; border:1px solid #2a2f3a; border-radius:14px; padding:16px; }
+
+  /* QC history modal wider */
+  #cmpHistoryModal .modal{ width:min(950px, 96vw); }
   .modal h3{ margin:0 0 8px; }
   .edit-row{ display:grid; grid-template-columns: 1fr 100px 32px; gap:8px; align-items:center; }
   .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
@@ -70,16 +145,30 @@
   .de-pass{ color:#86efac; font-weight:800; }
   .de-fail{ color:#fca5a5; font-weight:800; }
   .de-neutral{ color:#e5e7eb; font-weight:800; }
-  .wide{ max-width:1400px; margin:0 auto; }
-
+  .wide{ max-width:1200px; margin:0 auto; }
 
   /* Fixed logo overlay (doesn't affect layout) */
   #pulseLogo{ position:fixed; background: white; padding: 10px; border-radius: 20px;top:-20px; right:20px; height:120px; width:auto; z-index:999; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); opacity:.92; pointer-events:none; }
   @media (max-width: 520px){ #pulseLogo{ height:34px; top:10px; left:auto; } }
 
-
   .nowrap{ white-space:nowrap; }
   .hide{ display:none !important; }
+
+  /* Simple combobox (input + always-available dropdown list)
+     - Unlike <datalist>, we can keep showing ALL options even after typing.
+     - Typing reorders matches to the top using a forgiving (non-exact) match. */
+  .combo{ position:relative; }
+  .combo-drop{
+    position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:60;
+    max-height:260px; overflow:auto;
+    background:#0e1015; border:1px solid #2a2f3a; border-radius:12px;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+  }
+  .combo-item{ padding:10px 12px; cursor:pointer; border-bottom:1px dashed #242938; }
+  .combo-item:last-child{ border-bottom:none; }
+  .combo-item:hover{ background:rgba(255,255,255,.06); }
+  .combo-item .hit{ color:#e6e6e6; font-weight:700; }
+  .combo-item .sub{ display:block; margin-top:2px; color:#7b8496; font-size:.8rem; }
 
   /* Batch (compare) inputs should not be editable */
   .batch-readonly{
@@ -94,18 +183,66 @@
     -moz-appearance: textfield;
   }
 
+  /* Narrower LAB inputs for clearer separation */
+  .lab-input{ max-width:110px; }
+
+  /* QC: tighten Standard/Batch LAB groups */
+  #tab-compare .two-col{ gap:10px; }
+  .lab-row{ grid-template-columns:repeat(3, auto); justify-content:start; column-gap:10px; }
+  .lab-input{ max-width:95px; }
+
+  /* QC: place swatches beside LAB inputs */
+  .lab-with-swatch{ display:flex; align-items:flex-end; gap:10px; }
+  .lab-with-swatch .swatch{ margin-bottom:2px; }
+  /* QC: History button a bit larger */
+  #cmpHistoryBtn{ padding:12px 16px; font-weight:700; }
+
+  /* QC: subtle divider between Standard and Batch */
+  #tab-compare .two-col{
+    position: relative;
+  }
+  #tab-compare .two-col::after{
+    content:'';
+    position:absolute;
+    top:0;
+    bottom:0;
+    left:43%;
+    width:1px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      rgba(255,255,255,0.08),
+      transparent
+    );
+    pointer-events:none;
+  }
+
+  /* Hide divider when Standard/Batch stack vertically */
+  @media (max-width: 900px){
+    #tab-compare .two-col::after{ display:none; }
+  }
+
+  /* Settings tab: consistent spacing between cards */
+  #tab-settings .card{ margin-top:16px; }
+  #tab-settings .card:first-child{ margin-top:0; }
+
 </style>
 </head>
 <body>
 
   <img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
 
-  <div class="tabs" role="tablist" aria-label="Modes">
+  
+  <div class="appbar">
+    <div class="appbar-inner">
+      <div class="app-title"><span>Colour Hub</span></div>
+      <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
-    <button class="tabbtn" id="tabBtnCompare" role="tab" aria-selected="false" aria-controls="tab-compare">Compare Colours</button>
-    <button class="tabbtn" id="tabBtnLibraries" role="tab" aria-selected="false" aria-controls="tab-libraries">Colour Sets</button>
+    <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
     <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
+    </div>
+  </div>
 
   <!-- TAB: Match & Predict -->
   <section id="tab-match" role="tabpanel" aria-labelledby="tabBtnMatch">
@@ -135,12 +272,13 @@
 
         <div class="row2" style="margin-top:12px;">
           <div>
-            <label for="pms">Search by PMS (number only)</label>
-            <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+            <label class="nowrap">Or select colour (from active library)</label>
+            <div class="combo">
+              <input id="matchColourSelect" placeholder="Type to search…" autocomplete="off">
+              <div id="matchColourDrop" class="combo-drop hide" role="listbox" aria-label="Colour options"></div>
+            </div>
           </div>
-          <div style="align-self:end;">
-            <button class="btn" id="pmsBtn">Find PMS</button>
-          </div>
+          <div></div>
         </div>
 
         <div class="flex" style="margin-top:12px;">
@@ -191,25 +329,29 @@
 
   <!-- TAB: Compare Colours -->
   <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
-    <div class="card" style="max-width:1100px; margin:0 auto;">
+    <div class="card" style="max-width:1200px; margin:0 auto;">
       <div class="flex" style="justify-content:space-between;">
         <div>
           <h1>Compare Colours (ΔE2000)</h1>
           <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
         </div>
-        <div style="min-width:220px;">
-          <label for="cmpLibrarySelect">Colour library</label>
-          <select id="cmpLibrarySelect"></select>
-        </div>
       </div>
 
       
+      <div class="row2" style="margin-top:12px; align-items:end;">
+        <div style="max-width:360px;">
+          <label for="cmpLibrarySelect">Colour library</label>
+          <select id="cmpLibrarySelect"></select>
+        </div>
+        <div></div>
+      </div>
+
       <div class="row2" style="margin-top:12px;">
         <div>
           <label for="cmpJobRefTop">Job reference</label>
           <input id="cmpJobRefTop" type="text" placeholder="e.g. JOB-12345">
         </div>
-</div>
+      </div>
 
 <div class="flex" style="margin-top:8px;">
         <button class="btn" id="spectroConnectBtnCompare">Connect device</button>
@@ -221,37 +363,42 @@
           <div class="row2">
             <div>
               <label for="cmpASelect" class="nowrap">Pick Standard (from active library)</label>
-              <input list="cmpListA" id="cmpASelect" placeholder="Type to search…">
-              <datalist id="cmpListA"></datalist>
+              <div class="combo">
+                <input id="cmpASelect" placeholder="Type to search…" autocomplete="off">
+                <div id="cmpADrop" class="combo-drop hide" role="listbox" aria-label="Standard options"></div>
+              </div>
             </div>
-            <div style="align-self:end;"><button class="btn" id="cmpALoad" class="btn hide">Load A</button></div>
+            <div>
+              <label class="nowrap">Or scan</label>
+              <button class="btn" id="spectroScanCompareABtn">Scan Standard</button>
+            </div>
           </div>
-          <div class="row" style="margin-top:8px;">
-            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01"></div>
-            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01"></div>
-            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01"></div>
+          <div class="lab-with-swatch" style="margin-top:12px;">
+            <div class="row lab-row" style="margin-top:0;">
+            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01" class="lab-input"></div>
           </div>
-          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
-          <div class="flex" style="margin-top:8px;">
-            <button class="btn" id="spectroScanCompareABtn">Scan Standard</button>
+            <div class="swatch" id="swatchA"></div>
           </div>
+          
         </div>
         <div>
-          <div class="row2">
-            <div>
-              <label for="cmpBSelect" class="nowrap">Pick Batch (from active library)</label>
-              <input list="cmpListB" id="cmpBSelect" placeholder="Type to search…">
-              <datalist id="cmpListB"></datalist>
+          <div>
+            <label class="nowrap" style="font-size:1rem; font-weight:700;">Batch</label>
+            <div style="margin-top:6px;">
+              <button class="btn" id="spectroScanCompareBBtn">Scan Batch</button>
             </div>
-            <div style="align-self:end;"><button class="btn" id="cmpBLoad" class="btn hide">Load B</button></div>
           </div>
-          <div class="row" style="margin-top:8px;">
-            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly" id="BL" type="number" step="0.01" readonly></div>
-            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly" id="Ba" type="number" step="0.01" readonly></div>
-            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly" id="Bb" type="number" step="0.01" readonly></div>
+          <div class="lab-with-swatch" style="margin-top:12px;">
+            <div class="row lab-row" style="margin-top:0;">
+            <div><label for="BL" class="nowrap">Batch: L*</label><input id="BL" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input id="Ba" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input id="Bb" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
           </div>
-          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
-          <div class="flex" style="margin-top:8px;"><button class="btn" id="spectroScanCompareBBtn">Scan Batch</button></div>
+            <div class="swatch" id="swatchB"></div>
+          </div>
+          
         </div>
       </div>
 
@@ -276,30 +423,8 @@
         <div class="mini" id="cmpSaveMsg" style="margin-top:6px;"></div>
       </div>
 
-      <div class="formula-box" id="cmpLogBox" style="margin-top:12px;">
-        <div class="flex" style="justify-content:space-between; align-items:center;">
-          <h2 style="margin:0;">Saved comparisons (local)</h2>
-          <div class="flex">
-            <button class="btn" id="cmpExportLogBtn">Download CSV</button>
-            <button class="btn" id="cmpClearLogBtn">Clear</button>
-          </div>
-        </div>
-        <div style="max-height:260px; overflow:auto; border:1px solid #1f2933; border-radius:10px; margin-top:10px;">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Job</th>
-                                <th>A (L*a*b*)</th>
-                <th>B (L*a*b*)</th>
-                <th>ΔE2000</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody id="cmpLogTbody"></tbody>
-          </table>
-        </div>
-        <div class="mini" style="margin-top:6px;"></div>
+      <div class="flex" style="margin-top:10px; justify-content:flex-start;">
+        <button class="btn" id="cmpHistoryBtn">History</button>
       </div>
 
 </div>
@@ -317,9 +442,12 @@
     </div>
   </section>
 
-  <!-- TAB: Colour Sets (libraries) -->
-  <section id="tab-libraries" role="tabpanel" aria-labelledby="tabBtnLibraries" hidden>
-    <div class="card" style="max-width:900px; margin:0 auto;">
+  
+<!-- TAB: Settings -->
+  <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
+
+    <!-- Moved here: Colour Sets (Libraries) -->
+<div class="card" style="max-width:1200px; margin:0 auto;">
       <h1>Colour Sets (Libraries)</h1>
       <p class="muted">
         Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
@@ -353,7 +481,7 @@
     </div>
 
     <!-- Spectro capture lives ONLY on this tab -->
-    <div class="card" style="max-width:1600px; margin:16px auto 0;">
+    <div class="card" style="max-width:1200px; margin:16px auto 0;">
       <h1>Capture Ink Curves from Spectro</h1>
       <p class="muted">
         Connect the SKZ-SY3060, measure a patch, and store the full 400–700&nbsp;nm reflectance curve along with
@@ -467,11 +595,7 @@
         </div>
       </div>
     </div>
-  </section>
 
-  
-  <!-- TAB: Settings -->
-  <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
     <div class="card wide">
       <h1>Settings</h1>
       <p class="muted">
@@ -526,6 +650,82 @@
       <div class="footer-row">
         <button class="btn" id="cancelEdit">Cancel</button>
         <button class="btn" id="saveCorrection">Save correction</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: QC comparison history -->
+  <div class="modal-backdrop" id="cmpHistoryModal">
+    <div class="modal">
+      <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
+        <h3 style="margin:0;">QC history</h3>
+        <button class="btn" id="cmpHistoryClose">Close</button>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="histFrom">From date</label>
+          <input id="histFrom" type="date">
+        </div>
+        <div>
+          <label for="histTo">To date</label>
+          <input id="histTo" type="date">
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="histJob">Job contains</label>
+          <input id="histJob" type="text" placeholder="e.g. JOB-123">
+        </div>
+        <div>
+          <label for="histStandard">Standard contains</label>
+          <input id="histStandard" type="text" placeholder="e.g. 186">
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="histLibrary">Library</label>
+          <select id="histLibrary"></select>
+        </div>
+        <div>
+          <label for="histSort">Sort</label>
+          <select id="histSort">
+            <option value="date_desc" selected>Newest first</option>
+            <option value="date_asc">Oldest first</option>
+            <option value="job_asc">Job A→Z</option>
+            <option value="std_asc">Standard A→Z</option>
+            <option value="de_asc">ΔE low→high</option>
+            <option value="de_desc">ΔE high→low</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex" style="margin-top:12px; justify-content:space-between;">
+        <div class="mini" id="histCount"></div>
+        <div class="flex">
+          <button class="btn" id="cmpExportLogBtn">Download CSV</button>
+          <button class="btn" id="cmpClearLogBtn">Clear</button>
+        </div>
+      </div>
+
+      <div style="max-height:52vh; overflow:auto; border:1px solid #1f2933; border-radius:10px; margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Job</th>
+              <th>Standard</th>
+              <th>Library</th>
+              <th>Standard</th>
+              <th>Batch</th>
+              <th>ΔE2000</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody id="cmpLogTbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -617,7 +817,6 @@ function setJobRefUI(v){
   if (b && b.value !== v) b.value = v;
 }
 
-
 function loadSettings(){
   try{
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -660,6 +859,19 @@ function saveCompareLog(){
 function fmtLab(o){
   return `L ${(+o.L).toFixed(2)} a ${(+o.a).toFixed(2)} b ${(+o.b).toFixed(2)}`;
 }
+function escAttr(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+function labSwatch(o){
+  if(!o) return '';
+  const rgb = labToSrgb(+o.L, +o.a, +o.b);
+  const tip = escAttr(fmtLab(o));
+  return `<div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})" title="${tip}"></div>`;
+}
 function isoToNice(ts){
   const d = new Date(ts);
   // local time, demo-friendly
@@ -671,22 +883,31 @@ function renderCompareLog(){
   tb.innerHTML = '';
   if (!CMP_LOG.length){
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="7" class="muted">No saved comparisons yet.</td>';
+    tr.innerHTML = '<td colspan="8" class="muted">No saved comparisons yet.</td>';
     tb.appendChild(tr);
     return;
   }
-  // newest first
-  const rows = CMP_LOG.slice().sort((a,b)=> (b.ts||0)-(a.ts||0));
+
+  const rows = filteredAndSortedCompareLog();
+  const countEl = document.getElementById('histCount');
+  if (countEl){
+    countEl.textContent = `${rows.length} row${rows.length===1?'':'s'} shown (of ${CMP_LOG.length}).`;
+  }
+
   rows.forEach(r=>{
     const tr = document.createElement('tr');
     const pass = Number.isFinite(+r.deltaE) ? (+r.deltaE < SETTINGS.deltaEThreshold) : null;
     const cls = (pass===true) ? 'de-pass' : (pass===false ? 'de-fail' : 'de-neutral');
     const resTxt = (pass===true) ? 'PASS' : (pass===false ? 'FAIL' : '—');
+    const stdName = (r.standardName || '').replace(/</g,'&lt;');
+    const libLabel = (r.libraryLabel || '').replace(/</g,'&lt;');
     tr.innerHTML = `
       <td>${isoToNice(r.ts)}</td>
       <td class="mono">${(r.jobRef||'').replace(/</g,'&lt;')}</td>
-      <td class="mono">${fmtLab(r.A)}</td>
-      <td class="mono">${fmtLab(r.B)}</td>
+      <td class="mono">${stdName}</td>
+      <td>${libLabel}</td>
+      <td>${labSwatch(r.A)}</td>
+      <td>${labSwatch(r.B)}</td>
       <td class="${cls}">${(+r.deltaE).toFixed(2)}</td>
       <td class="${cls}">${resTxt}</td>
     `;
@@ -695,16 +916,17 @@ function renderCompareLog(){
 }
 function exportCompareLogCsv(){
   if (!CMP_LOG.length){ alert('No saved comparisons yet.'); return; }
-  const header = ['Date','JobRef','A_L','A_a','A_b','B_L','B_a','B_b','DeltaE2000','Threshold','Result'];
+  const header = ['Date','JobRef','StandardName','Library','A_L','A_a','A_b','B_L','B_a','B_b','DeltaE2000','Threshold','Result'];
   const lines = [header.join(',')];
   const thr = SETTINGS.deltaEThreshold;
-  const rows = CMP_LOG.slice().sort((a,b)=> (a.ts||0)-(b.ts||0));
+  const rows = filteredAndSortedCompareLog(true);
   rows.forEach(r=>{
     const pass = (+r.deltaE < thr);
     lines.push([
       new Date(r.ts).toISOString(),
       String(r.jobRef||'').replaceAll(',',' '),
-      String(r.jobId||'').replaceAll(',',' '),
+      String(r.standardName||'').replaceAll(',',' '),
+      String(r.libraryLabel||'').replaceAll(',',' '),
       r.A.L, r.A.a, r.A.b,
       r.B.L, r.B.a, r.B.b,
       r.deltaE,
@@ -731,11 +953,24 @@ function getCompareAB(){
 }
 function saveCurrentComparison(opts){
   const ab = getCompareAB();
-  if (!ab) return { ok:false, msg:'Enter valid L*a*b* for both A and B first.' };
+  if (!ab) return { ok:false, msg:'Enter valid L*a*b* for both Standard and Batch first.' };
   const jobRef = (document.getElementById('cmpJobRef')?.value || '').trim();
   if (!jobRef) return { ok:false, msg:'Please enter a Job reference before saving.' };
   const deltaE = deltaE2000({L:ab.A.L,a:ab.A.a,b:ab.A.b},{L:ab.B.L,a:ab.B.a,b:ab.B.b});
-  const rec = { ts: Date.now(), jobRef, jobId: CURRENT_JOB_ID, A: ab.A, B: ab.B, deltaE: +deltaE.toFixed(4) };
+  const libOpts = libraryOptions();
+  const libLabel = (libOpts.find(o=>o.id===activeLibraryId)?.label) || '';
+  const standardName = (CMP_STANDARD_NAME || document.getElementById('cmpASelect')?.value || '').trim();
+  const rec = {
+    ts: Date.now(),
+    jobRef,
+    jobId: CURRENT_JOB_ID,
+    standardName,
+    libraryId: activeLibraryId,
+    libraryLabel: libLabel,
+    A: ab.A,
+    B: ab.B,
+    deltaE: +deltaE.toFixed(4)
+  };
   CMP_LOG.push(rec);
   saveCompareLog();
   renderCompareLog();
@@ -743,7 +978,6 @@ function saveCurrentComparison(opts){
   setJobIdUI();
   return { ok:true, msg: (opts && opts.silent) ? '' : 'Saved.' };
 }
-
 
 function loadInkCurves(){
   try{
@@ -901,7 +1135,8 @@ function refreshActiveColours(){
   $('#countLabel').textContent = COLOURS.length;
   $('#resultsTbody').innerHTML = '';
   $('#formulaPanel').style.display = 'none';
-  refreshCompareDatalists();
+  refreshCompareStandardCombo();
+  refreshMatchColourCombo();
 }
 function renderLibraryList(){
   const wrap = $('#libList');
@@ -1794,7 +2029,6 @@ document.addEventListener('input',(e)=>{
   });
 })();
 
-
 // 3D LAB sphere with coloured panes
 const canvas=$('#labCanvas');
 const ctx=canvas.getContext('2d');
@@ -2045,7 +2279,7 @@ function drawLabScene(){
   } else {
     ctx.fillStyle='#e5e7eb';
     ctx.font='13px ui-sans-serif, system-ui';
-    ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18);
+    ctx.fillText('Enter L*a*b* for both Standard and Batch to render.', 12, 18);
   }
 }
 let rafId=null;
@@ -2216,39 +2450,302 @@ if (spectroScanCompareBBtn){
   });
 }
 
-// Compare tab datalists based on active library
-function refreshCompareDatalists(){
-  const opts = COLOURS.map(c=>{
+// ===== QC combobox (Standard) + History =====
+let CMP_STANDARD_NAME = '';
+
+function normText(s){
+  return String(s||'')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim();
+}
+function tokensOf(s){
+  const t = normText(s);
+  return t ? t.split(/\s+/).filter(Boolean) : [];
+}
+
+// Forgiving match:
+// - split query into tokens
+// - "match" if all tokens appear somewhere in name
+// - score boosts earlier occurrences, more token matches, shorter names
+function scoreName(name, query){
+  const n = normText(name);
+  const qTokens = tokensOf(query);
+  if (!qTokens.length) return { score:0, match:true, hit:'' };
+  let posSum = 0;
+  for (const tok of qTokens){
+    const idx = n.indexOf(tok);
+    if (idx < 0) return { score:-1e9, match:false, hit:'' };
+    posSum += idx;
+  }
+  // Higher is better
+  const score = (qTokens.length*10000) - (posSum*10) - (n.length);
+  return { score, match:true, hit:qTokens[0] };
+}
+
+function bestColourByQuery(query){
+  const q = (query||'').trim();
+  if (!q) return null;
+  // exact first
+  const exact = COLOURS.find(x => (x.name||x.Colour||x.color||'') === q);
+  if (exact) return exact;
+  // forgiving match
+  let best = null;
+  let bestScore = -1e18;
+  COLOURS.forEach(c=>{
     const name = (c.name||c.Colour||c.color||'').trim();
-    return name ? `<option value="${name}">` : '';
-  }).join('');
-  $('#cmpListA').innerHTML = opts;
-  $('#cmpListB').innerHTML = opts;
+    if (!name) return;
+    const s = scoreName(name, q);
+    if (!s.match) return;
+    if (s.score > bestScore){ bestScore = s.score; best = c; }
+  });
+  return best;
+}
+
+function loadCompareByQuery(which, query){
+  const c = bestColourByQuery(query);
+  if (!c) return false;
+  const nm = (c.name||c.Colour||c.color||'').trim();
+  if (which === 'A') CMP_STANDARD_NAME = nm;
+  if (which === 'A'){
+    $('#AL').value = c.L; $('#Aa').value = c.a; $('#Ab').value = c.b;
+    setSwatchFromFields('A');
+  } else {
+    $('#BL').value = c.L; $('#Ba').value = c.a; $('#Bb').value = c.b;
+    setSwatchFromFields('B');
+  }
+  computeCompareDE();
+  return true;
+}
+
+function closeCombo(drop){
+  if (!drop) return;
+  drop.classList.add('hide');
+}
+
+function refreshCompareStandardCombo(){
+  const input = document.getElementById('cmpASelect');
+  const drop = document.getElementById('cmpADrop');
+  if (!input || !drop) return;
+
+  const allNames = COLOURS
+    .map(c => (c.name||c.Colour||c.color||'').trim())
+    .filter(Boolean);
+
+  const render = (q)=>{
+    const query = (q||'').trim();
+    const scored = allNames.map(name=>({ name, ...scoreName(name, query) }));
+    // Show ALL options: matches first (sorted), then non-matches alphabetically
+    const matches = scored.filter(x=>x.match).sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name));
+    const rest = scored.filter(x=>!x.match).sort((a,b)=> a.name.localeCompare(b.name));
+    const merged = matches.concat(rest);
+
+    // Build DOM
+    drop.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    merged.forEach(x=>{
+      const div = document.createElement('div');
+      div.className = 'combo-item';
+      // lightweight highlight for first token only (keeps it readable)
+      const t = tokensOf(query)[0];
+      if (t){
+        const idx = normText(x.name).indexOf(t);
+        if (idx >= 0){
+          // Don't try to map indices back to original string; just bold the whole name when it matches.
+          div.innerHTML = `<span class="hit">${x.name.replace(/</g,'&lt;')}</span>`;
+        } else {
+          div.textContent = x.name;
+        }
+      } else {
+        div.textContent = x.name;
+      }
+      div.addEventListener('mousedown', (e)=>{
+        // mousedown to avoid blur closing before click
+        e.preventDefault();
+        input.value = x.name;
+        CMP_STANDARD_NAME = x.name;
+        loadCompareByQuery('A', x.name);
+        closeCombo(drop);
+      });
+      frag.appendChild(div);
+    });
+    drop.appendChild(frag);
+  };
+
+  // Initial fill (alphabetical)
+  render('');
+
+  const open = ()=>{ drop.classList.remove('hide'); };
+
+  input.addEventListener('focus', ()=>{ render(input.value); open(); });
+  input.addEventListener('click', ()=>{ render(input.value); open(); });
+  input.addEventListener('input', ()=>{ render(input.value); open(); });
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape'){ closeCombo(drop); return; }
+    if (e.key === 'Enter'){
+      // Auto-load best match (forgiving)
+      const q = input.value;
+      const best = bestColourByQuery(q);
+      if (best){
+        const nm = (best.name||best.Colour||best.color||'').trim();
+        input.value = nm;
+        CMP_STANDARD_NAME = nm;
+        loadCompareByQuery('A', nm);
+      }
+      closeCombo(drop);
+    }
+  });
+  input.addEventListener('blur', ()=>{
+    // Delay so list mousedown can run
+    setTimeout(()=> closeCombo(drop), 120);
+  });
+
+  // Clicking elsewhere closes
+  document.addEventListener('mousedown', (e)=>{
+    if (!drop || drop.classList.contains('hide')) return;
+    const within = drop.contains(e.target) || input.contains(e.target);
+    if (!within) closeCombo(drop);
+  });
+}function refreshMatchColourCombo(){
+  const input = document.getElementById('matchColourSelect');
+  const drop = document.getElementById('matchColourDrop');
+  if (!input || !drop) return;
+
+  const allNames = COLOURS
+    .map(c => (c.name||c.Colour||c.color||'').trim())
+    .filter(Boolean);
+
+  const render = (q)=>{
+    const query = (q||'').trim();
+    const scored = allNames.map(name=>({ name, ...scoreName(name, query) }));
+    const matches = scored.filter(x=>x.match).sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name));
+    const rest = scored.filter(x=>!x.match).sort((a,b)=> a.name.localeCompare(b.name));
+    const merged = matches.concat(rest);
+
+    drop.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    merged.forEach(x=>{
+      const div = document.createElement('div');
+      div.className = 'combo-item';
+      const t = tokensOf(query)[0];
+      if (t){
+        const idx = normText(x.name).indexOf(t);
+        if (idx >= 0){
+          div.innerHTML = `<span class="hit">${x.name.replace(/</g,'&lt;')}</span>`;
+        } else {
+          div.textContent = x.name;
+        }
+      } else {
+        div.textContent = x.name;
+      }
+
+      div.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        input.value = x.name;
+
+        const c = bestColourByQuery(x.name);
+        if (c){
+          document.getElementById('L').value = c.L;
+          document.getElementById('a').value = c.a;
+          document.getElementById('b').value = c.b;
+          updateTargetEcho();
+          showFormulaFor(x.name);
+          _lastContextName = x.name;
+        }
+        closeCombo(drop);
+      });
+
+      frag.appendChild(div);
+    });
+    drop.appendChild(frag);
+  };
+
+  render('');
+
+  const open = ()=>{ drop.classList.remove('hide'); };
+
+  input.addEventListener('focus', ()=>{ render(input.value); open(); });
+  input.addEventListener('click', ()=>{ render(input.value); open(); });
+  input.addEventListener('input', ()=>{ render(input.value); open(); });
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape'){ closeCombo(drop); return; }
+    if (e.key === 'Enter'){
+      const best = bestColourByQuery(input.value);
+      if (best){
+        const nm = (best.name||best.Colour||best.color||'').trim();
+        input.value = nm;
+        document.getElementById('L').value = best.L;
+        document.getElementById('a').value = best.a;
+        document.getElementById('b').value = best.b;
+        updateTargetEcho();
+        showFormulaFor(nm);
+        _lastContextName = nm;
+      }
+      closeCombo(drop);
+    }
+  });
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=> closeCombo(drop), 120);
+  });
+
+  document.addEventListener('mousedown', (e)=>{
+    if (!drop || drop.classList.contains('hide')) return;
+    const within = drop.contains(e.target) || input.contains(e.target);
+    if (!within) closeCombo(drop);
+  });
+}
+
+function isoDateOnly(ts){
+  try{ return new Date(ts).toISOString().slice(0,10); }catch(e){ return ''; }
+}
+function filteredAndSortedCompareLog(forExport){
+  const from = document.getElementById('histFrom')?.value || '';
+  const to = document.getElementById('histTo')?.value || '';
+  const jobQ = (document.getElementById('histJob')?.value || '').trim().toLowerCase();
+  const stdQ = (document.getElementById('histStandard')?.value || '').trim().toLowerCase();
+  const lib = document.getElementById('histLibrary')?.value || '';
+  const sort = document.getElementById('histSort')?.value || 'date_desc';
+
+  let rows = CMP_LOG.slice();
+  rows = rows.filter(r=>{
+    if (from && isoDateOnly(r.ts) < from) return false;
+    if (to && isoDateOnly(r.ts) > to) return false;
+    if (jobQ && !String(r.jobRef||'').toLowerCase().includes(jobQ)) return false;
+    if (stdQ && !String(r.standardName||'').toLowerCase().includes(stdQ)) return false;
+    if (lib && String(r.libraryId||'') !== lib) return false;
+    return true;
+  });
+
+  const by = {
+    date_desc: (a,b)=>(b.ts||0)-(a.ts||0),
+    date_asc:  (a,b)=>(a.ts||0)-(b.ts||0),
+    job_asc:   (a,b)=>String(a.jobRef||'').localeCompare(String(b.jobRef||'')),
+    std_asc:   (a,b)=>String(a.standardName||'').localeCompare(String(b.standardName||'')),
+    de_asc:    (a,b)=>(+a.deltaE)-(+b.deltaE),
+    de_desc:   (a,b)=>(+b.deltaE)-(+a.deltaE)
+  };
+  rows.sort(by[sort] || by.date_desc);
+  return rows;
 }
 
 // Tabs switching
 const tabBtnMatch=$('#tabBtnMatch');
 const tabBtnCompare=$('#tabBtnCompare');
-const tabBtnLibraries=$('#tabBtnLibraries');
 const tabBtnSettings=$('#tabBtnSettings');
 const tabMatch=$('#tab-match');
 const tabCompare=$('#tab-compare');
-const tabLibraries=$('#tab-libraries');
 const tabSettings=$('#tab-settings');
 function showTab(which){
   tabMatch.hidden = which!=='match';
   tabCompare.hidden = which!=='compare';
-  tabLibraries.hidden = which!=='libraries';
   tabSettings.hidden = which!=='settings';
   tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
   tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
-  tabBtnLibraries.setAttribute('aria-selected', which==='libraries' ? 'true':'false');
   tabBtnSettings.setAttribute('aria-selected', which==='settings' ? 'true':'false');
   if (which === 'compare') requestLabDraw();
 }
 tabBtnMatch.addEventListener('click',()=>showTab('match'));
 tabBtnCompare.addEventListener('click',()=>showTab('compare'));
-tabBtnLibraries.addEventListener('click',()=>showTab('libraries'));
 if (tabBtnSettings) tabBtnSettings.addEventListener('click',()=>showTab('settings'));
 
 // Wire up
@@ -2265,7 +2762,6 @@ $('#clearBtn').addEventListener('click', ()=>{
   $('#editRow').style.display='none';
 });
 $('#suggestBtn').addEventListener('click', suggestFormula);
-$('#pmsBtn').addEventListener('click', findByPms);
 ['L','a','b'].forEach(id=>$('#'+id).addEventListener('input', updateTargetEcho));
 
 $('#editFormulaBtn').addEventListener('click', openEdit);
@@ -2347,45 +2843,16 @@ $('#libTemplateBtn').addEventListener('click', ()=>{
 });
 
 // Compare tab quick-load
-
-// Compare tab quick-load (auto-load on pick/scan)
+// (We use a custom combobox so typing does not hide options like <datalist> does.)
 function loadCompareByName(which, name){
-	name = (name || '').trim();
-	if(!name) return false;
-	const c = COLOURS.find(x => (x.name||x.Colour||x.color||'') === name);
-	if(!c) return false;
-
-	if(which === 'A'){
-		$('#AL').value = c.L; $('#Aa').value = c.a; $('#Ab').value = c.b;
-		setSwatchFromFields('A');
-	} else {
-		$('#BL').value = c.L; $('#Ba').value = c.a; $('#Bb').value = c.b;
-		setSwatchFromFields('B');
-	}
-	computeCompareDE();
-	return true;
+  return loadCompareByQuery(which, name);
 }
 
-function debounce(fn, ms){
-	let t=null;
-	return (...args)=>{
-		if(t) clearTimeout(t);
-		t=setTimeout(()=>fn(...args), ms);
-	};
+// Keep the hidden standard load button functional (if you ever unhide it)
+const _cmpALoadBtn = document.getElementById('cmpALoad');
+if (_cmpALoadBtn){
+  _cmpALoadBtn.addEventListener('click', ()=> loadCompareByQuery('A', document.getElementById('cmpASelect')?.value || ''));
 }
-
-const _autoLoadA = debounce(()=>{ loadCompareByName('A', $('#cmpASelect').value); }, 150);
-const _autoLoadB = debounce(()=>{ loadCompareByName('B', $('#cmpBSelect').value); }, 150);
-
-$('#cmpASelect').addEventListener('input', _autoLoadA);
-$('#cmpASelect').addEventListener('change', _autoLoadA);
-$('#cmpBSelect').addEventListener('input', _autoLoadB);
-$('#cmpBSelect').addEventListener('change', _autoLoadB);
-
-// Keep hidden buttons functional (in case you unhide them later)
-$('#cmpALoad').addEventListener('click', ()=> loadCompareByName('A', $('#cmpASelect').value));
-$('#cmpBLoad').addEventListener('click', ()=> loadCompareByName('B', $('#cmpBSelect').value));
-
 
 // Compare save/log UI
 const cmpSaveBtn = document.getElementById('cmpSaveBtn');
@@ -2425,6 +2892,50 @@ const cmpExportLogBtn = document.getElementById('cmpExportLogBtn');
 if (cmpExportLogBtn){
   cmpExportLogBtn.addEventListener('click', exportCompareLogCsv);
 }
+
+// History modal
+(function wireHistoryModal(){
+  const btn = document.getElementById('cmpHistoryBtn');
+  const modal = document.getElementById('cmpHistoryModal');
+  const closeBtn = document.getElementById('cmpHistoryClose');
+  if (!btn || !modal) return;
+
+  const rebuildLibraryFilter = ()=>{
+    const sel = document.getElementById('histLibrary');
+    if (!sel) return;
+    const opts = libraryOptions();
+    sel.innerHTML = '';
+    const any = document.createElement('option');
+    any.value = '';
+    any.textContent = '— any —';
+    sel.appendChild(any);
+    opts.forEach(o=>{
+      const opt = document.createElement('option');
+      opt.value = o.id;
+      opt.textContent = o.label;
+      sel.appendChild(opt);
+    });
+  };
+
+  const open = ()=>{
+    rebuildLibraryFilter();
+    modal.style.display = 'flex';
+    renderCompareLog();
+  };
+  const close = ()=> { modal.style.display = 'none'; };
+
+  btn.addEventListener('click', open);
+  if (closeBtn) closeBtn.addEventListener('click', close);
+  modal.addEventListener('mousedown', (e)=>{ if (e.target === modal) close(); });
+
+  // Live filter
+  ['histFrom','histTo','histJob','histStandard','histLibrary','histSort'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', ()=> renderCompareLog());
+    el.addEventListener('change', ()=> renderCompareLog());
+  });
+})();
 
 // Settings UI
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
