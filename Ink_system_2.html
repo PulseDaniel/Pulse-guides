@@ -9,7 +9,18 @@
   *{ box-sizing:border-box; }
   body{ font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; margin:0; padding:16px; background:#0b0c10; color:#e6e6e6; }
   h1{ font-size:1.2rem; margin:0 0 8px; }
-  .tabs{ display:flex; gap:8px; margin:0 0 12px; flex-wrap:wrap; }
+  .tabs{
+    display:flex;
+    gap:8px;
+    margin:0 auto 12px;
+    flex-wrap:wrap;
+    justify-content:center;
+    width:fit-content;
+    background:#ffffff;
+    padding:10px 12px 12px;
+    border-radius:0 0 20px 20px;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+  }
   .tabbtn{ cursor:pointer; padding:10px 14px; border-radius:12px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:700; }
   .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
   .app{ max-width:1200px; margin:0 auto; display:grid; gap:var(--gap); grid-template-columns:420px 1fr; align-items:start; }
@@ -155,6 +166,10 @@
     #tab-compare .two-col::after{ display:none; }
   }
 
+
+  .tabs .tabbtn{ background:#141824; border-color:#2a2f3a; }
+  .tabs .tabbtn[aria-selected="true"]{ background:#1a2133; border-color:#3a4252; }
+
 </style>
 </head>
 <body>
@@ -259,19 +274,23 @@
           <h1>Compare Colours (ΔE2000)</h1>
           <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
         </div>
+      </div>
+
+      
+      <div class="row2" style="margin-top:12px; align-items:end;">
+        <div></div>
         <div style="min-width:220px;">
           <label for="cmpLibrarySelect">Colour library</label>
           <select id="cmpLibrarySelect"></select>
         </div>
       </div>
 
-      
       <div class="row2" style="margin-top:12px;">
         <div>
           <label for="cmpJobRefTop">Job reference</label>
           <input id="cmpJobRefTop" type="text" placeholder="e.g. JOB-12345">
         </div>
-</div>
+      </div>
 
 <div class="flex" style="margin-top:8px;">
         <button class="btn" id="spectroConnectBtnCompare">Connect device</button>
