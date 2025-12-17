@@ -27,7 +27,7 @@
   .appbar-inner{
     display:flex;
     align-items:center;
-    justify-content:space-between;
+    justify-content:flex-start;
     gap:12px;
     flex-wrap:wrap;
   }
@@ -55,7 +55,7 @@
     gap:6px;
     margin:0;
     flex-wrap:wrap;
-    justify-content:center;
+    justify-content:flex-start;
     width:auto;
     padding:0;
     background:transparent;
@@ -145,7 +145,7 @@
   .de-pass{ color:#86efac; font-weight:800; }
   .de-fail{ color:#fca5a5; font-weight:800; }
   .de-neutral{ color:#e5e7eb; font-weight:800; }
-  .wide{ max-width:1400px; margin:0 auto; }
+  .wide{ max-width:1200px; margin:0 auto; }
 
   /* Fixed logo overlay (doesn't affect layout) */
   #pulseLogo{ position:fixed; background: white; padding: 10px; border-radius: 20px;top:-20px; right:20px; height:120px; width:auto; z-index:999; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); opacity:.92; pointer-events:none; }
@@ -221,6 +221,11 @@
   @media (max-width: 900px){
     #tab-compare .two-col::after{ display:none; }
   }
+
+  /* Settings tab: consistent spacing between cards */
+  #tab-settings .card{ margin-top:16px; }
+  #tab-settings .card:first-child{ margin-top:0; }
+
 </style>
 </head>
 <body>
@@ -324,7 +329,7 @@
 
   <!-- TAB: Compare Colours -->
   <section id="tab-compare" role="tabpanel" aria-labelledby="tabBtnCompare" hidden>
-    <div class="card" style="max-width:1100px; margin:0 auto;">
+    <div class="card" style="max-width:1200px; margin:0 auto;">
       <div class="flex" style="justify-content:space-between;">
         <div>
           <h1>Compare Colours (ΔE2000)</h1>
@@ -334,11 +339,11 @@
 
       
       <div class="row2" style="margin-top:12px; align-items:end;">
-        <div></div>
-        <div style="min-width:220px;">
+        <div style="max-width:360px;">
           <label for="cmpLibrarySelect">Colour library</label>
           <select id="cmpLibrarySelect"></select>
         </div>
+        <div></div>
       </div>
 
       <div class="row2" style="margin-top:12px;">
@@ -442,7 +447,7 @@
   <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
 
     <!-- Moved here: Colour Sets (Libraries) -->
-<div class="card" style="max-width:900px; margin:0 auto;">
+<div class="card" style="max-width:1200px; margin:0 auto;">
       <h1>Colour Sets (Libraries)</h1>
       <p class="muted">
         Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
@@ -476,7 +481,7 @@
     </div>
 
     <!-- Spectro capture lives ONLY on this tab -->
-    <div class="card" style="max-width:1600px; margin:16px auto 0;">
+    <div class="card" style="max-width:1200px; margin:16px auto 0;">
       <h1>Capture Ink Curves from Spectro</h1>
       <p class="muted">
         Connect the SKZ-SY3060, measure a patch, and store the full 400–700&nbsp;nm reflectance curve along with
