@@ -121,6 +121,13 @@
   .lab-row{ grid-template-columns:repeat(3, auto); justify-content:start; column-gap:10px; }
   .lab-input{ max-width:95px; }
 
+
+  /* QC: place swatches beside LAB inputs */
+  .lab-with-swatch{ display:flex; align-items:flex-end; gap:10px; }
+  .lab-with-swatch .swatch{ margin-bottom:2px; }
+  /* QC: History button a bit larger */
+  #cmpHistoryBtn{ padding:12px 16px; font-weight:700; }
+
 </style>
 </head>
 <body>
@@ -259,12 +266,14 @@
               <button class="btn" id="spectroScanCompareABtn">Scan Standard</button>
             </div>
           </div>
-          <div class="row lab-row" style="margin-top:12px;">
+          <div class="lab-with-swatch" style="margin-top:12px;">
+            <div class="row lab-row" style="margin-top:0;">
             <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01" class="lab-input"></div>
             <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01" class="lab-input"></div>
             <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01" class="lab-input"></div>
           </div>
-          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
+            <div class="swatch" id="swatchA"></div>
+          </div>
           
         </div>
         <div>
@@ -274,12 +283,14 @@
               <button class="btn" id="spectroScanCompareBBtn">Scan Batch</button>
             </div>
           </div>
-          <div class="row lab-row" style="margin-top:12px;">
-            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly lab-input" id="BL" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
-            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly lab-input" id="Ba" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
-            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly lab-input" id="Bb" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
+          <div class="lab-with-swatch" style="margin-top:12px;">
+            <div class="row lab-row" style="margin-top:0;">
+            <div><label for="BL" class="nowrap">Batch: L*</label><input id="BL" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input id="Ba" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input id="Bb" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
           </div>
-          <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
+            <div class="swatch" id="swatchB"></div>
+          </div>
           
         </div>
       </div>
@@ -305,7 +316,7 @@
         <div class="mini" id="cmpSaveMsg" style="margin-top:6px;"></div>
       </div>
 
-      <div class="flex" style="margin-top:10px; justify-content:flex-end;">
+      <div class="flex" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn" id="cmpHistoryBtn">History</button>
       </div>
 
