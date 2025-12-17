@@ -111,6 +111,10 @@
     -moz-appearance: textfield;
   }
 
+
+  /* Narrower LAB inputs for clearer separation */
+  .lab-input{ max-width:110px; }
+
 </style>
 </head>
 <body>
@@ -248,23 +252,25 @@
               <button class="btn" id="spectroScanCompareABtn">Scan Standard</button>
             </div>
           </div>
-          <div class="row" style="margin-top:8px;">
-            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01"></div>
-            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01"></div>
-            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01"></div>
+          <div class="row" style="margin-top:12px;">
+            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01" class="lab-input"></div>
           </div>
           <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
           
         </div>
         <div>
-          <div class="flex" style="justify-content:space-between; align-items:flex-end;">
+          <div>
             <label class="nowrap" style="font-size:1rem; font-weight:700;">Batch</label>
-            <button class="btn" id="spectroScanCompareBBtn">Scan Batch</button>
+            <div style="margin-top:6px;">
+              <button class="btn" id="spectroScanCompareBBtn">Scan Batch</button>
+            </div>
           </div>
-          <div class="row" style="margin-top:8px;">
-            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly" id="BL" type="number" step="0.01" readonly></div>
-            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly" id="Ba" type="number" step="0.01" readonly></div>
-            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly" id="Bb" type="number" step="0.01" readonly></div>
+          <div class="row" style="margin-top:12px;">
+            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly" id="BL" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly" id="Ba" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly" id="Bb" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
           </div>
           <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
           
