@@ -57,10 +57,10 @@
     flex-wrap:wrap;
     justify-content:center;
     width:auto;
-    padding:6px;
-    background:#0f1219;
-    border:1px solid #242938;
-    border-radius:16px;
+    padding:0;
+    background:transparent;
+    border:none;
+    border-radius:0;
   }
   .tabbtn{
     cursor:pointer;
@@ -183,23 +183,19 @@
     -moz-appearance: textfield;
   }
 
-
   /* Narrower LAB inputs for clearer separation */
   .lab-input{ max-width:110px; }
-
 
   /* QC: tighten Standard/Batch LAB groups */
   #tab-compare .two-col{ gap:10px; }
   .lab-row{ grid-template-columns:repeat(3, auto); justify-content:start; column-gap:10px; }
   .lab-input{ max-width:95px; }
 
-
   /* QC: place swatches beside LAB inputs */
   .lab-with-swatch{ display:flex; align-items:flex-end; gap:10px; }
   .lab-with-swatch .swatch{ margin-bottom:2px; }
   /* QC: History button a bit larger */
   #cmpHistoryBtn{ padding:12px 16px; font-weight:700; }
-
 
   /* QC: subtle divider between Standard and Batch */
   #tab-compare .two-col{
@@ -221,7 +217,6 @@
     pointer-events:none;
   }
 
-
   /* Hide divider when Standard/Batch stack vertically */
   @media (max-width: 900px){
     #tab-compare .two-col::after{ display:none; }
@@ -235,18 +230,14 @@
   
   <div class="appbar">
     <div class="appbar-inner">
-      <div class="app-title">
-        <span>Colour Hub</span>
-      </div>
-      
+      <div class="app-title"><span>Colour Hub</span></div>
+      <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
-    <button class="tabbtn" id="tabBtnLibraries" role="tab" aria-selected="false" aria-controls="tab-libraries">Colour Sets</button>
     <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
-
+</div>
     </div>
   </div>
-
 
   <!-- TAB: Match & Predict -->
   <section id="tab-match" role="tabpanel" aria-labelledby="tabBtnMatch">
@@ -446,9 +437,12 @@
     </div>
   </section>
 
-  <!-- TAB: Colour Sets (libraries) -->
-  <section id="tab-libraries" role="tabpanel" aria-labelledby="tabBtnLibraries" hidden>
-    <div class="card" style="max-width:900px; margin:0 auto;">
+  
+<!-- TAB: Settings -->
+  <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
+
+    <!-- Moved here: Colour Sets (Libraries) -->
+<div class="card" style="max-width:900px; margin:0 auto;">
       <h1>Colour Sets (Libraries)</h1>
       <p class="muted">
         Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
@@ -596,11 +590,7 @@
         </div>
       </div>
     </div>
-  </section>
 
-  
-  <!-- TAB: Settings -->
-  <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
     <div class="card wide">
       <h1>Settings</h1>
       <p class="muted">
@@ -2700,7 +2690,6 @@ function refreshCompareStandardCombo(){
   });
 }
 
-
 function isoDateOnly(ts){
   try{ return new Date(ts).toISOString().slice(0,10); }catch(e){ return ''; }
 }
@@ -2737,11 +2726,9 @@ function filteredAndSortedCompareLog(forExport){
 // Tabs switching
 const tabBtnMatch=$('#tabBtnMatch');
 const tabBtnCompare=$('#tabBtnCompare');
-const tabBtnLibraries=$('#tabBtnLibraries');
 const tabBtnSettings=$('#tabBtnSettings');
 const tabMatch=$('#tab-match');
 const tabCompare=$('#tab-compare');
-const tabLibraries=$('#tab-libraries');
 const tabSettings=$('#tab-settings');
 function showTab(which){
   tabMatch.hidden = which!=='match';
@@ -2750,13 +2737,11 @@ function showTab(which){
   tabSettings.hidden = which!=='settings';
   tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
   tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
-  tabBtnLibraries.setAttribute('aria-selected', which==='libraries' ? 'true':'false');
   tabBtnSettings.setAttribute('aria-selected', which==='settings' ? 'true':'false');
   if (which === 'compare') requestLabDraw();
 }
 tabBtnMatch.addEventListener('click',()=>showTab('match'));
 tabBtnCompare.addEventListener('click',()=>showTab('compare'));
-tabBtnLibraries.addEventListener('click',()=>showTab('libraries'));
 if (tabBtnSettings) tabBtnSettings.addEventListener('click',()=>showTab('settings'));
 
 // Wire up
