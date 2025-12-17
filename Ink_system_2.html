@@ -2733,7 +2733,6 @@ const tabSettings=$('#tab-settings');
 function showTab(which){
   tabMatch.hidden = which!=='match';
   tabCompare.hidden = which!=='compare';
-  tabLibraries.hidden = which!=='libraries';
   tabSettings.hidden = which!=='settings';
   tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
   tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
