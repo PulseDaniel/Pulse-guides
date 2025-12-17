@@ -836,7 +836,7 @@ function getCompareAB(){
 }
 function saveCurrentComparison(opts){
   const ab = getCompareAB();
-  if (!ab) return { ok:false, msg:'Enter valid L*a*b* for both A and B first.' };
+  if (!ab) return { ok:false, msg:'Enter valid L*a*b* for both Standard and Batch first.' };
   const jobRef = (document.getElementById('cmpJobRef')?.value || '').trim();
   if (!jobRef) return { ok:false, msg:'Please enter a Job reference before saving.' };
   const deltaE = deltaE2000({L:ab.A.L,a:ab.A.a,b:ab.A.b},{L:ab.B.L,a:ab.B.a,b:ab.B.b});
@@ -2162,7 +2162,7 @@ function drawLabScene(){
   } else {
     ctx.fillStyle='#e5e7eb';
     ctx.font='13px ui-sans-serif, system-ui';
-    ctx.fillText('Enter L*a*b* for both A and B to render.', 12, 18);
+    ctx.fillText('Enter L*a*b* for both Standard and Batch to render.', 12, 18);
   }
 }
 let rafId=null;
