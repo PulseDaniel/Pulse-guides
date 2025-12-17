@@ -115,6 +115,12 @@
   /* Narrower LAB inputs for clearer separation */
   .lab-input{ max-width:110px; }
 
+
+  /* QC: tighten Standard/Batch LAB groups */
+  #tab-compare .two-col{ gap:10px; }
+  .lab-row{ grid-template-columns:repeat(3, auto); justify-content:start; column-gap:10px; }
+  .lab-input{ max-width:95px; }
+
 </style>
 </head>
 <body>
@@ -144,7 +150,7 @@
           <div class="pill" id="refCountPill"><span id="countLabel">0</span> colours</div>
         </div>
 
-        <div class="row" style="margin-top:12px; gap:8px;">
+        <div class="row" style="margin-top:12px;">
           <div><label for="L">L*</label><input id="L" type="number" step="0.01" placeholder="e.g. 52.30"></div>
           <div><label for="a">a*</label><input id="a" type="number" step="0.01" placeholder="e.g. 12.80"></div>
           <div><label for="b">b*</label><input id="b" type="number" step="0.01" placeholder="e.g. -4.10"></div>
@@ -156,12 +162,13 @@
 
         <div class="row2" style="margin-top:12px;">
           <div>
-            <label for="pms">Search by PMS (number only)</label>
-            <input id="pms" type="text" placeholder="e.g. 186 or 3005"/>
+            <label class="nowrap">Or select colour (from active library)</label>
+            <div class="combo">
+              <input id="matchColourSelect" placeholder="Type to search…" autocomplete="off">
+              <div id="matchColourDrop" class="combo-drop hide" role="listbox" aria-label="Colour options"></div>
+            </div>
           </div>
-          <div style="align-self:end;">
-            <button class="btn" id="pmsBtn">Find PMS</button>
-          </div>
+          <div></div>
         </div>
 
         <div class="flex" style="margin-top:12px;">
@@ -237,7 +244,7 @@
         <span class="mini"></span>
       </div>
 
-      <div class="two-col" style="margin-top:12px;" style="gap:18px;">
+      <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
             <div>
@@ -252,10 +259,10 @@
               <button class="btn" id="spectroScanCompareABtn">Scan Standard</button>
             </div>
           </div>
-          <div class="row" style="margin-top:12px; gap:8px;">
-            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01" class="lab-input" class="lab-input "></div>
-            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01" class="lab-input" class="lab-input "></div>
-            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01" class="lab-input" class="lab-input "></div>
+          <div class="row lab-row" style="margin-top:12px;">
+            <div><label for="AL" class="nowrap">Standard: L*</label><input id="AL" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Aa" class="nowrap">Standard: a*</label><input id="Aa" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Ab" class="nowrap">Standard: b*</label><input id="Ab" type="number" step="0.01" class="lab-input"></div>
           </div>
           <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchA"></div></div>
           
@@ -267,10 +274,10 @@
               <button class="btn" id="spectroScanCompareBBtn">Scan Batch</button>
             </div>
           </div>
-          <div class="row" style="margin-top:12px; gap:8px;">
-            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly" id="BL" type="number" step="0.01" readonly class="lab-input batch-readonly" class="lab-input batch-readonly "></div>
-            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly" id="Ba" type="number" step="0.01" readonly class="lab-input batch-readonly" class="lab-input batch-readonly "></div>
-            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly" id="Bb" type="number" step="0.01" readonly class="lab-input batch-readonly" class="lab-input batch-readonly "></div>
+          <div class="row lab-row" style="margin-top:12px;">
+            <div><label for="BL" class="nowrap">Batch: L*</label><input class="batch-readonly lab-input" id="BL" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input class="batch-readonly lab-input" id="Ba" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input class="batch-readonly lab-input" id="Bb" type="number" step="0.01" readonly class="lab-input batch-readonly"></div>
           </div>
           <div class="flex" style="margin-top:8px;"><div class="swatch" id="swatchB"></div></div>
           
@@ -1012,6 +1019,7 @@ function refreshActiveColours(){
   $('#resultsTbody').innerHTML = '';
   $('#formulaPanel').style.display = 'none';
   refreshCompareStandardCombo();
+  refreshMatchColourCombo();
 }
 function renderLibraryList(){
   const wrap = $('#libList');
@@ -2481,7 +2489,95 @@ function refreshCompareStandardCombo(){
     const within = drop.contains(e.target) || input.contains(e.target);
     if (!within) closeCombo(drop);
   });
+}function refreshMatchColourCombo(){
+  const input = document.getElementById('matchColourSelect');
+  const drop = document.getElementById('matchColourDrop');
+  if (!input || !drop) return;
+
+  const allNames = COLOURS
+    .map(c => (c.name||c.Colour||c.color||'').trim())
+    .filter(Boolean);
+
+  const render = (q)=>{
+    const query = (q||'').trim();
+    const scored = allNames.map(name=>({ name, ...scoreName(name, query) }));
+    const matches = scored.filter(x=>x.match).sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name));
+    const rest = scored.filter(x=>!x.match).sort((a,b)=> a.name.localeCompare(b.name));
+    const merged = matches.concat(rest);
+
+    drop.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    merged.forEach(x=>{
+      const div = document.createElement('div');
+      div.className = 'combo-item';
+      const t = tokensOf(query)[0];
+      if (t){
+        const idx = normText(x.name).indexOf(t);
+        if (idx >= 0){
+          div.innerHTML = `<span class="hit">${x.name.replace(/</g,'&lt;')}</span>`;
+        } else {
+          div.textContent = x.name;
+        }
+      } else {
+        div.textContent = x.name;
+      }
+
+      div.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        input.value = x.name;
+
+        const c = bestColourByQuery(x.name);
+        if (c){
+          document.getElementById('L').value = c.L;
+          document.getElementById('a').value = c.a;
+          document.getElementById('b').value = c.b;
+          updateTargetEcho();
+          showFormulaFor(x.name);
+          _lastContextName = x.name;
+        }
+        closeCombo(drop);
+      });
+
+      frag.appendChild(div);
+    });
+    drop.appendChild(frag);
+  };
+
+  render('');
+
+  const open = ()=>{ drop.classList.remove('hide'); };
+
+  input.addEventListener('focus', ()=>{ render(input.value); open(); });
+  input.addEventListener('click', ()=>{ render(input.value); open(); });
+  input.addEventListener('input', ()=>{ render(input.value); open(); });
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape'){ closeCombo(drop); return; }
+    if (e.key === 'Enter'){
+      const best = bestColourByQuery(input.value);
+      if (best){
+        const nm = (best.name||best.Colour||best.color||'').trim();
+        input.value = nm;
+        document.getElementById('L').value = best.L;
+        document.getElementById('a').value = best.a;
+        document.getElementById('b').value = best.b;
+        updateTargetEcho();
+        showFormulaFor(nm);
+        _lastContextName = nm;
+      }
+      closeCombo(drop);
+    }
+  });
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=> closeCombo(drop), 120);
+  });
+
+  document.addEventListener('mousedown', (e)=>{
+    if (!drop || drop.classList.contains('hide')) return;
+    const within = drop.contains(e.target) || input.contains(e.target);
+    if (!within) closeCombo(drop);
+  });
 }
+
 
 function isoDateOnly(ts){
   try{ return new Date(ts).toISOString().slice(0,10); }catch(e){ return ''; }
