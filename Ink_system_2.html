@@ -45,6 +45,9 @@
   /* Modal editor */
   .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; z-index:50; }
   .modal{ width:min(720px, 96vw); max-height:90vh; overflow:auto; background:#10121a; border:1px solid #2a2f3a; border-radius:14px; padding:16px; }
+
+  /* QC history modal wider */
+  #cmpHistoryModal .modal{ width:min(950px, 96vw); }
   .modal h3{ margin:0 0 8px; }
   .edit-row{ display:grid; grid-template-columns: 1fr 100px 32px; gap:8px; align-items:center; }
   .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
@@ -585,8 +588,8 @@
               <th>Job</th>
               <th>Standard</th>
               <th>Library</th>
-              <th>A (L*a*b*)</th>
-              <th>B (L*a*b*)</th>
+              <th>Standard</th>
+              <th>Batch</th>
               <th>ΔE2000</th>
               <th>Result</th>
             </tr>
@@ -726,6 +729,19 @@ function saveCompareLog(){
 function fmtLab(o){
   return `L ${(+o.L).toFixed(2)} a ${(+o.a).toFixed(2)} b ${(+o.b).toFixed(2)}`;
 }
+function escAttr(s){
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/"/g,'&quot;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+function labSwatch(o){
+  if(!o) return '';
+  const rgb = labToSrgb(+o.L, +o.a, +o.b);
+  const tip = escAttr(fmtLab(o));
+  return `<div class="swatch" style="background: rgb(${rgb.r},${rgb.g},${rgb.b})" title="${tip}"></div>`;
+}
 function isoToNice(ts){
   const d = new Date(ts);
   // local time, demo-friendly
@@ -760,8 +776,8 @@ function renderCompareLog(){
       <td class="mono">${(r.jobRef||'').replace(/</g,'&lt;')}</td>
       <td class="mono">${stdName}</td>
       <td>${libLabel}</td>
-      <td class="mono">${fmtLab(r.A)}</td>
-      <td class="mono">${fmtLab(r.B)}</td>
+      <td>${labSwatch(r.A)}</td>
+      <td>${labSwatch(r.B)}</td>
       <td class="${cls}">${(+r.deltaE).toFixed(2)}</td>
       <td class="${cls}">${resTxt}</td>
     `;
