@@ -371,11 +371,10 @@
     opacity:0;
     transition-delay:360ms;
   }
-  .appbar{
-    transform:translateY(-24px);
-    opacity:0;
-    transition:transform 260ms ease, opacity 260ms ease;
-  }
+
+  /* Safeguard: appbar should not be hidden */
+  .appbar{ opacity:1; transform:none; }
+
 </style>
 </head>
 <body>
