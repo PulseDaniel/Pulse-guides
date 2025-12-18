@@ -306,7 +306,7 @@
   .splash-title{
     font-weight:900;
     letter-spacing:.12em;
-    font-size:clamp(1.45rem, 2.8vw, 2.0rem);
+    font-size:clamp(1.74rem, 3.36vw, 2.40rem);
   }
   .splash-hint{ color:#9aa4b2; font-size:1.02rem; opacity:.92; }
 
@@ -363,6 +363,19 @@
     transform:translateY(0);
   }
 
+
+  /* Pulse logo: separate reveal (not part of the page fade) */
+  #pulseLogo{
+    opacity:0;
+    transform:translateY(-18px);
+    transition:transform 260ms ease, opacity 260ms ease;
+    will-change:transform, opacity;
+  }
+  body.nav-in #pulseLogo{
+    opacity:1;
+    transform:translateY(0);
+  }
+
 </style>
 </head>
 <body>
@@ -382,9 +395,6 @@
     </div>
   </div>
 
-  <div id="appRoot" class="app-hidden">
-<img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
-
   
   <div class="appbar">
     <div class="appbar-inner">
@@ -394,6 +404,10 @@
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
     <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
+
+
+  <div id="appRoot" class="app-hidden">
+<img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
     </div>
   </div>
 
