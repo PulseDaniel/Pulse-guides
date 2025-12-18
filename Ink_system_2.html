@@ -150,7 +150,7 @@
   /* Fixed logo overlay (doesn't affect layout) */
   #pulseLogo{
     position:fixed;
-    top: -10px;
+    top: -16px;
     right:14px;
     z-index:1200;
     background:#ffffff;
@@ -376,21 +376,6 @@
     opacity:0;
     transition:transform 260ms ease, opacity 260ms ease;
   }
-
-
-  /* App bar: keep off-screen until after app fade, then slide in */
-  .appbar{
-    transform:translateY(-44px);
-    opacity:0;
-    visibility:hidden;
-    transition:transform 260ms ease, opacity 260ms ease;
-  }
-  body.nav-in .appbar{
-    visibility:visible;
-    opacity:1;
-    transform:translateY(0);
-  }
-
 </style>
 </head>
 <body>
