@@ -148,7 +148,26 @@
   .wide{ max-width:1200px; margin:0 auto; }
 
   /* Fixed logo overlay (doesn't affect layout) */
-  #pulseLogo{ position:fixed; background: white; padding: 10px; border-radius: 20px;top:-20px; right:20px; height:120px; width:auto; z-index:999; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); opacity:.92; pointer-events:none; }
+  #pulseLogo{
+    position:fixed;
+    top:12px;
+    right:12px;
+    background:#ffffff;
+    padding:10px;
+    border-radius:18px;
+    box-shadow:0 6px 14px rgba(0,0,0,.55);
+    pointer-events:none;
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(-18px);
+    transition:opacity 260ms ease, transform 260ms ease;
+    will-change:opacity, transform;
+  }
+  body.nav-in #pulseLogo{
+    visibility:visible;
+    opacity:.92;
+    transform:translateY(0);
+  }
   @media (max-width: 520px){ #pulseLogo{ height:34px; top:10px; left:auto; } }
 
   .nowrap{ white-space:nowrap; }
@@ -363,19 +382,6 @@
     transform:translateY(0);
   }
 
-
-  /* Pulse logo: separate reveal (not part of the page fade) */
-  #pulseLogo{
-    opacity:0;
-    transform:translateY(-18px);
-    transition:transform 260ms ease, opacity 260ms ease;
-    will-change:transform, opacity;
-  }
-  body.nav-in #pulseLogo{
-    opacity:1;
-    transform:translateY(0);
-  }
-
 </style>
 </head>
 <body>
@@ -394,8 +400,10 @@
       <div class="splash-hint">Click the logo to enter</div>
     </div>
   </div>
+  <img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
 
-  
+
+  <div id="appRoot" class="app-hidden">
   <div class="appbar">
     <div class="appbar-inner">
       <div class="app-title"><span>Colour Hub</span></div>
@@ -404,10 +412,6 @@
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
     <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
-
-
-  <div id="appRoot" class="app-hidden">
-<img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
     </div>
   </div>
 
