@@ -102,7 +102,7 @@
   .swatch{ width:3.1rem; height:2.1rem; border-radius:6px; border:1px solid rgba(255,255,255,.2); }
   .pill{ font-size:.8rem; color:#98a2b3; }
   .muted{ color:#7b8496; font-size:.85rem; }
-  .formula-box{ background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:16px; }
+  .formula-box{ background:#0e1015; border:1px solid #2a2f3a; border-radius:10px; padding:12px; margin-top:10px; }
   .formula-box h2{ margin:0 0 8px; font-size:1rem; color:#ccc; }
   .formula-grid{ display:grid; grid-template-columns:1fr auto; column-gap:12px; row-gap:6px; align-items:center; }
   .fg-ink{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -148,7 +148,35 @@
   .wide{ max-width:1200px; margin:0 auto; }
 
   /* Fixed logo overlay (doesn't affect layout) */
-  #pulseLogo{ position:fixed; background: white; padding: 10px; border-radius: 20px;top:-20px; right:20px; height:120px; width:auto; z-index:999; filter:drop-shadow(0 6px 14px rgba(0,0,0,.55)); opacity:.92; pointer-events:none; }
+  #pulseLogo{
+    position:fixed;
+    top: -16px;
+    right:14px;
+    z-index:1200;
+    background:#ffffff;
+    padding:12px 14px;
+    border-radius:18px;
+    box-shadow:0 10px 26px rgba(0,0,0,.45);
+    pointer-events:none;
+
+    /* Constrain image size */
+    width:220px;
+    height:auto;
+    max-width:min(220px, calc(100vw - 28px));
+    object-fit:contain;
+
+    /* Hidden until nav-in */
+    opacity:0;
+    visibility:hidden;
+    transform:translateY(-18px);
+    transition:opacity 260ms ease, transform 260ms ease;
+    will-change:opacity, transform;
+  }
+  body.nav-in #pulseLogo{
+    visibility:visible;
+    opacity:.92;
+    transform:translateY(0);
+  }
   @media (max-width: 520px){ #pulseLogo{ height:34px; top:10px; left:auto; } }
 
   .nowrap{ white-space:nowrap; }
@@ -226,13 +254,149 @@
   #tab-settings .card{ margin-top:16px; }
   #tab-settings .card:first-child{ margin-top:0; }
 
+
+  /* Splash / landing */
+  /* Splash vignette */
+  .app-hidden{ display:none; }
+  .splash{
+    position:fixed;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#0b0c10;
+    background:
+      radial-gradient(900px 520px at 50% 44%, rgba(255,255,255,.06), transparent 60%),
+      #0b0c10;
+    z-index:2000;
+    transition: opacity 260ms ease;
+  }
+
+  .splash-inner{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:14px;
+    padding:24px;
+    text-align:center;
+  }
+  .splash-btn{
+    border:none;
+    background:transparent;
+    padding:0;
+    cursor:pointer;
+    border-radius:24px;
+    outline:none;
+  }
+  .splash-btn:focus-visible{
+    box-shadow:0 0 0 3px rgba(255,255,255,.18), 0 0 0 6px rgba(34,197,94,.15);
+  }
+  .splash-imgWrap{
+    position:relative;
+    width:min(440px, 84vw);
+    aspect-ratio:1 / 1;
+    display:block;
+    /* Let the shutter halves slide beyond the bounds (no clipping) */
+    overflow:visible;
+    /* Make it feel like the logo is floating, not contained */
+    border-radius:0;
+    background:transparent;
+    transform:translateZ(0);
+  }
+  .splash-img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
+    user-select:none;
+    pointer-events:none;
+    /* Keep the base image hidden; shutter halves provide the visual */
+    opacity:0;
+  }
+  .splash-half{
+    position:absolute;
+    inset:0;
+    background-image: var(--splash-img);
+    background-size:100% 100%;
+    background-repeat:no-repeat;
+    will-change:transform, opacity;
+    border-radius:28px;
+    filter:drop-shadow(0 18px 44px rgba(0,0,0,.55));
+    transition:transform 570ms cubic-bezier(.2,.9,.2,1), opacity 390ms ease;
+  }
+  .splash-left{ clip-path:inset(0 50% 0 0); background-position:left center; }
+  .splash-right{ clip-path:inset(0 0 0 50%); background-position:right center; }
+
+  .splash-btn:hover .splash-imgWrap{ filter:brightness(1.06); }
+  .splash-btn:hover .splash-img{ transform:translateY(-2px); transition:transform 220ms ease; }
+  .splash-btn:active .splash-img{ transform:translateY(0px) scale(.985); }
+
+  .splash-title{
+    font-weight:900;
+    letter-spacing:.12em;
+    font-size:clamp(1.74rem, 3.36vw, 2.40rem);
+  }
+  .splash-hint{ color:#9aa4b2; font-size:1.02rem; opacity:.92; }
+
+  .splash.exiting .splash-left{ transform:translateX(-110%); opacity:0; }
+  .splash.exiting .splash-right{ transform:translateX(110%); opacity:0; }
+  .splash.exiting .splash-title,
+  .splash.exiting .splash-hint{
+    opacity:0;
+    transform:translateY(6px);
+    transition:opacity 210ms ease, transform 210ms ease;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .splash-half{ transition:none; }
+    .splash-img{ opacity:1; filter:drop-shadow(0 18px 44px rgba(0,0,0,.55)); }
+    .splash.exiting .splash-left,
+    .splash.exiting .splash-right{ transform:none; opacity:0; }
+  }
+
+
+    /* Smooth app reveal after splash */
+  #appRoot{
+    opacity:0;
+    transform:translateY(6px);
+    transition:opacity 250ms ease, transform 250ms ease;
+  }
+  body.app-ready #appRoot{
+    opacity:1;
+    transform:none;
+  }
+
+
+  /* Splash container fade */
+  .splash.exiting{
+    opacity:0;
+    transition-delay:360ms;
+  }
+
+  /* Safeguard: appbar should not be hidden */
+  .appbar{ opacity:1; transform:none; }
+
 </style>
 </head>
 <body>
 
+  <!-- Splash / landing screen -->
+  <div id="splash" class="splash" role="dialog" aria-label="Colour Bar landing screen" aria-modal="true">
+    <div class="splash-inner">
+      <button id="splashBtn" class="splash-btn" type="button" aria-label="Enter Colour Bar">
+        <span class="splash-imgWrap" aria-hidden="true">
+          <span class="splash-half splash-left"></span>
+          <span class="splash-half splash-right"></span>
+          <img class="splash-img" src="./ColourBarLogo.png" alt="" draggable="false">
+        </span>
+      </button>
+      <div class="splash-title" aria-hidden="true">COLOUR BAR</div>
+      <div class="splash-hint">Click the logo to enter</div>
+    </div>
+  </div>
   <img id="pulseLogo" src="PulseLogo.png" alt="Pulse" />
 
-  
+
+  <div id="appRoot" class="app-hidden">
   <div class="appbar">
     <div class="appbar-inner">
       <div class="app-title"><span>Colour Hub</span></div>
@@ -597,7 +761,10 @@
     </div>
 
     <div class="card wide">
-      <h1>Colour Compare Settings</h1>
+      <h1>Settings</h1>
+      <p class="muted">
+        These settings are saved locally in this browser (simulating customer-specific preferences).
+      </p>
 
       <div class="row2" style="margin-top:12px;">
         <div>
@@ -3005,6 +3172,52 @@ try{
 }
 
 })();
+
+// ===== Splash / landing behaviour =====
+(function(){
+  const splash = document.getElementById('splash');
+  const appRoot = document.getElementById('appRoot');
+  const btn = document.getElementById('splashBtn');
+  if (!splash || !appRoot || !btn) return;
+
+  const img = btn.querySelector('.splash-img');
+  const wrap = splash.querySelector('.splash-imgWrap');
+  if (wrap && img) wrap.style.setProperty('--splash-img', `url("${img.src}")`);
+
+  const enter = ()=>{
+    if (splash.classList.contains('exiting')) return;
+    splash.classList.add('exiting');
+
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const done = ()=>{
+      // Reveal app immediately (kept invisible until we add app-ready)
+      appRoot.classList.remove('app-hidden');
+
+      // Start app fade-in when the splash begins fading out (matches the text fade timing feel)
+      window.setTimeout(()=> document.body.classList.add('app-ready'), 360);
+
+      // Slide the nav in after the app has faded up
+      window.setTimeout(()=> document.body.classList.add('nav-in'), 640);
+
+      // Remove splash after shutter + fade complete
+      window.setTimeout(()=> splash.remove(), 720);
+    };
+
+    if (reduced){ done(); return; }
+    window.setTimeout(done, 590);
+  };
+
+  btn.addEventListener('click', enter);
+  btn.addEventListener('keydown', (e)=>{
+    if (e.key === 'Enter' || e.key === ' '){
+      e.preventDefault();
+      enter();
+    }
+  });
+})();
+
 </script>
+  </div>
+
 </body>
 </html>
