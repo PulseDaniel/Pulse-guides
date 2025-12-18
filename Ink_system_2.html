@@ -344,6 +344,18 @@
     transition-delay:360ms;
   }
 
+
+  /* App bar slide-in on reveal */
+  body.app-ready .appbar{
+    transform:translateY(0);
+    opacity:1;
+  }
+  .appbar{
+    transform:translateY(-24px);
+    opacity:0;
+    transition:transform 260ms ease, opacity 260ms ease;
+  }
+
 </style>
 </head>
 <body>
