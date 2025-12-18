@@ -343,17 +343,24 @@
     opacity:0;
     transition-delay:360ms;
   }
-
-
-  /* App bar slide-in on reveal */
-  body.app-ready .appbar{
-    transform:translateY(0);
-    opacity:1;
-  }
   .appbar{
     transform:translateY(-24px);
     opacity:0;
     transition:transform 260ms ease, opacity 260ms ease;
+  }
+
+
+  /* App bar: keep off-screen until after app fade, then slide in */
+  .appbar{
+    transform:translateY(-44px);
+    opacity:0;
+    visibility:hidden;
+    transition:transform 260ms ease, opacity 260ms ease;
+  }
+  body.nav-in .appbar{
+    visibility:visible;
+    opacity:1;
+    transform:translateY(0);
   }
 
 </style>
@@ -3178,8 +3185,11 @@ try{
       // Start app fade-in when the splash begins fading out (matches the text fade timing feel)
       window.setTimeout(()=> document.body.classList.add('app-ready'), 360);
 
+      // Slide the nav in after the app has faded up
+      window.setTimeout(()=> document.body.classList.add('nav-in'), 640);
+
       // Remove splash after shutter + fade complete
-      window.setTimeout(()=> splash.remove(), 640);
+      window.setTimeout(()=> splash.remove(), 720);
     };
 
     if (reduced){ done(); return; }
