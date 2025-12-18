@@ -241,7 +241,9 @@
       radial-gradient(900px 520px at 50% 44%, rgba(255,255,255,.06), transparent 60%),
       #0b0c10;
     z-index:2000;
+    transition: opacity 260ms ease;
   }
+
   .splash-inner{
     display:flex;
     flex-direction:column;
@@ -292,7 +294,7 @@
     will-change:transform, opacity;
     border-radius:28px;
     filter:drop-shadow(0 18px 44px rgba(0,0,0,.55));
-    transition:transform 950ms cubic-bezier(.2,.9,.2,1), opacity 650ms ease;
+    transition:transform 570ms cubic-bezier(.2,.9,.2,1), opacity 390ms ease;
   }
   .splash-left{ clip-path:inset(0 50% 0 0); background-position:left center; }
   .splash-right{ clip-path:inset(0 0 0 50%); background-position:right center; }
@@ -314,7 +316,7 @@
   .splash.exiting .splash-hint{
     opacity:0;
     transform:translateY(6px);
-    transition:opacity 350ms ease, transform 350ms ease;
+    transition:opacity 210ms ease, transform 210ms ease;
   }
   @media (prefers-reduced-motion: reduce){
     .splash-half{ transition:none; }
@@ -324,15 +326,22 @@
   }
 
 
-  /* Smooth app reveal after splash */
+    /* Smooth app reveal after splash */
   #appRoot{
     opacity:0;
     transform:translateY(6px);
-    transition:opacity 420ms ease, transform 420ms ease;
+    transition:opacity 250ms ease, transform 250ms ease;
   }
   body.app-ready #appRoot{
     opacity:1;
     transform:none;
+  }
+
+
+  /* Splash container fade */
+  .splash.exiting{
+    opacity:0;
+    transition-delay:360ms;
   }
 
 </style>
@@ -3151,15 +3160,18 @@ try{
 
     const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const done = ()=>{
-      // Reveal app, then fade it in
+      // Reveal app immediately (kept invisible until we add app-ready)
       appRoot.classList.remove('app-hidden');
-      requestAnimationFrame(()=> document.body.classList.add('app-ready'));
-      // Remove splash a moment later so the fade feels continuous
-      window.setTimeout(()=> splash.remove(), 180);
+
+      // Start app fade-in when the splash begins fading out (matches the text fade timing feel)
+      window.setTimeout(()=> document.body.classList.add('app-ready'), 360);
+
+      // Remove splash after shutter + fade complete
+      window.setTimeout(()=> splash.remove(), 640);
     };
 
     if (reduced){ done(); return; }
-    window.setTimeout(done, 980);
+    window.setTimeout(done, 590);
   };
 
   btn.addEventListener('click', enter);
