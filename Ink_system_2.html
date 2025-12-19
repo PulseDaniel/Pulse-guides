@@ -615,12 +615,6 @@
   <!-- TAB: Mixing guide -->
   <section id="tab-mix" role="tabpanel" aria-labelledby="tabBtnMix" hidden>
     <div class="card" style="max-width:1200px; margin:0 auto;">
-      <div class="flex" style="justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
-        <div>
-          <h1>Mixing guide</h1>
-</div>
-</div>
-
       <div class="row2" style="margin-top:12px; align-items:end;">
         <div>
           <label for="mixInkRange">Ink range</label>
@@ -634,10 +628,10 @@
         <div>
           <label for="mixAnilox">Anilox / film thickness</label>
           <select id="mixAnilox">
-            <option value="4v">4v (60%)</option>
-            <option value="5v">5v (80%)</option>
-            <option value="6v" selected>6v (100%)</option>
-            <option value="7v">7v (120%)</option>
+            <option value="4v">4v</option>
+            <option value="5v">5v</option>
+            <option value="6v" selected>6v</option>
+            <option value="7v">7v</option>
           </select>
         </div>
       </div>
@@ -668,11 +662,9 @@
               <div>
                 <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
                 
-              </div>
-              <button class="btn" id="mixCopyInkReq" type="button">Set quantity = ink required</button>
-            </div>
+              </div></div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
               <div>
                 <label for="mixTrayVol">Tray volume</label>
                 <input id="mixTrayVol" type="number" step="0.001" value="0">
@@ -701,7 +693,7 @@
               <div>
                 <label for="mixInkReq">Ink required</label>
                 <div id="mixInkReq" class="out">—</div>
-</div>
+<button class="btn" id="mixCopyInkReq" type="button" style="display:block; width:100%; margin-top:6px;">Set as Quantity Required (kg)</button></div>
             </div>
           </div>
         </div>
@@ -715,8 +707,7 @@
           </thead>
           <tbody id="mixFormulaTbody"></tbody>
         </table>
-        <div class="mini" id="mixGuideStatus" style="margin-top:8px;"></div>
-      </div>
+</div>
     </div>
   </section>
 
