@@ -405,9 +405,9 @@
     <div class="appbar-inner">
       <div class="app-title"><span>Colour Hub</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
-        <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
-        <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
-        <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
+    <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
+    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
+<button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
         <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
     </div>
@@ -2318,9 +2318,8 @@ window.addEventListener('mousemove',e=>{
   requestLabDraw();
 });
 canvas.addEventListener('wheel', e=>{
-  // Zoom-on-scroll disabled (was confusing / easy to trigger accidentally)
-  e.preventDefault();
-}, {passive:false});
+  // Zoom-on-scroll disabled; allow normal page scrolling.
+}, {passive:true});
 $('#resetView').addEventListener('click', ()=>{
   rotX=DEFAULT_VIEW.rx;
   rotY=DEFAULT_VIEW.ry;
