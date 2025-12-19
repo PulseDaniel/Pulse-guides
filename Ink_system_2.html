@@ -152,6 +152,7 @@
     position:fixed;
     top: -16px;
     right:14px;
+    display:none !important;
     z-index:1200;
     background:#ffffff;
     padding:12px 14px;
@@ -3000,6 +3001,31 @@ function filteredAndSortedCompareLog(forExport){
 let MIX_GUIDE = null; // { sheets:{[sheetName]: {rows:[...], byPantone:Map}}, ready:boolean }
 let MIX_ACTIVE_PANTONE = '';
 
+// Sync helper: when a Pantone is selected in the Mixing Guide, mirror it back into Match & Predict.
+function matchSetPantoneFromOutside(name){
+  const nm = (name||'').trim();
+  if (!nm) return;
+
+  const matchInput = document.getElementById('matchColourSelect');
+  if (matchInput) matchInput.value = nm;
+
+  // If the library has this Pantone, also populate L*a*b* and refresh the suggestion display.
+  try{
+    const c = bestColourByQuery(nm);
+    if (c){
+      const L = document.getElementById('L');
+      const a = document.getElementById('a');
+      const b = document.getElementById('b');
+      if (L) L.value = c.L;
+      if (a) a.value = c.a;
+      if (b) b.value = c.b;
+      updateTargetEcho();
+      showFormulaFor(nm);
+      _lastContextName = nm;
+    }
+  }catch(e){ /* non-fatal */ }
+}
+
 function mixNormalisePantoneName(s){
   return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
 }
@@ -3204,6 +3230,8 @@ function mixRefreshPantoneCombo(){
         input.value = x.name;
         MIX_ACTIVE_PANTONE = x.name;
         mixRenderFormula();
+        // Mirror selection back into Match & Predict
+        matchSetPantoneFromOutside(x.name);
         closeCombo(drop);
       });
 
@@ -3227,6 +3255,8 @@ function mixRefreshPantoneCombo(){
         input.value = best;
         MIX_ACTIVE_PANTONE = best;
         mixRenderFormula();
+        // Mirror selection back into Match & Predict
+        matchSetPantoneFromOutside(best);
       }
       closeCombo(drop);
     }
