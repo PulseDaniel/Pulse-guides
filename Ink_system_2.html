@@ -428,6 +428,19 @@
   border:1px solid var(--border);
   background: transparent;
 }
+
+  /* Mixing guide top inputs: allow 4-up on desktop */
+  .mix-top-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--gap);
+    align-items: end;
+  }
+  /* Slightly slimmer controls in mixing guide top area */
+  #tab-mix .mix-top-grid select,
+  #tab-mix .mix-top-grid input{
+    min-width: 0;
+  }
 </style>
 </head>
 <body>
@@ -666,7 +679,7 @@
   <!-- TAB: Mixing guide -->
   <section id="tab-mix" role="tabpanel" aria-labelledby="tabBtnMix" hidden>
     <div class="card" style="max-width:1200px; margin:0 auto;">
-      <div class="row2" style="margin-top:12px; align-items:end;">
+      <div class="mix-top-grid" style="margin-top:12px;">
         <div>
           <label for="mixInkRange">Ink range</label>
           <select id="mixInkRange">
@@ -685,9 +698,6 @@
             <option value="7v">7v</option>
           </select>
         </div>
-      </div>
-
-      <div class="row2" style="margin-top:12px;">
         <div>
           <label class="nowrap">Pantone</label>
           <div class="combo">
@@ -707,7 +717,6 @@
           <div id="mixDeltaE" class="out">—</div>
         </div>
         <div>
-          <label>Swatch</label>
           <div id="mixPantoneSwatch" class="mix-swatch" aria-label="Selected Pantone swatch"></div>
         </div>
 
