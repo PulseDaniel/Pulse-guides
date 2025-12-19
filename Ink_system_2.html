@@ -375,6 +375,9 @@
   /* Safeguard: appbar should not be hidden */
   .appbar{ opacity:1; transform:none; }
 
+
+.out{display:flex; align-items:center; min-height:38px; padding:0 10px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.04); color:#e6e6e6;}
+.out.miniout{min-height:30px; font-size:12px;}
 </style>
 </head>
 <body>
@@ -655,14 +658,14 @@
         <div>
           <label for="mixQtyKg">Quantity required (kg)</label>
           <input id="mixQtyKg" type="number" step="0.001" value="1">
-          <div class="mini" style="margin-top:6px;">Grams = (% × kg × 10). If “Use Ink required” is ticked, the kg value is driven by the calculator below. → 125 g.</div>
+          <div class="mini" style="margin-top:6px;">This is the batch size you want to mix. It scales the grams in the recipe.</div>
         </div>
       </div>
 
       <div class="row2" style="margin-top:12px;">
         <div>
           <label for="mixDeltaE">Best match prediction (ΔE)</label>
-          <input id="mixDeltaE" type="text" readonly placeholder="—">
+          <div id="mixDeltaE" class="out">—</div>
         </div>
 
         <div style="grid-column: 1 / -1;">
@@ -672,10 +675,7 @@
                 <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
                 <div class="mini">Optional helper for estimating how much ink you need, matching the Excel logic.</div>
               </div>
-              <label class="mini" style="display:flex; gap:8px; align-items:center; margin:0;">
-                <input id="mixAutoQty" type="checkbox" checked>
-                Use “Ink required” as the mix quantity
-              </label>
+              <button class="btn" id="mixCopyInkReq" type="button">Set quantity = ink required</button>
             </div>
 
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
@@ -693,7 +693,7 @@
               </div>
               <div>
                 <label for="mixSquareM">Square meters</label>
-                <input id="mixSquareM" type="text" value="—" readonly>
+                <div id="mixSquareM" class="out">—</div>
               </div>
               <div>
                 <label for="mixCoverage">% coverage</label>
@@ -701,11 +701,11 @@
               </div>
               <div>
                 <label for="mixAniloxVol">Anilox volume</label>
-                <input id="mixAniloxVol" type="text" value="—" readonly>
+                <div id="mixAniloxVol" class="out">—</div>
               </div>
               <div>
                 <label for="mixInkReq">Ink required</label>
-                <input id="mixInkReq" type="text" value="—" readonly>
+                <div id="mixInkReq" class="out">—</div>
                 <div class="mini" style="margin-top:6px;">Formula: <code>3*((SqM*%Cov)/100)*(Anilox/10000)+Tray</code></div>
               </div>
             </div>
@@ -714,7 +714,7 @@
 
         <div>
           <label for="mixSheetUsed">Sheet used</label>
-          <input id="mixSheetUsed" type="text" readonly placeholder="—">
+          <div id="mixSheetUsed" class="out">—</div>
         </div>
       </div>
 
@@ -3117,10 +3117,10 @@ function mixUpdateInkCalc(){
 
   const sq = (Number.isFinite(linear) ? linear : 0) * (Number.isFinite(width) ? width : 0) / 1000;
   const sqEl = document.getElementById('mixSquareM');
-  if (sqEl) sqEl.value = Number.isFinite(sq) ? sq.toFixed(2) : '—';
+  if (sqEl) sqEl.textContent = Number.isFinite(sq) ? sq.toFixed(2) : '—';
 
   const anEl = document.getElementById('mixAniloxVol');
-  if (anEl) anEl.value = Number.isFinite(aniloxVol) ? String(aniloxVol) : '—';
+  if (anEl) anEl.textContent = Number.isFinite(aniloxVol) ? String(aniloxVol) : '—';
 
   // Excel: =3*((SqM*%Cov)/100)*(Anilox/10000)+Tray
   const inkReq = 3 * (((sq * (Number.isFinite(cov) ? cov : 0)) / 100)) * ((Number.isFinite(aniloxVol) ? aniloxVol : 0) / 10000) + (Number.isFinite(tray) ? tray : 0);
@@ -3128,41 +3128,25 @@ function mixUpdateInkCalc(){
   const inkEl = document.getElementById('mixInkReq');
   if (inkEl){
     if (Number.isFinite(inkReq)){
-      inkEl.value = inkReq.toFixed(3);
+      inkEl.textContent = inkReq.toFixed(3);
       inkEl.dataset.value = String(inkReq);
     } else {
-      inkEl.value = '—';
+      inkEl.textContent = '—';
       inkEl.dataset.value = '';
-    }
-  }
-
-  const auto = !!document.getElementById('mixAutoQty')?.checked;
-  const qtyEl = document.getElementById('mixQtyKg');
-  const trayEl = document.getElementById('mixTrayVol');
-  const linEl = document.getElementById('mixLinearM');
-  const webEl = document.getElementById('mixWebWidth');
-  const covEl = document.getElementById('mixCoverage');
-  const autoEl = document.getElementById('mixAutoQty');
-  if (qtyEl){
-    qtyEl.disabled = auto;
-    if (auto && Number.isFinite(inkReq)){
-      qtyEl.value = inkReq.toFixed(3);
     }
   }
 }
 
 
 function mixRenderFormula(){
-  const autoQty = !!document.getElementById('mixAutoQty')?.checked;
-  const inkReqNum = parseFloat(document.getElementById('mixInkReq')?.dataset?.value || '');
-  const qtyKg = autoQty && Number.isFinite(inkReqNum) ? inkReqNum : parseFloat(document.getElementById('mixQtyKg')?.value || '1');
+  const qtyKg = parseFloat(document.getElementById('mixQtyKg')?.value || '1');
   const tbody = document.getElementById('mixFormulaTbody');
   const deEl = document.getElementById('mixDeltaE');
   const sheetEl = document.getElementById('mixSheetUsed');
 
   if (sheetEl){
     const { sheet } = mixGetActiveTable();
-    sheetEl.value = sheet || '—';
+    sheetEl.textContent = sheet || '—';
   }
 
   if (!tbody) return;
@@ -3170,7 +3154,7 @@ function mixRenderFormula(){
 
   const { table } = mixGetActiveTable();
   if (!table){
-    if (deEl) deEl.value = '';
+    if (deEl) deEl.textContent = '—';
     mixSetStatus('Guide not loaded yet. If it doesn’t load automatically, choose the .xlsm file above.', 'warn');
     return;
   }
@@ -3178,13 +3162,13 @@ function mixRenderFormula(){
   const key = mixNormalisePantoneName(MIX_ACTIVE_PANTONE);
   const rec = table.byPantone.get(key);
   if (!rec){
-    if (deEl) deEl.value = '';
+    if (deEl) deEl.textContent = '—';
     mixSetStatus('Pick a Pantone from the list.', 'mini');
     return;
   }
 
   if (deEl){
-    deEl.value = (rec.deltaE==null) ? '—' : rec.deltaE.toFixed(2);
+    deEl.textContent = (rec.deltaE==null) ? '—' : rec.deltaE.toFixed(2);
   }
 
   const q = (Number.isFinite(qtyKg) && qtyKg > 0) ? qtyKg : 0;
@@ -3289,7 +3273,7 @@ async function mixInit(){
   const linEl = document.getElementById('mixLinearM');
   const webEl = document.getElementById('mixWebWidth');
   const covEl = document.getElementById('mixCoverage');
-  const autoEl = document.getElementById('mixAutoQty');
+  const copyEl = document.getElementById('mixCopyInkReq');
 
   if (rangeEl) rangeEl.addEventListener('change', ()=>{
     mixRefreshPantoneCombo();
@@ -3308,7 +3292,15 @@ async function mixInit(){
     if (!el) return;
     el.addEventListener('input', ()=>{ mixUpdateInkCalc(); mixRenderFormula(); });
   });
-  if (autoEl) autoEl.addEventListener('change', ()=>{ mixUpdateInkCalc(); mixRenderFormula(); });
+
+
+  if (copyEl) copyEl.addEventListener('click', ()=>{
+    const inkReqNum = parseFloat(document.getElementById('mixInkReq')?.dataset?.value || '');
+    if (!Number.isFinite(inkReqNum)) return;
+    const qtyEl2 = document.getElementById('mixQtyKg');
+    if (qtyEl2){ qtyEl2.value = inkReqNum.toFixed(3); }
+    mixRenderFormula();
+  });
 
   if (fileEl){
     fileEl.addEventListener('change', async ()=>{
