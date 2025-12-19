@@ -150,9 +150,9 @@
   /* Fixed logo overlay (doesn't affect layout) */
   #pulseLogo{
     position:fixed;
-    display:none;
     top: -16px;
     right:14px;
+    display:none !important;
     z-index:1200;
     background:#ffffff;
     padding:12px 14px;
@@ -379,6 +379,68 @@
 
 .out{display:flex; align-items:center; min-height:38px; padding:0 10px; border:1px solid rgba(255,255,255,0.12); border-radius:10px; background:rgba(255,255,255,0.04); color:#e6e6e6;}
 .out.miniout{min-height:30px; font-size:12px;}
+
+/* Mixing Guide: calculator layout + emphasis */
+.mix-calc-card{
+  padding:12px;
+  margin-top:10px;
+}
+.mix-calc-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap:12px;
+  margin-top:10px;
+  align-items:end;
+}
+.mix-inkreq-row{
+  display:flex;
+  gap:12px;
+  margin-top:12px;
+  align-items:stretch;
+  flex-wrap:wrap;
+}
+.mix-inkreq-display{
+  flex: 1 1 220px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 12px;
+  background: rgba(255,255,255,0.02);
+}
+.mix-inkreq-label{
+  font-size:12px;
+  color: var(--muted);
+  margin-bottom:6px;
+}
+.mix-inkreq-value{
+  font-size:22px;
+  font-weight:700;
+  line-height:1.1;
+}
+.mix-inkreq-btn{
+  flex: 0 0 auto;
+  align-self:stretch;
+  min-width: 220px;
+}
+.mix-swatch{
+  width: 44px;
+  height: 34px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background: transparent;
+}
+
+  /* Mixing guide top inputs: allow 4-up on desktop */
+  .mix-top-grid{
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--gap);
+    align-items: end;
+  }
+  /* Slightly slimmer controls in mixing guide top area */
+  #tab-mix .mix-top-grid select,
+  #tab-mix .mix-top-grid input{
+    min-width: 0;
+  }
 </style>
 </head>
 <body>
@@ -406,8 +468,9 @@
       <div class="app-title"><span>Colour Hub</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
+    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
-        <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
+        
 <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
     </div>
@@ -604,7 +667,7 @@
           <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot"></span>
           <span style="margin-left:auto;"></span>
           <button class="btn" id="resetView">Reset view</button>
-          <span style="font-size:.8rem; opacity:.8;">Drag to rotate • Scroll to zoom</span>
+          <span style="font-size:.8rem; opacity:.8;">Drag to rotate</span>
         </div>
         <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
       </div>
@@ -616,7 +679,7 @@
   <!-- TAB: Mixing guide -->
   <section id="tab-mix" role="tabpanel" aria-labelledby="tabBtnMix" hidden>
     <div class="card" style="max-width:1200px; margin:0 auto;">
-      <div class="row2" style="margin-top:12px; align-items:end;">
+      <div class="mix-top-grid" style="margin-top:12px;">
         <div>
           <label for="mixInkRange">Ink range</label>
           <select id="mixInkRange">
@@ -635,11 +698,8 @@
             <option value="7v">7v</option>
           </select>
         </div>
-      </div>
-
-      <div class="row2" style="margin-top:12px;">
         <div>
-          <label class="nowrap">Pantone (from selected range + anilox)</label>
+          <label class="nowrap">Pantone</label>
           <div class="combo">
             <input id="mixPantoneSelect" placeholder="Type to search…" autocomplete="off">
             <div id="mixPantoneDrop" class="combo-drop hide" role="listbox" aria-label="Pantone options"></div>
@@ -656,51 +716,56 @@
           <label for="mixDeltaE">Best match prediction (ΔE)</label>
           <div id="mixDeltaE" class="out">—</div>
         </div>
+        <div>
+          <div id="mixPantoneSwatch" class="mix-swatch" style="margin-top: 26px; aria-label="Selected Pantone swatch"></div>
+        </div>
 
         <div style="grid-column: 1 / -1;">
-          <div class="card" style="padding:12px; margin-top:10px;">
-            <div class="flex" style="justify-content:space-between; align-items:flex-end; gap:10px; flex-wrap:wrap;">
-              <div>
-                <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
-                
-              </div></div>
+          <div style="grid-column: 1 / -1;">
+  <div class="card mix-calc-card">
+    <div class="flex" style="justify-content:space-between; align-items:center; gap:10px;">
+      <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
+    </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
-              <div>
-                <label for="mixTrayVol">Tray volume</label>
-                <input id="mixTrayVol" type="number" step="0.001" value="0">
-              </div>
-              <div>
-                <label for="mixLinearM">Linear metres</label>
-                <input id="mixLinearM" type="number" step="1" value="1000">
-              </div>
-              <div>
-                <label for="mixWebWidth">Web width (mm)</label>
-                <input id="mixWebWidth" type="number" step="1" value="1000">
-              </div>
-              <div>
-                <label for="mixCoverage">% coverage</label>
-                <input id="mixCoverage" type="number" step="0.1" value="100">
-              </div>
-              <div>
-                <label for="mixSquareM">Square meters</label>
-                <div id="mixSquareM" class="out">—</div>
-              </div>
-              
-              <div>
-                <label for="mixAniloxVol">Anilox volume</label>
-                <div id="mixAniloxVol" class="out">—</div>
-              </div>
-              <div>
-                <label for="mixInkReq">Ink required</label>
-                <div id="mixInkReq" class="out">—</div>
-<button class="btn" id="mixCopyInkReq" type="button" style="display:block; width:100%; margin-top:6px;">Set as Quantity Required (kg)</button></div>
-            </div>
-          </div>
-        </div>
+    <div class="mix-calc-grid">
+      <div>
+        <label for="mixLinearM">Linear metres</label>
+        <input id="mixLinearM" type="number" step="1" value="1000">
+      </div>
+
+      <div>
+        <label for="mixWebWidth">Web width (mm)</label>
+        <input id="mixWebWidth" type="number" step="1" value="1000">
+      </div>
+
+      <div>
+        <label for="mixCoverage">% coverage</label>
+        <input id="mixCoverage" type="number" step="0.1" value="100">
+      </div>
+
+      <div>
+        <label>Square meters</label>
+        <div id="mixSquareM" class="out">—</div>
+      </div>
+
+      <div>
+        <label>Anilox volume</label>
+        <div id="mixAniloxVol" class="out">—</div>
+      </div>
+    </div>
+
+    <div class="mix-inkreq-row">
+      <div class="mix-inkreq-display">
+        <div class="mix-inkreq-label">Ink required</div>
+        <div id="mixInkReq" class="mix-inkreq-value">—</div>
+      </div>
+
+      <button class="btn mix-inkreq-btn" id="mixCopyInkReq" type="button">Set as Quantity Required (kg)</button>
+    </div>
+  </div>
 </div>
 
-      <div class="formula-box" style="margin-top:12px;">
+<div class="formula-box" style="margin-top:12px;">
         <h2>Formula</h2>
         <table>
           <thead>
@@ -2322,11 +2387,8 @@ window.addEventListener('mousemove',e=>{
   requestLabDraw();
 });
 canvas.addEventListener('wheel', e=>{
-  e.preventDefault();
-  const f=(e.deltaY>0)?0.9:1.1;
-  scale3d=clamp(scale3d*f,80,1200);
-  requestLabDraw();
-},{passive:false});
+  // Leave wheel scrolling to the page; no zooming on the orb view.
+}, {passive:true});
 $('#resetView').addEventListener('click', ()=>{
   rotX=DEFAULT_VIEW.rx;
   rotY=DEFAULT_VIEW.ry;
@@ -2921,6 +2983,8 @@ function refreshCompareStandardCombo(){
           updateTargetEcho();
           showFormulaFor(x.name);
           _lastContextName = x.name;
+          // Mirror selection into Mixing Guide
+          mixSetPantoneFromOutside(x.name);
         }
         closeCombo(drop);
       });
@@ -2950,6 +3014,8 @@ function refreshCompareStandardCombo(){
         updateTargetEcho();
         showFormulaFor(nm);
         _lastContextName = nm;
+        // Mirror selection into Mixing Guide
+        mixSetPantoneFromOutside(nm);
       }
       closeCombo(drop);
     }
@@ -3002,6 +3068,31 @@ function filteredAndSortedCompareLog(forExport){
 // ===== Mixing guide (reads Combined mixing guide workbook) =====
 let MIX_GUIDE = null; // { sheets:{[sheetName]: {rows:[...], byPantone:Map}}, ready:boolean }
 let MIX_ACTIVE_PANTONE = '';
+
+// Sync helper: when a Pantone is selected in the Mixing Guide, mirror it back into Match & Predict.
+function matchSetPantoneFromOutside(name){
+  const nm = (name||'').trim();
+  if (!nm) return;
+
+  const matchInput = document.getElementById('matchColourSelect');
+  if (matchInput) matchInput.value = nm;
+
+  // If the library has this Pantone, also populate L*a*b* and refresh the suggestion display.
+  try{
+    const c = bestColourByQuery(nm);
+    if (c){
+      const L = document.getElementById('L');
+      const a = document.getElementById('a');
+      const b = document.getElementById('b');
+      if (L) L.value = c.L;
+      if (a) a.value = c.a;
+      if (b) b.value = c.b;
+      updateTargetEcho();
+      showFormulaFor(nm);
+      _lastContextName = nm;
+    }
+  }catch(e){ /* non-fatal */ }
+}
 
 function mixNormalisePantoneName(s){
   return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
@@ -3089,7 +3180,9 @@ function mixParseAniloxVolume(aniloxStr){
 }
 
 function mixUpdateInkCalc(){
-  const tray = parseFloat(document.getElementById('mixTrayVol')?.value || '0');
+  // Tray volume is assumed to be 0 (removed from UI)
+  const tray = 0;
+
   const linear = parseFloat(document.getElementById('mixLinearM')?.value || '0');
   const width = parseFloat(document.getElementById('mixWebWidth')?.value || '0');
   const cov = parseFloat(document.getElementById('mixCoverage')?.value || '0');
@@ -3103,8 +3196,11 @@ function mixUpdateInkCalc(){
   const anEl = document.getElementById('mixAniloxVol');
   if (anEl) anEl.textContent = Number.isFinite(aniloxVol) ? String(aniloxVol) : '—';
 
-  // Excel: =3*((SqM*%Cov)/100)*(Anilox/10000)+Tray
-  const inkReq = 3 * (((sq * (Number.isFinite(cov) ? cov : 0)) / 100)) * ((Number.isFinite(aniloxVol) ? aniloxVol : 0) / 10000) + (Number.isFinite(tray) ? tray : 0);
+  // Excel logic (with Tray forced to 0):
+  // Ink Required = 3 * ((SqM * %Coverage)/100) * (Anilox/10000) + Tray
+  const covSafe = Number.isFinite(cov) ? cov : 0;
+  const anSafe = Number.isFinite(aniloxVol) ? aniloxVol : 0;
+  const inkReq = 3 * (((sq * covSafe) / 100) * (anSafe / 10000)) + tray;
 
   const inkEl = document.getElementById('mixInkReq');
   if (inkEl){
@@ -3117,6 +3213,7 @@ function mixUpdateInkCalc(){
     }
   }
 }
+
 
 
 function mixRenderFormula(){
@@ -3168,6 +3265,24 @@ function mixRenderFormula(){
 
   tbody.appendChild(frag);
   mixSetStatus('', 'ok');
+  mixUpdateSwatch();
+}
+
+function mixUpdateSwatch(){
+  const sw = document.getElementById('mixPantoneSwatch');
+  if (!sw) return;
+  const name = (document.getElementById('mixPantoneSelect')?.value || MIX_ACTIVE_PANTONE || '').trim();
+  if (!name){
+    sw.style.background = 'transparent';
+    return;
+  }
+  // Pull Lab from the active colour library (Match & Predict data), if available
+  const c = (typeof bestColourByQuery === 'function') ? bestColourByQuery(name) : null;
+  if (c && Number.isFinite(+c.L) && Number.isFinite(+c.a) && Number.isFinite(+c.b) && typeof labToRgbCssForSwatch === 'function'){
+    sw.style.background = labToRgbCssForSwatch(+c.L, +c.a, +c.b);
+  } else {
+    sw.style.background = 'transparent';
+  }
 }
 
 function mixRefreshPantoneCombo(){
@@ -3207,6 +3322,10 @@ function mixRefreshPantoneCombo(){
         input.value = x.name;
         MIX_ACTIVE_PANTONE = x.name;
         mixRenderFormula();
+        
+        mixUpdateSwatch();
+// Mirror selection back into Match & Predict
+        matchSetPantoneFromOutside(x.name);
         closeCombo(drop);
       });
 
@@ -3230,6 +3349,8 @@ function mixRefreshPantoneCombo(){
         input.value = best;
         MIX_ACTIVE_PANTONE = best;
         mixRenderFormula();
+        // Mirror selection back into Match & Predict
+        matchSetPantoneFromOutside(best);
       }
       closeCombo(drop);
     }
@@ -3245,12 +3366,36 @@ function mixRefreshPantoneCombo(){
   });
 }
 
+
+// Sync: when a Pantone is selected elsewhere (Match & Predict), mirror it here.
+let MIX_PENDING_PANTONE = '';
+function mixSetPantoneFromOutside(name){
+  const nm = (name||'').trim();
+  if (!nm) return;
+  const input = document.getElementById('mixPantoneSelect');
+  if (!input){
+    MIX_PENDING_PANTONE = nm;
+    return;
+  }
+  input.value = nm;
+
+  // If the guide isn't loaded yet, remember it and apply after load.
+  if (!(MIX_GUIDE && MIX_GUIDE.ready)){
+    MIX_PENDING_PANTONE = nm;
+    return;
+  }
+  MIX_ACTIVE_PANTONE = nm;
+  mixRenderFormula();
+
+  mixUpdateSwatch();
+}
+
 async function mixInit(){
   const fileEl = document.getElementById('mixGuideFile');
   const rangeEl = document.getElementById('mixInkRange');
   const aniloxEl = document.getElementById('mixAnilox');
   const qtyEl = document.getElementById('mixQtyKg');
-  const trayEl = document.getElementById('mixTrayVol');
+  const trayEl = null; // Tray volume assumed 0
   const linEl = document.getElementById('mixLinearM');
   const webEl = document.getElementById('mixWebWidth');
   const covEl = document.getElementById('mixCoverage');
@@ -3292,6 +3437,7 @@ async function mixInit(){
         const wb = await mixLoadWorkbookFromFile(f);
         MIX_GUIDE = mixParseWorkbook(wb);
         mixSetStatus('Workbook loaded.', 'ok');
+        if (MIX_PENDING_PANTONE) { mixSetPantoneFromOutside(MIX_PENDING_PANTONE); MIX_PENDING_PANTONE=''; }
         mixRefreshPantoneCombo();
         mixUpdateInkCalc();
         mixRenderFormula();
@@ -3309,6 +3455,7 @@ async function mixInit(){
     const wb = await mixLoadWorkbookFromUrl(encodeURI('./'+fname));
     MIX_GUIDE = mixParseWorkbook(wb);
     mixSetStatus('Workbook loaded.', 'ok');
+    if (MIX_PENDING_PANTONE) { mixSetPantoneFromOutside(MIX_PENDING_PANTONE); MIX_PENDING_PANTONE=''; }
   }catch(err){
     mixSetStatus('Auto-load failed (use file picker above).', 'warn');
   }
