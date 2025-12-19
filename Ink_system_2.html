@@ -618,13 +618,8 @@
       <div class="flex" style="justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
         <div>
           <h1>Mixing guide</h1>
-          <div class="mini">Reads <code>Combined mixing guide v4 '25 update.xlsm</code> from the same folder as this HTML (or you can browse to it below).</div>
-        </div>
-        <div style="min-width:280px;">
-          <label for="mixGuideFile">Guide workbook (optional)</label>
-          <input id="mixGuideFile" type="file" accept=".xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
-        </div>
-      </div>
+</div>
+</div>
 
       <div class="row2" style="margin-top:12px; align-items:end;">
         <div>
@@ -658,8 +653,7 @@
         <div>
           <label for="mixQtyKg">Quantity required (kg)</label>
           <input id="mixQtyKg" type="number" step="0.001" value="1">
-          <div class="mini" style="margin-top:6px;">This is the batch size you want to mix. It scales the grams in the recipe.</div>
-        </div>
+</div>
       </div>
 
       <div class="row2" style="margin-top:12px;">
@@ -673,12 +667,12 @@
             <div class="flex" style="justify-content:space-between; align-items:flex-end; gap:10px; flex-wrap:wrap;">
               <div>
                 <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
-                <div class="mini">Optional helper for estimating how much ink you need, matching the Excel logic.</div>
+                
               </div>
               <button class="btn" id="mixCopyInkReq" type="button">Set quantity = ink required</button>
             </div>
 
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
               <div>
                 <label for="mixTrayVol">Tray volume</label>
                 <input id="mixTrayVol" type="number" step="0.001" value="0">
@@ -692,13 +686,14 @@
                 <input id="mixWebWidth" type="number" step="1" value="1000">
               </div>
               <div>
-                <label for="mixSquareM">Square meters</label>
-                <div id="mixSquareM" class="out">—</div>
-              </div>
-              <div>
                 <label for="mixCoverage">% coverage</label>
                 <input id="mixCoverage" type="number" step="0.1" value="100">
               </div>
+              <div>
+                <label for="mixSquareM">Square meters</label>
+                <div id="mixSquareM" class="out">—</div>
+              </div>
+              
               <div>
                 <label for="mixAniloxVol">Anilox volume</label>
                 <div id="mixAniloxVol" class="out">—</div>
@@ -706,17 +701,11 @@
               <div>
                 <label for="mixInkReq">Ink required</label>
                 <div id="mixInkReq" class="out">—</div>
-                <div class="mini" style="margin-top:6px;">Formula: <code>3*((SqM*%Cov)/100)*(Anilox/10000)+Tray</code></div>
-              </div>
+</div>
             </div>
           </div>
         </div>
-
-        <div>
-          <label for="mixSheetUsed">Sheet used</label>
-          <div id="mixSheetUsed" class="out">—</div>
-        </div>
-      </div>
+</div>
 
       <div class="formula-box" style="margin-top:12px;">
         <h2>Formula</h2>
@@ -3186,7 +3175,7 @@ function mixRenderFormula(){
   });
 
   tbody.appendChild(frag);
-  mixSetStatus(`Loaded ${Object.keys(MIX_GUIDE.sheets).length} sheets.`, 'ok');
+  mixSetStatus('', 'ok');
 }
 
 function mixRefreshPantoneCombo(){
