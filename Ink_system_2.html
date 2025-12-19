@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Ink Colour Matcher + Predictor</title>
+<title>Pulse - Colour Bar</title>
 <style>
   :root{ --gap:12px; --radius:14px; }
   *{ box-sizing:border-box; }
@@ -429,6 +429,18 @@
   background: transparent;
 }
 
+/* Mixing guide: totals row under formula */
+.mix-totals td{
+  border-bottom:none;
+  border-top:1px solid #242938;
+  padding-top:12px;
+  font-weight:800;
+}
+.mix-totals td:first-child{
+  color:#9aa4b2;
+  letter-spacing:.06em;
+}
+
   /* Mixing guide top inputs: allow 4-up on desktop */
   .mix-top-grid{
     display:grid;
@@ -465,7 +477,7 @@
   <div id="appRoot" class="app-hidden">
   <div class="appbar">
     <div class="appbar-inner">
-      <div class="app-title"><span>Colour Hub</span></div>
+      <div class="app-title"><span>Colour Bar</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
@@ -772,6 +784,13 @@
             <tr><th>Ink</th><th style="text-align:right;">%</th><th style="text-align:right;">g</th></tr>
           </thead>
           <tbody id="mixFormulaTbody"></tbody>
+          <tfoot>
+            <tr class="mix-totals">
+              <td class="mono" style="text-align:left;">TOTAL</td>
+              <td id="mixTotalPct" style="text-align:right;">—</td>
+              <td id="mixTotalGrams" style="text-align:right;">—</td>
+            </tr>
+          </tfoot>
         </table>
 </div>
     </div>
@@ -2088,6 +2107,16 @@ function renderInkCurvesTable(){
   const tbody = document.getElementById('inkCurvesTbody');
   if (!tbody) return;
   tbody.innerHTML = '';
+  const pctEl0 = document.getElementById('mixTotalPct');
+  const gEl0 = document.getElementById('mixTotalGrams');
+  if (pctEl0) pctEl0.textContent = '—';
+  if (gEl0) gEl0.textContent = '—';
+
+  const pctEl0 = document.getElementById('mixTotalPct');
+  const gEl0 = document.getElementById('mixTotalGrams');
+  if (pctEl0) pctEl0.textContent = '—';
+  if (gEl0) gEl0.textContent = '—';
+
 
   INK_CURVES.forEach((rec, idx)=>{
     const tr = document.createElement('tr');
@@ -3262,6 +3291,14 @@ function mixRenderFormula(){
     `;
     frag.appendChild(tr);
   });
+
+    // Totals row
+  const totalPct = rec.ingredients.reduce((s,r)=> s + (Number.isFinite(r.pct)? r.pct : 0), 0);
+  const totalGrams = rec.ingredients.reduce((s,r)=> s + ((Number.isFinite(r.pct)? r.pct : 0) * q * 10), 0); // grams
+  const pctEl = document.getElementById('mixTotalPct');
+  const gEl = document.getElementById('mixTotalGrams');
+  if (pctEl) pctEl.textContent = Number.isFinite(totalPct) ? totalPct.toFixed(3).replace(/\.0+$/,'').replace(/\.$/,'') : '—';
+  if (gEl) gEl.textContent = Number.isFinite(totalGrams) ? (Math.round(totalGrams*10)/10).toFixed(1) : '—';
 
   tbody.appendChild(frag);
   mixSetStatus('', 'ok');
