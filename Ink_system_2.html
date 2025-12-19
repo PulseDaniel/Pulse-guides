@@ -627,10 +627,10 @@
         <div>
           <label for="mixInkRange">Ink range</label>
           <select id="mixInkRange">
-            <option value="A" selected>A</option>
-            <option value="B">B</option>
-            <option value="C">C</option>
-            <option value="D">D</option>
+            <option value="A" selected>PureTone (FPC UV PT121)</option>
+            <option value="B">PureTone (STD UV PT120)</option>
+            <option value="C">PureTone (Water Based)</option>
+            <option value="D">PureTone DC</option>
           </select>
         </div>
         <div>
@@ -653,9 +653,9 @@
           </div>
         </div>
         <div>
-          <label for="mixQtyKg">Quantity required</label>
+          <label for="mixQtyKg">Quantity required (kg)</label>
           <input id="mixQtyKg" type="number" step="0.001" value="1">
-          <div class="mini" style="margin-top:6px;">Grams = (% × kg × 10). So 1 kg at 12.5% → 125 g.</div>
+          <div class="mini" style="margin-top:6px;">Grams = (% × kg × 10). If “Use Ink required” is ticked, the kg value is driven by the calculator below. → 125 g.</div>
         </div>
       </div>
 
@@ -664,6 +664,54 @@
           <label for="mixDeltaE">Best match prediction (ΔE)</label>
           <input id="mixDeltaE" type="text" readonly placeholder="—">
         </div>
+
+        <div style="grid-column: 1 / -1;">
+          <div class="card" style="padding:12px; margin-top:10px;">
+            <div class="flex" style="justify-content:space-between; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+              <div>
+                <h2 style="margin:0; font-size:16px;">Ink requirement calculator</h2>
+                <div class="mini">Optional helper for estimating how much ink you need, matching the Excel logic.</div>
+              </div>
+              <label class="mini" style="display:flex; gap:8px; align-items:center; margin:0;">
+                <input id="mixAutoQty" type="checkbox" checked>
+                Use “Ink required” as the mix quantity
+              </label>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-top:10px; align-items:end;">
+              <div>
+                <label for="mixTrayVol">Tray volume</label>
+                <input id="mixTrayVol" type="number" step="0.001" value="0">
+              </div>
+              <div>
+                <label for="mixLinearM">Linear metres</label>
+                <input id="mixLinearM" type="number" step="1" value="1000">
+              </div>
+              <div>
+                <label for="mixWebWidth">Web width (mm)</label>
+                <input id="mixWebWidth" type="number" step="1" value="1000">
+              </div>
+              <div>
+                <label for="mixSquareM">Square meters</label>
+                <input id="mixSquareM" type="text" value="—" readonly>
+              </div>
+              <div>
+                <label for="mixCoverage">% coverage</label>
+                <input id="mixCoverage" type="number" step="0.1" value="100">
+              </div>
+              <div>
+                <label for="mixAniloxVol">Anilox volume</label>
+                <input id="mixAniloxVol" type="text" value="—" readonly>
+              </div>
+              <div>
+                <label for="mixInkReq">Ink required</label>
+                <input id="mixInkReq" type="text" value="—" readonly>
+                <div class="mini" style="margin-top:6px;">Formula: <code>3*((SqM*%Cov)/100)*(Anilox/10000)+Tray</code></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label for="mixSheetUsed">Sheet used</label>
           <input id="mixSheetUsed" type="text" readonly placeholder="—">
@@ -3053,8 +3101,61 @@ function mixGetActiveTable(){
   return { sheet, table: MIX_GUIDE.sheets[sheet] };
 }
 
+function mixParseAniloxVolume(aniloxStr){
+  // Excel uses LEFT(F3,1) where F3 is like "6v"
+  const m = String(aniloxStr||'').trim().match(/^\s*(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : NaN;
+}
+
+function mixUpdateInkCalc(){
+  const tray = parseFloat(document.getElementById('mixTrayVol')?.value || '0');
+  const linear = parseFloat(document.getElementById('mixLinearM')?.value || '0');
+  const width = parseFloat(document.getElementById('mixWebWidth')?.value || '0');
+  const cov = parseFloat(document.getElementById('mixCoverage')?.value || '0');
+  const aniloxStr = document.getElementById('mixAnilox')?.value || '';
+  const aniloxVol = mixParseAniloxVolume(aniloxStr);
+
+  const sq = (Number.isFinite(linear) ? linear : 0) * (Number.isFinite(width) ? width : 0) / 1000;
+  const sqEl = document.getElementById('mixSquareM');
+  if (sqEl) sqEl.value = Number.isFinite(sq) ? sq.toFixed(2) : '—';
+
+  const anEl = document.getElementById('mixAniloxVol');
+  if (anEl) anEl.value = Number.isFinite(aniloxVol) ? String(aniloxVol) : '—';
+
+  // Excel: =3*((SqM*%Cov)/100)*(Anilox/10000)+Tray
+  const inkReq = 3 * (((sq * (Number.isFinite(cov) ? cov : 0)) / 100)) * ((Number.isFinite(aniloxVol) ? aniloxVol : 0) / 10000) + (Number.isFinite(tray) ? tray : 0);
+
+  const inkEl = document.getElementById('mixInkReq');
+  if (inkEl){
+    if (Number.isFinite(inkReq)){
+      inkEl.value = inkReq.toFixed(3);
+      inkEl.dataset.value = String(inkReq);
+    } else {
+      inkEl.value = '—';
+      inkEl.dataset.value = '';
+    }
+  }
+
+  const auto = !!document.getElementById('mixAutoQty')?.checked;
+  const qtyEl = document.getElementById('mixQtyKg');
+  const trayEl = document.getElementById('mixTrayVol');
+  const linEl = document.getElementById('mixLinearM');
+  const webEl = document.getElementById('mixWebWidth');
+  const covEl = document.getElementById('mixCoverage');
+  const autoEl = document.getElementById('mixAutoQty');
+  if (qtyEl){
+    qtyEl.disabled = auto;
+    if (auto && Number.isFinite(inkReq)){
+      qtyEl.value = inkReq.toFixed(3);
+    }
+  }
+}
+
+
 function mixRenderFormula(){
-  const qtyKg = parseFloat(document.getElementById('mixQtyKg')?.value || '1');
+  const autoQty = !!document.getElementById('mixAutoQty')?.checked;
+  const inkReqNum = parseFloat(document.getElementById('mixInkReq')?.dataset?.value || '');
+  const qtyKg = autoQty && Number.isFinite(inkReqNum) ? inkReqNum : parseFloat(document.getElementById('mixQtyKg')?.value || '1');
   const tbody = document.getElementById('mixFormulaTbody');
   const deEl = document.getElementById('mixDeltaE');
   const sheetEl = document.getElementById('mixSheetUsed');
@@ -3184,16 +3285,30 @@ async function mixInit(){
   const rangeEl = document.getElementById('mixInkRange');
   const aniloxEl = document.getElementById('mixAnilox');
   const qtyEl = document.getElementById('mixQtyKg');
+  const trayEl = document.getElementById('mixTrayVol');
+  const linEl = document.getElementById('mixLinearM');
+  const webEl = document.getElementById('mixWebWidth');
+  const covEl = document.getElementById('mixCoverage');
+  const autoEl = document.getElementById('mixAutoQty');
 
   if (rangeEl) rangeEl.addEventListener('change', ()=>{
     mixRefreshPantoneCombo();
+    mixUpdateInkCalc();
     mixRenderFormula();
   });
   if (aniloxEl) aniloxEl.addEventListener('change', ()=>{
     mixRefreshPantoneCombo();
+    mixUpdateInkCalc();
     mixRenderFormula();
   });
   if (qtyEl) qtyEl.addEventListener('input', mixRenderFormula);
+
+  const inkInputs = [trayEl, linEl, webEl, covEl];
+  inkInputs.forEach(el=>{
+    if (!el) return;
+    el.addEventListener('input', ()=>{ mixUpdateInkCalc(); mixRenderFormula(); });
+  });
+  if (autoEl) autoEl.addEventListener('change', ()=>{ mixUpdateInkCalc(); mixRenderFormula(); });
 
   if (fileEl){
     fileEl.addEventListener('change', async ()=>{
@@ -3205,6 +3320,7 @@ async function mixInit(){
         MIX_GUIDE = mixParseWorkbook(wb);
         mixSetStatus('Workbook loaded.', 'ok');
         mixRefreshPantoneCombo();
+        mixUpdateInkCalc();
         mixRenderFormula();
       }catch(err){
         mixSetStatus('Could not read workbook: ' + (err.message||err), 'warn');
@@ -3225,6 +3341,7 @@ async function mixInit(){
   }
 
   mixRefreshPantoneCombo();
+  mixUpdateInkCalc();
   mixRenderFormula();
 }
 
