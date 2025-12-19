@@ -403,7 +403,8 @@
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
-    <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
+        <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
+<button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
     </div>
   </div>
@@ -607,6 +608,81 @@
   </section>
 
   
+
+  <!-- TAB: Mixing guide -->
+  <section id="tab-mix" role="tabpanel" aria-labelledby="tabBtnMix" hidden>
+    <div class="card" style="max-width:1200px; margin:0 auto;">
+      <div class="flex" style="justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:10px;">
+        <div>
+          <h1>Mixing guide</h1>
+          <div class="mini">Reads <code>Combined mixing guide v4 '25 update.xlsm</code> from the same folder as this HTML (or you can browse to it below).</div>
+        </div>
+        <div style="min-width:280px;">
+          <label for="mixGuideFile">Guide workbook (optional)</label>
+          <input id="mixGuideFile" type="file" accept=".xlsx,.xlsm,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px; align-items:end;">
+        <div>
+          <label for="mixInkRange">Ink range</label>
+          <select id="mixInkRange">
+            <option value="A" selected>A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select>
+        </div>
+        <div>
+          <label for="mixAnilox">Anilox / film thickness</label>
+          <select id="mixAnilox">
+            <option value="4v">4v (60%)</option>
+            <option value="5v">5v (80%)</option>
+            <option value="6v" selected>6v (100%)</option>
+            <option value="7v">7v (120%)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label class="nowrap">Pantone (from selected range + anilox)</label>
+          <div class="combo">
+            <input id="mixPantoneSelect" placeholder="Type to search…" autocomplete="off">
+            <div id="mixPantoneDrop" class="combo-drop hide" role="listbox" aria-label="Pantone options"></div>
+          </div>
+        </div>
+        <div>
+          <label for="mixQtyKg">Quantity required</label>
+          <input id="mixQtyKg" type="number" step="0.001" value="1">
+          <div class="mini" style="margin-top:6px;">Grams = (% × kg × 10). So 1 kg at 12.5% → 125 g.</div>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="mixDeltaE">Best match prediction (ΔE)</label>
+          <input id="mixDeltaE" type="text" readonly placeholder="—">
+        </div>
+        <div>
+          <label for="mixSheetUsed">Sheet used</label>
+          <input id="mixSheetUsed" type="text" readonly placeholder="—">
+        </div>
+      </div>
+
+      <div class="formula-box" style="margin-top:12px;">
+        <h2>Formula</h2>
+        <table>
+          <thead>
+            <tr><th>Ink</th><th style="text-align:right;">%</th><th style="text-align:right;">g</th></tr>
+          </thead>
+          <tbody id="mixFormulaTbody"></tbody>
+        </table>
+        <div class="mini" id="mixGuideStatus" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  </section>
+
 <!-- TAB: Settings -->
   <section id="tab-settings" role="tabpanel" aria-labelledby="tabBtnSettings" hidden>
 
@@ -894,6 +970,7 @@
     </div>
   </div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
 (function(){
 'use strict';
@@ -2892,26 +2969,299 @@ function filteredAndSortedCompareLog(forExport){
   return rows;
 }
 
+
+// ===== Mixing guide (reads Combined mixing guide workbook) =====
+let MIX_GUIDE = null; // { sheets:{[sheetName]: {rows:[...], byPantone:Map}}, ready:boolean }
+let MIX_ACTIVE_PANTONE = '';
+
+function mixNormalisePantoneName(s){
+  return String(s||'').trim().toUpperCase().replace(/\s+/g,' ');
+}
+
+function mixSheetName(range, anilox){
+  return String(range||'A') + String(anilox||'6v');
+}
+
+function mixParseWorkbook(wb){
+  const sheets = {};
+  (wb.SheetNames||[]).forEach(name=>{
+    if (!/^[A-D][4-7]v$/.test(name)) return;
+    const ws = wb.Sheets[name];
+    if (!ws) return;
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+    const out = [];
+    for (let i=0;i<rows.length;i++){
+      const r = rows[i];
+      const pantone = (r && r[0]) ? String(r[0]).trim() : '';
+      if (!pantone) continue;
+      // expected: A=pantone, then (ink,%) pairs across cols 1..10, then ΔE around col 11
+      const ingredients = [];
+      for (let c=1; c<=10; c+=2){
+        const ink = r[c];
+        const pct = r[c+1];
+        if (!ink) continue;
+        const inkName = String(ink).trim();
+        const pctNum = typeof pct === 'number' ? pct : parseFloat(pct);
+        if (!inkName) continue;
+        if (!(pctNum >= 0)) continue;
+        if (pctNum === 0) continue;
+        ingredients.push({ ink: inkName, pct: +pctNum });
+      }
+      const deCell = r[11];
+      const deltaE = typeof deCell === 'number' ? deCell : parseFloat(deCell);
+      out.push({
+        pantone: pantone,
+        pantoneNorm: mixNormalisePantoneName(pantone),
+        ingredients,
+        deltaE: Number.isFinite(deltaE) ? +deltaE : null
+      });
+    }
+    const byPantone = new Map();
+    out.forEach(rec=>{
+      if (!byPantone.has(rec.pantoneNorm)) byPantone.set(rec.pantoneNorm, rec);
+    });
+    sheets[name] = { rows: out, byPantone };
+  });
+
+  return { sheets, ready: true };
+}
+
+async function mixLoadWorkbookFromUrl(url){
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not fetch workbook (${res.status})`);
+  const buf = await res.arrayBuffer();
+  return XLSX.read(buf, {type:'array', cellDates:false, cellText:false});
+}
+
+async function mixLoadWorkbookFromFile(file){
+  const buf = await file.arrayBuffer();
+  return XLSX.read(buf, {type:'array', cellDates:false, cellText:false});
+}
+
+function mixSetStatus(msg, cls){
+  const el = document.getElementById('mixGuideStatus');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'mini ' + (cls||'');
+}
+
+function mixGetActiveTable(){
+  const range = document.getElementById('mixInkRange')?.value || 'A';
+  const anilox = document.getElementById('mixAnilox')?.value || '6v';
+  const sheet = mixSheetName(range, anilox);
+  if (!MIX_GUIDE || !MIX_GUIDE.sheets || !MIX_GUIDE.sheets[sheet]) return { sheet, table:null };
+  return { sheet, table: MIX_GUIDE.sheets[sheet] };
+}
+
+function mixRenderFormula(){
+  const qtyKg = parseFloat(document.getElementById('mixQtyKg')?.value || '1');
+  const tbody = document.getElementById('mixFormulaTbody');
+  const deEl = document.getElementById('mixDeltaE');
+  const sheetEl = document.getElementById('mixSheetUsed');
+
+  if (sheetEl){
+    const { sheet } = mixGetActiveTable();
+    sheetEl.value = sheet || '—';
+  }
+
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const { table } = mixGetActiveTable();
+  if (!table){
+    if (deEl) deEl.value = '';
+    mixSetStatus('Guide not loaded yet. If it doesn’t load automatically, choose the .xlsm file above.', 'warn');
+    return;
+  }
+
+  const key = mixNormalisePantoneName(MIX_ACTIVE_PANTONE);
+  const rec = table.byPantone.get(key);
+  if (!rec){
+    if (deEl) deEl.value = '';
+    mixSetStatus('Pick a Pantone from the list.', 'mini');
+    return;
+  }
+
+  if (deEl){
+    deEl.value = (rec.deltaE==null) ? '—' : rec.deltaE.toFixed(2);
+  }
+
+  const q = (Number.isFinite(qtyKg) && qtyKg > 0) ? qtyKg : 0;
+  const frag = document.createDocumentFragment();
+
+  rec.ingredients.forEach(row=>{
+    const grams = row.pct * q * 10; // (% * kg * 1000 / 100)
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row.ink.replace(/</g,'&lt;')}</td>
+      <td style="text-align:right;">${row.pct.toFixed(3).replace(/\.?0+$/,'')}</td>
+      <td style="text-align:right;">${(Math.round(grams*10)/10).toFixed(1)}</td>
+    `;
+    frag.appendChild(tr);
+  });
+
+  tbody.appendChild(frag);
+  mixSetStatus(`Loaded ${Object.keys(MIX_GUIDE.sheets).length} sheets.`, 'ok');
+}
+
+function mixRefreshPantoneCombo(){
+  const input = document.getElementById('mixPantoneSelect');
+  const drop = document.getElementById('mixPantoneDrop');
+  if (!input || !drop) return;
+
+  const { table } = mixGetActiveTable();
+  const allNames = table ? table.rows.map(r=>r.pantone).filter(Boolean) : [];
+
+  const render = (q)=>{
+    const query = (q||'').trim();
+    const scored = allNames.map(name=>({ name, ...scoreName(name, query) }));
+    const matches = scored.filter(x=>x.match).sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name));
+    const rest = scored.filter(x=>!x.match).sort((a,b)=> a.name.localeCompare(b.name));
+    const merged = matches.concat(rest);
+
+    drop.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    merged.forEach(x=>{
+      const div = document.createElement('div');
+      div.className = 'combo-item';
+      const t = tokensOf(query)[0];
+      if (t){
+        const idx = normText(x.name).indexOf(t);
+        if (idx >= 0){
+          div.innerHTML = `<span class="hit">${x.name.replace(/</g,'&lt;')}</span>`;
+        } else {
+          div.textContent = x.name;
+        }
+      } else {
+        div.textContent = x.name;
+      }
+
+      div.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        input.value = x.name;
+        MIX_ACTIVE_PANTONE = x.name;
+        mixRenderFormula();
+        closeCombo(drop);
+      });
+
+      frag.appendChild(div);
+    });
+    drop.appendChild(frag);
+  };
+
+  render('');
+
+  const open = ()=>{ drop.classList.remove('hide'); };
+
+  input.addEventListener('focus', ()=>{ render(input.value); open(); });
+  input.addEventListener('click', ()=>{ render(input.value); open(); });
+  input.addEventListener('input', ()=>{ render(input.value); open(); });
+  input.addEventListener('keydown', (e)=>{
+    if (e.key === 'Escape'){ closeCombo(drop); return; }
+    if (e.key === 'Enter'){
+      const best = allNames.length ? (allNames.find(n=>mixNormalisePantoneName(n)===mixNormalisePantoneName(input.value)) || allNames[0]) : '';
+      if (best){
+        input.value = best;
+        MIX_ACTIVE_PANTONE = best;
+        mixRenderFormula();
+      }
+      closeCombo(drop);
+    }
+  });
+  input.addEventListener('blur', ()=>{
+    setTimeout(()=> closeCombo(drop), 120);
+  });
+
+  document.addEventListener('mousedown', (e)=>{
+    if (!drop || drop.classList.contains('hide')) return;
+    const within = drop.contains(e.target) || input.contains(e.target);
+    if (!within) closeCombo(drop);
+  });
+}
+
+async function mixInit(){
+  const fileEl = document.getElementById('mixGuideFile');
+  const rangeEl = document.getElementById('mixInkRange');
+  const aniloxEl = document.getElementById('mixAnilox');
+  const qtyEl = document.getElementById('mixQtyKg');
+
+  if (rangeEl) rangeEl.addEventListener('change', ()=>{
+    mixRefreshPantoneCombo();
+    mixRenderFormula();
+  });
+  if (aniloxEl) aniloxEl.addEventListener('change', ()=>{
+    mixRefreshPantoneCombo();
+    mixRenderFormula();
+  });
+  if (qtyEl) qtyEl.addEventListener('input', mixRenderFormula);
+
+  if (fileEl){
+    fileEl.addEventListener('change', async ()=>{
+      const f = fileEl.files && fileEl.files[0];
+      if (!f) return;
+      try{
+        mixSetStatus('Loading workbook…');
+        const wb = await mixLoadWorkbookFromFile(f);
+        MIX_GUIDE = mixParseWorkbook(wb);
+        mixSetStatus('Workbook loaded.', 'ok');
+        mixRefreshPantoneCombo();
+        mixRenderFormula();
+      }catch(err){
+        mixSetStatus('Could not read workbook: ' + (err.message||err), 'warn');
+      }
+    });
+  }
+
+  // Auto-load from same folder (GitHub / local)
+  try{
+    if (!window.XLSX) throw new Error('XLSX library not available.');
+    mixSetStatus('Loading workbook…');
+    const fname = "Combined mixing guide v4 '25 update.xlsm";
+    const wb = await mixLoadWorkbookFromUrl(encodeURI('./'+fname));
+    MIX_GUIDE = mixParseWorkbook(wb);
+    mixSetStatus('Workbook loaded.', 'ok');
+  }catch(err){
+    mixSetStatus('Auto-load failed (use file picker above).', 'warn');
+  }
+
+  mixRefreshPantoneCombo();
+  mixRenderFormula();
+}
+
+// Kick off once DOM is ready (after existing wiring)
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{ mixInit(); }catch(e){}
+});
+
 // Tabs switching
 const tabBtnMatch=$('#tabBtnMatch');
 const tabBtnCompare=$('#tabBtnCompare');
+const tabBtnMix=$('#tabBtnMix');
 const tabBtnSettings=$('#tabBtnSettings');
+
 const tabMatch=$('#tab-match');
 const tabCompare=$('#tab-compare');
+const tabMix=$('#tab-mix');
 const tabSettings=$('#tab-settings');
+
 function showTab(which){
   tabMatch.hidden = which!=='match';
   tabCompare.hidden = which!=='compare';
+  tabMix.hidden = which!=='mix';
   tabSettings.hidden = which!=='settings';
+
   tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
   tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
+  if (tabBtnMix) tabBtnMix.setAttribute('aria-selected', which==='mix' ? 'true':'false');
   tabBtnSettings.setAttribute('aria-selected', which==='settings' ? 'true':'false');
+
   if (which === 'compare') requestLabDraw();
 }
+
 tabBtnMatch.addEventListener('click',()=>showTab('match'));
 tabBtnCompare.addEventListener('click',()=>showTab('compare'));
+if (tabBtnMix) tabBtnMix.addEventListener('click',()=>showTab('mix'));
 if (tabBtnSettings) tabBtnSettings.addEventListener('click',()=>showTab('settings'));
-
 // Wire up
 $('#findBtn').addEventListener('click', findClosest);
 $('#clearBtn').addEventListener('click', ()=>{
