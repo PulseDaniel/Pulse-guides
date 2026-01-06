@@ -137,12 +137,16 @@
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
 
   /* LAB 2D readout (a/b grid + L slider) */
-  .labVizRow{ display:grid; grid-template-columns: 1fr minmax(320px, 380px); gap:12px; padding:12px; align-items:start; }
+  .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
   .lab3dWrap{ min-width:0; }
+  @media (max-width: 980px){
+    .labVizRow{ grid-template-columns: 1fr; }
+    .labReadout{ width:100%; }
+  }
   .labReadout{ background:#0d1016; border:1px solid #242938; border-radius:12px; padding:10px; }
   .labReadoutTitle{ font-size:0.95rem; font-weight:800; letter-spacing:.2px; }
   .labReadoutHdr{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; }
-  .labReadoutBody{ display:grid; grid-template-columns: 1fr 120px; gap:10px; align-items:start; }
+  .labReadoutBody{ display:grid; grid-template-columns: 1fr 40px; gap:10px; align-items:stretch; }
   .abGridWrap{ position:relative; }
   #abCanvas{
     width:100%;
@@ -163,13 +167,13 @@
   .abAxisLabelX{ right:8px; bottom:6px; }
   .abAxisLabelY{ left:8px; top:6px; }
 
-  .lReadoutWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .lReadoutWrap{ display:grid; grid-template-rows: 1fr auto; align-items:stretch; gap:6px; height:100%; }
   .lTrack{
     position:relative;
-    width:112px;
-    height: min(320px, 60vw);
-    max-height: 320px;
-    min-height: 220px;
+    width:40px;
+    height:100%;
+    min-height:0;
+    max-height:none;
     border-radius:12px;
     border:1px solid #242938;
     background: transparent;
@@ -184,28 +188,20 @@
     z-index:0;
   }
   .lTrack > *{ position:relative; z-index:2; }
-  .lAxisLabel{ font-size:12px; color:#9aa4b2; user-select:none; }
+  .lAxisLabel{ font-size:11px; opacity:.85; text-align:center; }
   .lMarker{
   position:absolute;
   left:50%;
-  transform:translate(-50%,-50%);
-  width:112px;
-  height:0;
-  pointer-events:none;
-  color:#e5e7eb;
-}
-.lMarker::before{
-  content:'';
-  position:absolute;
-  left:50%;
-  top:-2px;
   transform:translateX(-50%);
-  width:34px;
-  height:4px;
-  border-radius:4px;
-  background: currentColor;
-  box-shadow:0 0 0 1px rgba(0,0,0,.55);
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  border:2px solid rgba(0,0,0,.55);
+  background:#e5e7eb;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
+  pointer-events:none;
 }
+.lDot{ }
 .lMarkerTag{
   position:absolute;
   left:50%;
@@ -827,8 +823,8 @@
 
               <div class="lReadoutWrap">
                 <div class="lTrack" id="lTrack">
-                  <div class="lMarker" id="lMarkerA"><span class="lMarkerTag">Std</span><span class="lMarkerVal" id="lValA">—</span></div>
-                  <div class="lMarker" id="lMarkerB"><span class="lMarkerTag">Batch</span><span class="lMarkerVal" id="lValB">—</span></div>
+                  <div class="lMarker lDot" id="lMarkerA" title="Std"></div>
+                  <div class="lMarker lDot" id="lMarkerB" title="Batch"></div>
                 </div>
                 <div class="lAxisLabel">L*</div>
               </div>
@@ -2528,8 +2524,6 @@ const abCtx = abCanvas ? abCanvas.getContext('2d') : null;
 const lTrack = document.getElementById('lTrack');
 const lMarkerA = document.getElementById('lMarkerA');
 const lMarkerB = document.getElementById('lMarkerB');
-const lValA = document.getElementById('lValA');
-const lValB = document.getElementById('lValB');
 const labNumsA = document.getElementById('labNumsA');
 const labNumsB = document.getElementById('labNumsB');
 const labTagA = document.getElementById('labTagA');
@@ -2539,25 +2533,36 @@ function formatLabLine(L,a,b){
   if (![L,a,b].every(Number.isFinite)) return 'L —  a —  b —';
   return `L ${L.toFixed(2)}  a ${a.toFixed(2)}  b ${b.toFixed(2)}`;
 }
-function computeLMarkerY(L){
-  if (!lTrack || !Number.isFinite(L)) return NaN;
-  const pad = 8;
-  const h = lTrack.clientHeight || 260;
-  return pad + (1 - clamp(L/100, 0, 1)) * Math.max(1, (h - pad*2));
-}
-function setLMarker(marker, valEl, L, rgb, xPct){
-  if (!lTrack || !marker || !valEl) return NaN;
+function setLMarker(marker, L, rgb){
+  if (!lTrack || !marker) return NaN;
   if (!Number.isFinite(L)){
     marker.style.display = 'none';
+    marker.dataset.y = '';
     return NaN;
   }
-  marker.style.display = 'flex';
-  const y = computeLMarkerY(L);
+  marker.style.display = 'block';
+  const pad = 6;
+  const h = lTrack.clientHeight || 260;
+  const y = pad + (1 - clamp(L/100, 0, 1)) * Math.max(1, (h - pad*2));
   marker.style.top = `${y}px`;
-  marker.style.left = `${Number.isFinite(xPct) ? xPct : 50}%`;
-  marker.style.color = rgb ? `rgb(${rgb.r},${rgb.g},${rgb.b})` : '#e5e7eb';
-  valEl.textContent = L.toFixed(2);
+
+  const col = rgb ? `rgb(${rgb.r},${rgb.g},${rgb.b})` : '#e5e7eb';
+  marker.style.background = col;
+  marker.style.boxShadow = `0 0 0 2px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.28) inset`;
+
+  marker.dataset.y = String(y);
   return y;
+}
+function positionLMarkers(yA, yB){
+  const aOk = Number.isFinite(yA);
+  const bOk = Number.isFinite(yB);
+  if (aOk && bOk && Math.abs(yA - yB) < 14){
+    lMarkerA.style.left = '38%';
+    lMarkerB.style.left = '62%';
+  } else {
+    if (lMarkerA) lMarkerA.style.left = '50%';
+    if (lMarkerB) lMarkerB.style.left = '50%';
+  }
 }
 function ensureAbCanvasPixels(){
   if (!abCanvas || !abCtx) return null;
@@ -2662,10 +2667,11 @@ function drawAbGrid(A, B){
   abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
   abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
 
-  function drawPt(pt, label){
-    if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return;
+  function drawPtDot(pt){
+    if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return null;
     const rgb = labToSrgb(pt.L, pt.a, pt.b);
     const x = toX(pt.a), y = toY(pt.b);
+
     abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
     abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
     abCtx.lineWidth = 2;
@@ -2673,26 +2679,43 @@ function drawAbGrid(A, B){
     abCtx.arc(x,y,6,0,Math.PI*2);
     abCtx.fill();
     abCtx.stroke();
+    return { x, y, rgb };
+  }
 
+  function drawPtLabel(text, x, y, side, dy){
+    const w = abCanvas.clientWidth || 280;
+    const h = abCanvas.clientHeight || 280;
+
+    let dx = side === 'left' ? -10 : 10;
+
+    // Avoid clipping at edges
+    if (side === 'left' && x < 38){ side = 'right'; dx = 10; }
+    if (side === 'right' && x > w - 38){ side = 'left'; dx = -10; }
+
+    abCtx.save();
     abCtx.fillStyle = '#e5e7eb';
     abCtx.font = '12px ui-sans-serif, system-ui';
-    // Labels: Std to the LEFT, Batch to the RIGHT to avoid overlap when dots coincide.
-    const text = label;
-    const m = abCtx.measureText(text);
-    let tx = (label === 'Std') ? (x - 9 - m.width) : (x + 9);
-    let ty = y - 9;
-    tx = clamp(tx, 2, w - m.width - 2);
-    ty = clamp(ty, 12, h - 2);
-
-    abCtx.lineJoin = 'round';
-    abCtx.miterLimit = 2;
-    abCtx.strokeStyle = 'rgba(0,0,0,0.70)';
-    abCtx.lineWidth = 3;
-    abCtx.strokeText(text, tx, ty);
-    abCtx.fillText(text, tx, ty);
+    abCtx.textBaseline = 'middle';
+    abCtx.textAlign = side === 'left' ? 'right' : 'left';
+    abCtx.shadowColor = 'rgba(0,0,0,.85)';
+    abCtx.shadowBlur = 6;
+    abCtx.shadowOffsetY = 1;
+    abCtx.fillText(text, x + dx, y + dy);
+    abCtx.restore();
   }
-  drawPt(A, 'Std');
-  drawPt(B, 'Batch');
+
+  const pA = drawPtDot(A);
+  const pB = drawPtDot(B);
+
+  let dyA = -12, dyB = -12;
+  if (pA && pB){
+    const d = Math.hypot(pA.x - pB.x, pA.y - pB.y);
+    if (d < 14){ dyA = -18; dyB = 10; }
+  }
+
+  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA);
+  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB);
+}  }
 }
 function updateLabReadout(){
   const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
@@ -2718,14 +2741,9 @@ function updateLabReadout(){
 
   const rgbA = aOk ? labToSrgb(A.L,A.a,A.b) : null;
   const rgbB = bOk ? labToSrgb(B.L,B.a,B.b) : null;
-  // Keep the two L* tags readable when they're close: push them side-by-side.
-  const yA = aOk ? computeLMarkerY(A.L) : NaN;
-  const yB = bOk ? computeLMarkerY(B.L) : NaN;
-  const lOverlap = (aOk && bOk && Number.isFinite(yA) && Number.isFinite(yB) && Math.abs(yA - yB) < 26);
-  const xA = lOverlap ? 26 : 50;
-  const xB = lOverlap ? 74 : 50;
-  setLMarker(lMarkerA, lValA, aOk ? A.L : NaN, rgbA, xA);
-  setLMarker(lMarkerB, lValB, bOk ? B.L : NaN, rgbB, xB);
+  const yA = setLMarker(lMarkerA, aOk ? A.L : NaN, rgbA);
+  const yB = setLMarker(lMarkerB, bOk ? B.L : NaN, rgbB);
+  positionLMarkers(yA, yB);
 
   drawAbGrid(aOk ? A : null, bOk ? B : null);
 }
