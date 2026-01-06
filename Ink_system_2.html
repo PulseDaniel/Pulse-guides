@@ -136,6 +136,93 @@
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
 
+  /* LAB 2D readout (a/b grid + L slider) */
+  .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
+  .lab3dWrap{ min-width:0; }
+  .labReadout{ background:#0d1016; border:1px solid #242938; border-radius:12px; padding:10px; }
+  .labReadoutTitle{ font-size:0.95rem; font-weight:800; letter-spacing:.2px; }
+  .labReadoutHdr{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .labReadoutBody{ display:grid; grid-template-columns: 1fr 54px; gap:10px; align-items:start; }
+  .abGridWrap{ position:relative; }
+  #abCanvas{
+    width:100%;
+    aspect-ratio: 1 / 1;
+    height:auto;
+    display:block;
+    border-radius:10px;
+    border:1px solid #242938;
+    background:#0f1219;
+  }
+  .abAxisLabel{
+    position:absolute;
+    font-size:12px;
+    color:#9aa4b2;
+    user-select:none;
+    pointer-events:none;
+  }
+  .abAxisLabelX{ right:8px; bottom:6px; }
+  .abAxisLabelY{ left:8px; top:6px; }
+
+  .lReadoutWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .lTrack{
+    position:relative;
+    width:34px;
+    height: min(320px, 60vw);
+    max-height: 320px;
+    min-height: 220px;
+    border-radius:12px;
+    border:1px solid #242938;
+    background: linear-gradient(to top, #ffffff, #000000);
+    overflow:hidden;
+  }
+  .lAxisLabel{ font-size:12px; color:#9aa4b2; user-select:none; }
+  .lMarker{
+    position:absolute;
+    left:50%;
+    transform:translate(-50%,-50%);
+    display:flex;
+    align-items:center;
+    gap:6px;
+    pointer-events:none;
+    color:#e5e7eb;
+  }
+  .lMarker::before{
+    content:'';
+    display:block;
+    width:22px;
+    height:4px;
+    border-radius:4px;
+    background: currentColor;
+    box-shadow:0 0 0 1px rgba(0,0,0,.55);
+  }
+  .lMarkerTag,
+  .lMarkerVal{
+    font-size:11px;
+    padding:2px 6px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    color: inherit;
+    line-height:1.2;
+    white-space:nowrap;
+  }
+  .labReadoutNums{ margin-top:10px; display:grid; gap:6px; }
+  .labNumRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .labTag{
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    white-space:nowrap;
+    color:#e5e7eb;
+  }
+  .labNumsText{ font-size:12px; color:#e5e7eb; }
+  @media (max-width: 980px){
+    .labVizRow{ grid-template-columns: 1fr; }
+    .lTrack{ height:260px; max-height:260px; }
+  }
+
   /* Libraries */
   .lib-list{ margin-top:8px; border-top:1px dashed #2a2f3a; padding-top:8px; }
   .lib-item{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.9rem; }
@@ -429,18 +516,6 @@
   background: transparent;
 }
 
-/* Mixing guide: totals row under formula */
-.mix-totals td{
-  border-bottom:none;
-  border-top:1px solid #242938;
-  padding-top:12px;
-  font-weight:800;
-}
-.mix-totals td:first-child{
-  color:#9aa4b2;
-  letter-spacing:.06em;
-}
-
   /* Mixing guide top inputs: allow 4-up on desktop */
   .mix-top-grid{
     display:grid;
@@ -681,7 +756,46 @@
           <button class="btn" id="resetView">Reset view</button>
           <span style="font-size:.8rem; opacity:.8;">Drag to rotate</span>
         </div>
-        <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
+
+        <div class="labVizRow">
+          <div class="lab3dWrap">
+            <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
+          </div>
+
+          <aside class="labReadout" aria-label="2D LAB readout">
+            <div class="labReadoutHdr">
+              <div class="labReadoutTitle">LAB readout</div>
+              <div class="mini">a*/b* plane + L*</div>
+            </div>
+
+            <div class="labReadoutBody">
+              <div class="abGridWrap">
+                <canvas id="abCanvas" width="280" height="280"></canvas>
+                <div class="abAxisLabel abAxisLabelY">b*</div>
+                <div class="abAxisLabel abAxisLabelX">a*</div>
+              </div>
+
+              <div class="lReadoutWrap">
+                <div class="lTrack" id="lTrack">
+                  <div class="lMarker" id="lMarkerA"><span class="lMarkerTag">Std</span><span class="lMarkerVal" id="lValA">—</span></div>
+                  <div class="lMarker" id="lMarkerB"><span class="lMarkerTag">Batch</span><span class="lMarkerVal" id="lValB">—</span></div>
+                </div>
+                <div class="lAxisLabel">L*</div>
+              </div>
+            </div>
+
+            <div class="labReadoutNums">
+              <div class="labNumRow">
+                <span class="labTag" id="labTagA">Std</span>
+                <span class="mono labNumsText" id="labNumsA">L —  a —  b —</span>
+              </div>
+              <div class="labNumRow">
+                <span class="labTag" id="labTagB">Batch</span>
+                <span class="mono labNumsText" id="labNumsB">L —  a —  b —</span>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   </section>
@@ -784,13 +898,6 @@
             <tr><th>Ink</th><th style="text-align:right;">%</th><th style="text-align:right;">g</th></tr>
           </thead>
           <tbody id="mixFormulaTbody"></tbody>
-          <tfoot>
-            <tr class="mix-totals">
-              <td class="mono" style="text-align:left;">TOTAL</td>
-              <td id="mixTotalPct" style="text-align:right;">—</td>
-              <td id="mixTotalGrams" style="text-align:right;">—</td>
-            </tr>
-          </tfoot>
         </table>
 </div>
     </div>
@@ -2107,14 +2214,6 @@ function renderInkCurvesTable(){
   const tbody = document.getElementById('inkCurvesTbody');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const pctEl0 = document.getElementById('mixTotalPct');
-  const gEl0 = document.getElementById('mixTotalGrams');
-  if (pctEl0) pctEl0.textContent = '—';
-  if (gEl0) gEl0.textContent = '—';
-
-  if (pctEl0) pctEl0.textContent = '—';
-  if (gEl0) gEl0.textContent = '—';
-
 
   INK_CURVES.forEach((rec, idx)=>{
     const tr = document.createElement('tr');
@@ -2394,6 +2493,140 @@ document.addEventListener('input',(e)=>{
 // 3D LAB sphere with coloured panes
 const canvas=$('#labCanvas');
 const ctx=canvas.getContext('2d');
+
+// 2D readout widgets (a*/b* plane + L* slider)
+const abCanvas = document.getElementById('abCanvas');
+const abCtx = abCanvas ? abCanvas.getContext('2d') : null;
+const lTrack = document.getElementById('lTrack');
+const lMarkerA = document.getElementById('lMarkerA');
+const lMarkerB = document.getElementById('lMarkerB');
+const lValA = document.getElementById('lValA');
+const lValB = document.getElementById('lValB');
+const labNumsA = document.getElementById('labNumsA');
+const labNumsB = document.getElementById('labNumsB');
+const labTagA = document.getElementById('labTagA');
+const labTagB = document.getElementById('labTagB');
+
+function formatLabLine(L,a,b){
+  if (![L,a,b].every(Number.isFinite)) return 'L —  a —  b —';
+  return `L ${L.toFixed(2)}  a ${a.toFixed(2)}  b ${b.toFixed(2)}`;
+}
+function setLMarker(marker, valEl, L, rgb){
+  if (!lTrack || !marker || !valEl) return;
+  if (!Number.isFinite(L)){
+    marker.style.display = 'none';
+    return;
+  }
+  marker.style.display = 'flex';
+  const pad = 8;
+  const h = lTrack.clientHeight || 260;
+  const y = pad + (1 - clamp(L/100, 0, 1)) * Math.max(1, (h - pad*2));
+  marker.style.top = `${y}px`;
+  marker.style.color = rgb ? `rgb(${rgb.r},${rgb.g},${rgb.b})` : '#e5e7eb';
+  valEl.textContent = L.toFixed(2);
+}
+function ensureAbCanvasPixels(){
+  if (!abCanvas || !abCtx) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.max(1, abCanvas.clientWidth || 280);
+  const cssH = Math.max(1, abCanvas.clientHeight || cssW);
+  const w = Math.round(cssW * dpr);
+  const h = Math.round(cssH * dpr);
+  if (abCanvas.width !== w || abCanvas.height !== h){
+    abCanvas.width = w;
+    abCanvas.height = h;
+  }
+  // draw in CSS pixels
+  abCtx.setTransform(dpr,0,0,dpr,0,0);
+  return { cssW, cssH };
+}
+function drawAbGrid(A, B){
+  if (!abCanvas || !abCtx) return;
+  const dims = ensureAbCanvasPixels();
+  if (!dims) return;
+  const { cssW:w, cssH:h } = dims;
+
+  abCtx.clearRect(0,0,w,h);
+  abCtx.fillStyle = '#0f1219';
+  abCtx.fillRect(0,0,w,h);
+
+  // Border glow
+  abCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+  abCtx.lineWidth = 1;
+  abCtx.strokeRect(0.5,0.5,w-1,h-1);
+
+  const range = 128;
+  const toX = (a)=> ( (a + range) / (2*range) ) * w;
+  const toY = (b)=> ( (range - b) / (2*range) ) * h;
+
+  // Grid lines every 32
+  abCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  abCtx.lineWidth = 1;
+  for (let v=-128; v<=128; v+=32){
+    const x = toX(v);
+    abCtx.beginPath(); abCtx.moveTo(x,0); abCtx.lineTo(x,h); abCtx.stroke();
+
+    const y = toY(v);
+    abCtx.beginPath(); abCtx.moveTo(0,y); abCtx.lineTo(w,y); abCtx.stroke();
+  }
+
+  // Axes
+  abCtx.strokeStyle = 'rgba(255,255,255,0.35)';
+  abCtx.lineWidth = 1.5;
+  const x0 = toX(0);
+  const y0 = toY(0);
+  abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
+  abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
+
+  function drawPt(pt, label){
+    if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return;
+    const rgb = labToSrgb(pt.L, pt.a, pt.b);
+    const x = toX(pt.a), y = toY(pt.b);
+    abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+    abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
+    abCtx.lineWidth = 2;
+    abCtx.beginPath();
+    abCtx.arc(x,y,6,0,Math.PI*2);
+    abCtx.fill();
+    abCtx.stroke();
+
+    abCtx.fillStyle = '#e5e7eb';
+    abCtx.font = '12px ui-sans-serif, system-ui';
+    abCtx.fillText(label, x+9, y-9);
+  }
+  drawPt(A, 'Std');
+  drawPt(B, 'Batch');
+}
+function updateLabReadout(){
+  const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
+  const B = { L: parseFloat(document.getElementById('BL')?.value), a: parseFloat(document.getElementById('Ba')?.value), b: parseFloat(document.getElementById('Bb')?.value) };
+
+  const aOk = [A.L,A.a,A.b].every(Number.isFinite);
+  const bOk = [B.L,B.a,B.b].every(Number.isFinite);
+
+  if (labNumsA) labNumsA.textContent = formatLabLine(A.L,A.a,A.b);
+  if (labNumsB) labNumsB.textContent = formatLabLine(B.L,B.a,B.b);
+
+  // Colour the tags to match swatches (so the readout legend stays obvious)
+  if (labTagA && aOk){
+    const rgb = labToSrgb(A.L,A.a,A.b);
+    labTagA.style.borderColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`;
+    labTagA.style.boxShadow = `0 0 0 1px rgba(${rgb.r},${rgb.g},${rgb.b},0.25) inset`;
+  }
+  if (labTagB && bOk){
+    const rgb = labToSrgb(B.L,B.a,B.b);
+    labTagB.style.borderColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`;
+    labTagB.style.boxShadow = `0 0 0 1px rgba(${rgb.r},${rgb.g},${rgb.b},0.25) inset`;
+  }
+
+  const rgbA = aOk ? labToSrgb(A.L,A.a,A.b) : null;
+  const rgbB = bOk ? labToSrgb(B.L,B.a,B.b) : null;
+  setLMarker(lMarkerA, lValA, aOk ? A.L : NaN, rgbA);
+  setLMarker(lMarkerB, lValB, bOk ? B.L : NaN, rgbB);
+
+  drawAbGrid(aOk ? A : null, bOk ? B : null);
+}
+window.addEventListener('resize', ()=>{ updateLabReadout(); }, { passive:true });
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
 let dragging=false,lastX=0,lastY=0;
@@ -2647,6 +2880,7 @@ function requestLabDraw(){
   rafId = requestAnimationFrame(()=>{
     rafId=null;
     drawLabScene();
+    updateLabReadout();
   });
 }
 
@@ -3289,14 +3523,6 @@ function mixRenderFormula(){
     `;
     frag.appendChild(tr);
   });
-
-    // Totals row
-  const totalPct = rec.ingredients.reduce((s,r)=> s + (Number.isFinite(r.pct)? r.pct : 0), 0);
-  const totalGrams = rec.ingredients.reduce((s,r)=> s + ((Number.isFinite(r.pct)? r.pct : 0) * q * 10), 0); // grams
-  const pctEl = document.getElementById('mixTotalPct');
-  const gEl = document.getElementById('mixTotalGrams');
-  if (pctEl) pctEl.textContent = Number.isFinite(totalPct) ? totalPct.toFixed(3).replace(/\.0+$/,'').replace(/\.$/,'') : '—';
-  if (gEl) gEl.textContent = Number.isFinite(totalGrams) ? (Math.round(totalGrams*10)/10).toFixed(1) : '—';
 
   tbody.appendChild(frag);
   mixSetStatus('', 'ok');
