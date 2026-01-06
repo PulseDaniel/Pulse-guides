@@ -1902,13 +1902,9 @@ function renderLibraryEditor(){
   btnScan.disabled = lib.readonly;
   btnAdd.disabled = lib.readonly;
 
-  if (!editable){
-    hint.textContent = 'Built-in Pantone is read-only. Select a custom library to edit.';
-    wrap.innerHTML = '';
-    return;
-  }
-
-  hint.textContent = 'Edit values directly. Changes apply app-wide.';
+  hint.textContent = editable
+    ? 'Edit values directly. Changes apply app-wide.'
+    : 'Select a custom library to edit.';
 
   const rows = lib.colours || [];
   const head = `
@@ -1934,18 +1930,19 @@ function renderLibraryEditor(){
       <tr data-lib-row="${i}">
         <td><div class="lib-swatch" style="background:${css};"></div></td>
         <td>
-          <input class="lib-row-input" data-lib-field="name" data-lib-idx="${i}" value="${escapeHtml(c.name||c.Name||'')}">
+          <input class="lib-row-input" ${editable ? "" : "disabled"} data-lib-field="name" data-lib-idx="${i}" value="${escapeHtml(c.name||c.Name||'')}">
         </td>
-        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="L" data-lib-idx="${i}" value="${Number.isFinite(L)?L.toFixed(2):'0.00'}"></td>
-        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="a" data-lib-idx="${i}" value="${Number.isFinite(a)?a.toFixed(2):'0.00'}"></td>
-        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="b" data-lib-idx="${i}" value="${Number.isFinite(b)?b.toFixed(2):'0.00'}"></td>
-        <td class="lib-row-actions"><button class="btn" data-lib-del-col="${i}">Remove</button></td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="L" data-lib-idx="${i}" value="${Number.isFinite(L)?L.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="a" data-lib-idx="${i}" value="${Number.isFinite(a)?a.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="b" data-lib-idx="${i}" value="${Number.isFinite(b)?b.toFixed(2):'0.00'}"></td>
+        <td class="lib-row-actions"><button class="btn" ${editable ? "" : "disabled"} data-lib-del-col="${i}">Remove</button></td>
       </tr>
     `;
   }).join('');
 
   wrap.innerHTML = head + body + '</tbody></table>';
 
+  if (editable){
   // Wire edits
   wrap.querySelectorAll('[data-lib-field]').forEach(inp=>{
     inp.addEventListener('input', ()=>{
@@ -1982,6 +1979,7 @@ function renderLibraryEditor(){
       renderLibraryEditor();
     });
   });
+  }
 }
 
 
