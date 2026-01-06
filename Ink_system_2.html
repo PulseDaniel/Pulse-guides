@@ -166,47 +166,84 @@
   .lReadoutWrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
   .lTrack{
     position:relative;
-    width:34px;
+    width:54px;
     height: min(320px, 60vw);
     max-height: 320px;
     min-height: 220px;
     border-radius:12px;
     border:1px solid #242938;
-    background: linear-gradient(to top, #ffffff, #000000);
-    overflow:hidden;
+    background: transparent;
+    overflow: visible;
   }
+  .lTrack::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    background: linear-gradient(to top, #ffffff, #000000);
+    z-index:0;
+  }
+  .lTrack > *{ position:relative; z-index:2; }
   .lAxisLabel{ font-size:12px; color:#9aa4b2; user-select:none; }
   .lMarker{
-    position:absolute;
-    left:50%;
-    transform:translate(-50%,-50%);
-    display:flex;
-    align-items:center;
-    gap:6px;
-    pointer-events:none;
-    color:#e5e7eb;
-  }
-  .lMarker::before{
-    content:'';
-    display:block;
-    width:22px;
-    height:4px;
-    border-radius:4px;
-    background: currentColor;
-    box-shadow:0 0 0 1px rgba(0,0,0,.55);
-  }
-  .lMarkerTag,
-  .lMarkerVal{
-    font-size:11px;
-    padding:2px 6px;
-    border-radius:999px;
-    border:1px solid rgba(255,255,255,.12);
-    background: rgba(255,255,255,.06);
-    color: inherit;
-    line-height:1.2;
-    white-space:nowrap;
-  }
-  .labReadoutNums{ margin-top:10px; display:grid; gap:6px; }
+  position:absolute;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:54px;
+  height:0;
+  pointer-events:none;
+  color:#e5e7eb;
+}
+.lMarker::before{
+  content:'';
+  position:absolute;
+  left:50%;
+  top:-2px;
+  transform:translateX(-50%);
+  width:26px;
+  height:4px;
+  border-radius:4px;
+  background: currentColor;
+  box-shadow:0 0 0 1px rgba(0,0,0,.55);
+}
+.lMarkerTag{
+  position:absolute;
+  left:50%;
+  top:-24px;
+  transform:translateX(-50%);
+  font-size:11px;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: inherit;
+  line-height:1.2;
+  white-space:nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.65);
+}
+.lMarkerVal{
+  position:absolute;
+  left:50%;
+  top:8px;
+  transform:translateX(-50%);
+  width:52px;
+  text-align:center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: inherit;
+  line-height:1.2;
+  white-space:nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.65);
+}
+.labReadoutNums{ margin-top:10px; display:grid; gap:6px; }
   .labNumRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .labTag{
     font-size:11px;
@@ -2553,6 +2590,48 @@ function ensureAbCanvasPixels(){
   abCtx.setTransform(dpr,0,0,dpr,0,0);
   return { cssW, cssH };
 }
+let _abFieldCacheKey = null;
+const _abFieldCanvas = document.createElement('canvas');
+const _abFieldCtx = _abFieldCanvas.getContext('2d', { willReadFrequently: true });
+
+function drawAbFieldBackground(L, w, h){
+  if (!abCtx) return;
+  const planeL = clamp(Number.isFinite(L) ? L : 50, 0, 100);
+  // Render to a square offscreen canvas at a moderate fixed resolution for speed.
+  const res = 260; // good balance of quality/perf; scaled to the visible grid
+  const key = `${res}@${Math.round(planeL*2)/2}`;
+  if (_abFieldCacheKey !== key){
+    _abFieldCacheKey = key;
+    _abFieldCanvas.width = res;
+    _abFieldCanvas.height = res;
+    const img = _abFieldCtx.createImageData(res, res);
+    const data = img.data;
+    const range = 128;
+    for (let y=0; y<res; y++){
+      const b = range - (y/(res-1)) * (2*range);
+      for (let x=0; x<res; x++){
+        const a = -range + (x/(res-1)) * (2*range);
+        const rgb = labToSrgb(planeL, a, b);
+        const i = (y*res + x) * 4;
+        data[i+0] = rgb.r;
+        data[i+1] = rgb.g;
+        data[i+2] = rgb.b;
+        data[i+3] = 255;
+      }
+    }
+    _abFieldCtx.putImageData(img, 0, 0);
+  }
+
+  abCtx.save();
+  // Subtle darken to keep grid lines/labels readable
+  abCtx.globalAlpha = 0.92;
+  abCtx.drawImage(_abFieldCanvas, 0, 0, w, h);
+  abCtx.globalAlpha = 1;
+  abCtx.fillStyle = 'rgba(0,0,0,0.18)';
+  abCtx.fillRect(0,0,w,h);
+  abCtx.restore();
+}
+
 function drawAbGrid(A, B){
   if (!abCanvas || !abCtx) return;
   const dims = ensureAbCanvasPixels();
@@ -2560,10 +2639,18 @@ function drawAbGrid(A, B){
   const { cssW:w, cssH:h } = dims;
 
   abCtx.clearRect(0,0,w,h);
-  abCtx.fillStyle = '#0f1219';
-  abCtx.fillRect(0,0,w,h);
 
-  // Border glow
+  // Colour field in a*/b* at a representative L*
+  const Lplane = (()=>{
+    const vals=[];
+    if (A && Number.isFinite(A.L)) vals.push(A.L);
+    if (B && Number.isFinite(B.L)) vals.push(B.L);
+    if (!vals.length) return 50;
+    return vals.reduce((s,v)=>s+v,0)/vals.length;
+  })();
+  drawAbFieldBackground(Lplane, w, h);
+
+// Border glow
   abCtx.strokeStyle = 'rgba(255,255,255,0.10)';
   abCtx.lineWidth = 1;
   abCtx.strokeRect(0.5,0.5,w-1,h-1);
