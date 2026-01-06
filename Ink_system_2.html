@@ -1802,7 +1802,7 @@ function renderLibraryEditor(){
   const optionsHtml = userLibraries.map(l=>`<option value="${escapeHtml(l.id)}"${l.id===lib.id?' selected':''}>${escapeHtml(l.name)}</option>`).join('');
 
   editor.innerHTML = `
-    <div class="flex" style="gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <div class="flex" style="width:725px; gap:10px; align-items:flex-end; flex-wrap:wrap;">
       <div style="min-width:220px; flex:1;">
         <label for="libEditSelect">Library</label>
         <select id="libEditSelect">${optionsHtml}</select>
