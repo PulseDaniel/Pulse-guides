@@ -528,6 +528,24 @@
   #tab-mix .mix-top-grid input{
     min-width: 0;
   }
+
+
+
+
+  /* Readout layout tweaks (spacing + size) */
+  .labVizRow{ grid-template-columns: 1fr 360px; align-items:start; }
+  .labReadout{ padding:8px; }
+  .labReadoutBody{ grid-template-columns: 1fr 44px; align-items:stretch; }
+
+  .lReadoutWrap{ height:100%; gap:4px; justify-content:stretch; }
+  .lTrack{ flex: 1 1 auto; height:auto; max-height:none; min-height:0; }
+
+  .labReadoutNums{ margin-top:8px; }
+
+  @media (max-width: 980px){
+    .lTrack{ flex: 1 1 auto; height:auto; }
+  }
+
 </style>
 </head>
 <body>
@@ -762,13 +780,8 @@
             <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
           </div>
 
-          <aside class="labReadout" aria-label="2D LAB readout">
-            <div class="labReadoutHdr">
-              <div class="labReadoutTitle">LAB readout</div>
-              <div class="mini">a*/b* plane + L*</div>
-            </div>
-
-            <div class="labReadoutBody">
+          <aside class="labReadout" aria-label="Readout">
+<div class="labReadoutBody">
               <div class="abGridWrap">
                 <canvas id="abCanvas" width="280" height="280"></canvas>
                 <div class="abAxisLabel abAxisLabelY">b*</div>
