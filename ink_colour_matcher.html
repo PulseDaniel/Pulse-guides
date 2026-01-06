@@ -136,11 +136,243 @@
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
 
+  /* LAB 2D readout (a/b grid + L slider) */
+  .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
+  .lab3dWrap{ min-width:0; }
+  @media (max-width: 980px){
+    .labVizRow{ grid-template-columns: 1fr; }
+    .labReadout{ width:100%; }
+  }
+  .labReadout{ background:#0d1016; border:1px solid #242938; border-radius:12px; padding:10px; }
+  .labReadoutTitle{ font-size:0.95rem; font-weight:800; letter-spacing:.2px; }
+  .labReadoutHdr{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:10px; }
+  .labReadoutBody{ display:grid; grid-template-columns: 1fr 40px; gap:10px; align-items:stretch; }
+  .abGridWrap{ position:relative; }
+  #abCanvas{
+    width:100%;
+    aspect-ratio: 1 / 1;
+    height:auto;
+    display:block;
+    border-radius:10px;
+    border:1px solid #242938;
+    background:#0f1219;
+  }
+  .abAxisLabel{
+    position:absolute;
+    font-size:12px;
+    color:#9aa4b2;
+    user-select:none;
+    pointer-events:none;
+  }
+  .abAxisLabelX{ right:8px; bottom:6px; }
+  .abAxisLabelY{ left:8px; top:6px; }
+
+  .lReadoutWrap{ display:grid; grid-template-rows: 1fr auto; align-items:stretch; gap:6px; height:100%; }
+  .lTrack{
+    position:relative;
+    width:40px;
+    height:100%;
+    min-height:0;
+    max-height:none;
+    border-radius:12px;
+    border:1px solid #242938;
+    background: transparent;
+    overflow: visible;
+  }
+  .lTrack::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:12px;
+    background: linear-gradient(to bottom, #ffffff, #000000);
+    z-index:0;
+  }
+  .lTrack > *{ position:relative; z-index:2; }
+  .lAxisLabel{ font-size:11px; opacity:.85; text-align:center; }
+  .lMarker{
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  border:2px solid rgba(0,0,0,.55);
+  background:#e5e7eb;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
+  pointer-events:none;
+}
+.lDot{ }
+.lMarkerTag{
+  position:absolute;
+  left:50%;
+  top:-24px;
+  transform:translateX(-50%);
+  font-size:11px;
+  padding:2px 7px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: inherit;
+  line-height:1.2;
+  white-space:nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.65);
+}
+.lMarkerVal{
+  position:absolute;
+  left:50%;
+  top:8px;
+  transform:translateX(-50%);
+  width:52px;
+  text-align:center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:11px;
+  padding:2px 6px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: inherit;
+  line-height:1.2;
+  white-space:nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,.65);
+}
+.labReadoutNums{ margin-top:10px; display:grid; gap:6px; }
+  .labNumRow{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .labTag{
+    font-size:11px;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    white-space:nowrap;
+    color:#e5e7eb;
+  }
+  .labNumsText{ font-size:12px; color:#e5e7eb; }
+  @media (max-width: 980px){
+    .labVizRow{ grid-template-columns: 1fr; }
+    .lTrack{ height:260px; max-height:260px; }
+  }
+
   /* Libraries */
-  .lib-list{ margin-top:8px; border-top:1px dashed #2a2f3a; padding-top:8px; }
-  .lib-item{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.9rem; }
-  .lib-item-name{ font-weight:600; }
-  .lib-badge{ font-size:.75rem; color:#9aa4b2; }
+
+  /* Libraries manager layout (Colour Sets tab) */
+  .lib-manager{
+    display:grid;
+    grid-template-columns: 1fr 220px;
+    gap:12px;
+    margin-top:12px;
+    align-items:stretch;
+  }
+  @media (max-width: 980px){
+    .lib-manager{ grid-template-columns: 1fr; }
+  }
+  .lib-sidebar{
+    border-left:1px solid #1f2430;
+    padding-left:12px;
+  }
+  @media (max-width: 980px){
+    .lib-sidebar{ border-left:none; padding-left:0; border-top:1px solid #1f2430; padding-top:12px; }
+  }
+  .lib-list{
+    margin-top:0;
+    border-top:none;
+    padding-top:0;
+  }
+  .lib-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:8px 8px;
+    border:1px solid #1f2430;
+    border-radius:12px;
+    margin-bottom:8px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .lib-item:hover{ border-color:#2a3142; background:#0f131b; }
+  .lib-item.selected{ border-color:#3b82f6; box-shadow:0 0 0 1px rgba(59,130,246,.25) inset; }
+  .lib-item .btn{ padding:6px 10px; }
+  .lib-item-left{ min-width:0; }
+  .lib-item-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+  .lib-badge{ font-size:.75rem; color:#9aa4b2; margin-top:2px; }
+
+  .lib-editor-pane{
+    border:1px solid #1f2430;
+    border-radius:16px;
+    padding:12px;
+    background:rgba(10,12,16,.35);
+    min-height:520px;
+    display:flex;
+    flex-direction:column;
+  }
+  .lib-editor-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .lib-editor-title{
+    font-size:1.05rem;
+    font-weight:800;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .lib-editor-actions{ display:flex; gap:8px; align-items:center; }
+  .btn.danger{ border-color:#7f1d1d; color:#fecaca; background:rgba(127,29,29,.15); }
+  .btn.danger:hover{ background:rgba(127,29,29,.22); }
+  .lib-colour-table-wrap{
+    margin-top:12px;
+    border:1px solid #1f2430;
+    border-radius:14px;
+    overflow:auto;
+    flex:1;
+    min-height:260px;
+  }
+  table.lib-colour-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.9rem;
+  }
+  table.lib-colour-table th, table.lib-colour-table td{
+    padding:10px 10px;
+    border-bottom:1px solid #1f2430;
+    vertical-align:middle;
+  }
+  table.lib-colour-table th{
+    position:sticky;
+    top:0;
+    background:#0b0e14;
+    z-index:2;
+    text-align:left;
+    font-weight:800;
+    color:#e5e7eb;
+  }
+  .lib-swatch{
+    width:22px; height:22px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 6px 14px rgba(0,0,0,.35);
+  }
+  .lib-cell-flex{ display:flex; align-items:center; gap:10px; }
+  .lib-row-input{
+    width:100%;
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid #1f2430;
+    background:#0b0e14;
+    color:#e5e7eb;
+    outline:none;
+  }
+  .lib-row-input:focus{ border-color:#3b82f6; box-shadow:0 0 0 1px rgba(59,130,246,.25) inset; }
+  .lib-row-num{ width:100px; font-variant-numeric:tabular-nums; }
+  .lib-row-actions{ text-align:right; white-space:nowrap; }
+
 
   .de-pass{ color:#86efac; font-weight:800; }
   .de-fail{ color:#fca5a5; font-weight:800; }
@@ -441,6 +673,24 @@
   #tab-mix .mix-top-grid input{
     min-width: 0;
   }
+
+
+
+
+  /* Readout layout tweaks (spacing + size) */
+  .labVizRow{ grid-template-columns: 1fr 360px; align-items:start; }
+  .labReadout{ padding:8px; }
+  .labReadoutBody{ grid-template-columns: 1fr 44px; align-items:stretch; }
+
+  .lReadoutWrap{ height:100%; gap:4px; justify-content:stretch; }
+  .lTrack{ flex: 1 1 auto; height:auto; max-height:none; min-height:0; }
+
+  .labReadoutNums{ margin-top:8px; }
+
+  @media (max-width: 980px){
+    .lTrack{ flex: 1 1 auto; height:auto; }
+  }
+
 </style>
 </head>
 <body>
@@ -483,7 +733,7 @@
         <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
           <div>
             <h1>Ink Colour Matcher</h1>
-            <div class="pill">Active library: <span id="activeLibLabel">Pantone (base)</span></div>
+            <div class="pill">Active library: <span id="activeLibLabel">Pantone</span></div>
           </div>
           <div style="min-width:200px;">
             <label for="librarySelect">Colour library</label>
@@ -565,7 +815,7 @@
       <div class="flex" style="justify-content:space-between;">
         <div>
           <h1>Compare Colours (ΔE2000)</h1>
-          <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
+          <div class="pill">Using library: <span id="cmpLibLabel">Pantone</span></div>
         </div>
       </div>
 
@@ -624,9 +874,9 @@
           </div>
           <div class="lab-with-swatch" style="margin-top:12px;">
             <div class="row lab-row" style="margin-top:0;">
-            <div><label for="BL" class="nowrap">Batch: L*</label><input id="BL" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
-            <div><label for="Ba" class="nowrap">Batch: a*</label><input id="Ba" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
-            <div><label for="Bb" class="nowrap">Batch: b*</label><input id="Bb" type="number" step="0.01" readonly class="batch-readonly lab-input"></div>
+            <div><label for="BL" class="nowrap">Batch: L*</label><input id="BL" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Ba" class="nowrap">Batch: a*</label><input id="Ba" type="number" step="0.01" class="lab-input"></div>
+            <div><label for="Bb" class="nowrap">Batch: b*</label><input id="Bb" type="number" step="0.01" class="lab-input"></div>
           </div>
             <div class="swatch" id="swatchB"></div>
           </div>
@@ -669,7 +919,41 @@
           <button class="btn" id="resetView">Reset view</button>
           <span style="font-size:.8rem; opacity:.8;">Drag to rotate</span>
         </div>
-        <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
+
+        <div class="labVizRow">
+          <div class="lab3dWrap">
+            <canvas id="labCanvas" width="1100" height="520" style="display:block; width:100%; height:auto;"></canvas>
+          </div>
+
+          <aside class="labReadout" aria-label="Readout">
+<div class="labReadoutBody">
+              <div class="abGridWrap">
+                <canvas id="abCanvas" width="280" height="280"></canvas>
+                <div class="abAxisLabel abAxisLabelY">b*</div>
+                <div class="abAxisLabel abAxisLabelX">a*</div>
+              </div>
+
+              <div class="lReadoutWrap">
+                <div class="lTrack" id="lTrack">
+                  <div class="lMarker lDot" id="lMarkerA" title="Std"></div>
+                  <div class="lMarker lDot" id="lMarkerB" title="Batch"></div>
+                </div>
+                <div class="lAxisLabel">L*</div>
+              </div>
+            </div>
+
+            <div class="labReadoutNums">
+              <div class="labNumRow">
+                <span class="labTag" id="labTagA">Std</span>
+                <span class="mono labNumsText" id="labNumsA">L —  a —  b —</span>
+              </div>
+              <div class="labNumRow">
+                <span class="labTag" id="labTagB">Batch</span>
+                <span class="mono labNumsText" id="labNumsB">L —  a —  b —</span>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   </section>
@@ -784,7 +1068,7 @@
 <div class="card" style="max-width:1200px; margin:0 auto;">
       <h1>Colour Sets (Libraries)</h1>
       <p class="muted">
-        Upload your own colour sets (in addition to the built-in Pantone set). Each set becomes a selectable library
+        Upload your own colour sets. Each set becomes a selectable library
         in the <strong>Match &amp; Predict</strong> and <strong>Compare Colours</strong> tabs.
       </p>
       <p class="muted" style="margin-top:6px;">
@@ -809,10 +1093,59 @@
         <span class="mini">Files stay local to this browser (saved in localStorage).</span>
       </div>
 
-      <div class="lib-list" id="libList">
-        <!-- Populated in JS -->
+      <div class="lib-manager">
+        <div class="lib-editor-pane" id="libEditorPane">
+          <div class="lib-editor-header">
+            <div class="lib-editor-title" id="libEditorTitle">Select a library</div>
+            <div class="lib-editor-actions">
+              <button class="btn" id="libExportBtn" disabled>Export CSV</button>
+              <button class="btn danger" id="libDeleteBtn" disabled>Delete</button>
+            </div>
+          </div>
+
+          <div class="row2" style="margin-top:12px;">
+            <div>
+              <label for="libColourName">Name</label>
+              <input id="libColourName" type="text" placeholder="e.g. Warm Red">
+            </div>
+            <div class="flex" style="align-items:flex-end; justify-content:flex-end; gap:8px;">
+              <button class="btn" id="libScanBtn" disabled>Scan</button>
+              <button class="btn" id="libAddColourBtn" disabled>Add</button>
+            </div>
+          </div>
+
+          <div class="row3" style="margin-top:10px;">
+            <div>
+              <label for="libColourL">L*</label>
+              <input id="libColourL" type="number" step="0.01" placeholder="50.00">
+            </div>
+            <div>
+              <label for="libColourA">a*</label>
+              <input id="libColourA" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div>
+              <label for="libColourB">b*</label>
+              <input id="libColourB" type="number" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="mini" id="libEditorHint" style="margin-top:10px;">
+            Click a library on the right to view/edit.
+          </div>
+
+          <div class="lib-colour-table-wrap" id="libColourTableWrap">
+            <!-- Populated in JS -->
+          </div>
+        </div>
+
+        <div class="lib-sidebar">
+          <div class="lib-list" id="libList">
+            <!-- Populated in JS -->
+          </div>
+        </div>
       </div>
-    </div>
+
+</div>
 
     <!-- Spectro capture lives ONLY on this tab -->
     <div class="card" style="max-width:1200px; margin:16px auto 0;">
@@ -1069,6 +1402,7 @@
 (function(){
 'use strict';
 function $(sel){ return document.querySelector(sel); }
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 
@@ -1336,6 +1670,7 @@ const LIB_BASE_ID = 'base';
 const LIB_ALL_ID = 'all';
 let userLibraries = []; // [{id,name,colours:[]}]
 let activeLibraryId = LIB_BASE_ID;
+let settingsLibraryId = LIB_BASE_ID;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -1428,7 +1763,7 @@ function loadLibraries(){
 }
 function libraryOptions(){
   const opts = [
-    {id: LIB_BASE_ID, label: 'Pantone (base)'}
+    {id: LIB_BASE_ID, label: 'Pantone'}
   ];
   userLibraries.forEach(l => opts.push({id: l.id, label: l.name}));
   if (userLibraries.length) opts.push({id: LIB_ALL_ID, label: 'All libraries (combined)'});
@@ -1451,7 +1786,7 @@ function refreshLibrarySelects(){
   };
   build(sel1);
   build(sel2);
-  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone (base)';
+  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone';
   $('#activeLibLabel').textContent = activeLabel;
   $('#cmpLibLabel').textContent = activeLabel;
 }
@@ -1475,32 +1810,178 @@ function refreshActiveColours(){
 }
 function renderLibraryList(){
   const wrap = $('#libList');
-  if (!userLibraries.length){
-    wrap.innerHTML = '<div class="muted">No custom libraries yet. Add one above.</div>';
-    return;
-  }
-  let html = '<h3 style="margin-top:8px;">Your libraries</h3>';
-  userLibraries.forEach(l=>{
-    html += `<div class="lib-item">
-      <div>
-        <div class="lib-item-name">${l.name}</div>
-        <div class="lib-badge">${l.colours.length} colours</div>
+  const items = [
+    { id: LIB_BASE_ID, name: 'Pantone', colours: BASE_COLOURS, readonly:true }
+  ].concat(userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false})));
+
+  let out = '';
+  items.forEach(l=>{
+    const selected = (settingsLibraryId === l.id) ? ' selected' : '';
+    const badge = l.readonly ? 'Read-only' : `${l.colours.length} colours`;
+    out += `<div class="lib-item${selected}" data-lib-select="${l.id}">
+      <div class="lib-item-left">
+        <div class="lib-item-name">${escapeHtml(l.name)}</div>
+        <div class="lib-badge">${badge}</div>
       </div>
-      <button class="btn" data-del-lib="${l.id}">Delete</button>
+      ${l.readonly ? '' : `<button class="btn" data-del-lib="${l.id}" title="Delete library">Delete</button>`}
     </div>`;
   });
-  wrap.innerHTML = html;
+
+  wrap.innerHTML = out || '<div class="muted">No libraries found.</div>';
+
+  wrap.querySelectorAll('[data-lib-select]').forEach(el=>{
+    el.addEventListener('click', (ev)=>{
+      const btn = ev.target.closest('[data-del-lib]');
+      if (btn) return; // let delete handler run
+      const id = el.getAttribute('data-lib-select');
+      setSettingsLibrary(id);
+    });
+  });
+
   wrap.querySelectorAll('[data-del-lib]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
       const id = btn.getAttribute('data-del-lib');
+      const lib = userLibraries.find(l=>l.id === id);
+      if (!lib) return;
+      if (!confirm(`Delete library "${lib.name}"? This cannot be undone.`)) return;
       userLibraries = userLibraries.filter(l=>l.id !== id);
       saveLibraries();
+      if (activeLibraryId === id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
       refreshLibrarySelects();
-      refreshActiveColours();
+      if (settingsLibraryId === id) settingsLibraryId = LIB_BASE_ID;
       renderLibraryList();
+      renderLibraryEditor();
     });
   });
 }
+
+let _libSaveTimer = null;
+function scheduleSaveLibraries(){
+  if (_libSaveTimer) clearTimeout(_libSaveTimer);
+  _libSaveTimer = setTimeout(()=>{
+    saveLibraries();
+    refreshLibrarySelects();
+    if (activeLibraryId === settingsLibraryId || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  }, 200);
+}
+
+function setSettingsLibrary(id){
+  settingsLibraryId = id || LIB_BASE_ID;
+  renderLibraryList();
+  renderLibraryEditor();
+}
+
+function getSettingsLibrary(){
+  if (settingsLibraryId === LIB_BASE_ID){
+    return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
+  }
+  const lib = userLibraries.find(l=>l.id === settingsLibraryId);
+  if (!lib) return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
+  return { id:lib.id, name:lib.name, colours:lib.colours, readonly:false, ref:lib };
+}
+
+function renderLibraryEditor(){
+  const title = $('#libEditorTitle');
+  const hint = $('#libEditorHint');
+  const wrap = $('#libColourTableWrap');
+  const btnExport = $('#libExportBtn');
+  const btnDelete = $('#libDeleteBtn');
+  const btnScan = $('#libScanBtn');
+  const btnAdd = $('#libAddColourBtn');
+
+  if (!title || !wrap) return;
+
+  const lib = getSettingsLibrary();
+  title.textContent = lib.name;
+
+  const editable = !lib.readonly;
+  btnExport.disabled = lib.readonly;
+  btnDelete.disabled = lib.readonly;
+  btnScan.disabled = lib.readonly;
+  btnAdd.disabled = lib.readonly;
+
+  hint.textContent = editable
+    ? 'Edit values directly. Changes apply app-wide.'
+    : 'Select a custom library to edit.';
+
+  const rows = lib.colours || [];
+  const head = `
+    <table class="lib-colour-table">
+      <thead>
+        <tr>
+          <th style="width:44px;"></th>
+          <th>Name</th>
+          <th style="width:120px;">L*</th>
+          <th style="width:120px;">a*</th>
+          <th style="width:120px;">b*</th>
+          <th style="width:90px; text-align:right;"> </th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  const body = rows.map((c, i)=>{
+    const L = Number(c.L ?? 0);
+    const a = Number(c.a ?? 0);
+    const b = Number(c.b ?? 0);
+    const css = labToRgbCssForSwatch(L,a,b);
+    return `
+      <tr data-lib-row="${i}">
+        <td><div class="lib-swatch" style="background:${css};"></div></td>
+        <td>
+          <input class="lib-row-input" ${editable ? "" : "disabled"} data-lib-field="name" data-lib-idx="${i}" value="${escapeHtml(c.name||c.Name||'')}">
+        </td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="L" data-lib-idx="${i}" value="${Number.isFinite(L)?L.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="a" data-lib-idx="${i}" value="${Number.isFinite(a)?a.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" ${editable ? "" : "disabled"} step="0.01" data-lib-field="b" data-lib-idx="${i}" value="${Number.isFinite(b)?b.toFixed(2):'0.00'}"></td>
+        <td class="lib-row-actions"><button class="btn" ${editable ? "" : "disabled"} data-lib-del-col="${i}">Remove</button></td>
+      </tr>
+    `;
+  }).join('');
+
+  wrap.innerHTML = head + body + '</tbody></table>';
+
+  if (editable){
+  // Wire edits
+  wrap.querySelectorAll('[data-lib-field]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const idx = Number(inp.getAttribute('data-lib-idx'));
+      const field = inp.getAttribute('data-lib-field');
+      if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
+      const val = inp.value;
+      if (field === 'name'){
+        rows[idx].name = val;
+      }else{
+        const num = parseFloat(val);
+        rows[idx][field] = Number.isFinite(num) ? num : 0;
+      }
+      // update swatch immediately
+      const tr = inp.closest('tr');
+      if (tr){
+        const c = rows[idx];
+        const sw = tr.querySelector('.lib-swatch');
+        if (sw){
+          sw.style.background = labToRgbCssForSwatch(Number(c.L||0), Number(c.a||0), Number(c.b||0));
+        }
+      }
+      scheduleSaveLibraries();
+    });
+  });
+
+  wrap.querySelectorAll('[data-lib-del-col]').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      const idx = Number(btn.getAttribute('data-lib-del-col'));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
+      rows.splice(idx, 1);
+      scheduleSaveLibraries();
+      renderLibraryEditor();
+    });
+  });
+  }
+}
+
 
 // parse CSV into colours
 function parseCsvColours(text){
@@ -2338,35 +2819,238 @@ document.addEventListener('input',(e)=>{
   }
 });
 
-// Make Batch L*a*b* fields read-only (no typing, no arrows, no wheel changes)
-(function lockBatchInputs(){
-  const ids = ['BL','Ba','Bb'];
-  ids.forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.readOnly = true;
 
-    // Prevent scroll-wheel from changing value when focused/hovered
-    el.addEventListener('wheel', (e)=>{
-      e.preventDefault();
-    }, { passive:false });
-
-    // Extra safety: block key presses except Tab/Shift+Tab
-    el.addEventListener('keydown', (e)=>{
-      if (e.key === 'Tab' || e.key === 'Shift') return;
-      e.preventDefault();
-    });
-
-    // Block clicks on (hidden) stepper area in some browsers
-    el.addEventListener('mousedown', (e)=>{
-      if (e.offsetX > el.clientWidth - 24) e.preventDefault();
-    });
-  });
-})();
+// Batch inputs are editable in this build (manual entry supported).
+;
 
 // 3D LAB sphere with coloured panes
 const canvas=$('#labCanvas');
 const ctx=canvas.getContext('2d');
+
+// 2D readout widgets (a*/b* plane + L* slider)
+const LAB_AB_GRID_L = 50; // Fixed L* used for the a*/b* colour field (edit this value)
+const abCanvas = document.getElementById('abCanvas');
+const abCtx = abCanvas ? abCanvas.getContext('2d') : null;
+const lTrack = document.getElementById('lTrack');
+const lMarkerA = document.getElementById('lMarkerA');
+const lMarkerB = document.getElementById('lMarkerB');
+const labNumsA = document.getElementById('labNumsA');
+const labNumsB = document.getElementById('labNumsB');
+const labTagA = document.getElementById('labTagA');
+const labTagB = document.getElementById('labTagB');
+
+function formatLabLine(L,a,b){
+  if (![L,a,b].every(Number.isFinite)) return 'L —  a —  b —';
+  return `L ${L.toFixed(2)}  a ${a.toFixed(2)}  b ${b.toFixed(2)}`;
+}
+function setLMarker(marker, L, rgb){
+  if (!lTrack || !marker) return NaN;
+  if (!Number.isFinite(L)){
+    marker.style.display = 'none';
+    marker.dataset.y = '';
+    return NaN;
+  }
+  marker.style.display = 'block';
+  const pad = 6;
+  const h = lTrack.clientHeight || 260;
+  const y = pad + (1 - clamp(L/100, 0, 1)) * Math.max(1, (h - pad*2));
+  marker.style.top = `${y}px`;
+
+  const col = rgb ? `rgb(${rgb.r},${rgb.g},${rgb.b})` : '#e5e7eb';
+  marker.style.background = col;
+  marker.style.boxShadow = `0 0 0 2px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.28) inset`;
+
+  marker.dataset.y = String(y);
+  return y;
+}
+function positionLMarkers(yA, yB){
+  const aOk = Number.isFinite(yA);
+  const bOk = Number.isFinite(yB);
+  if (aOk && bOk && Math.abs(yA - yB) < 14){
+    lMarkerA.style.left = '38%';
+    lMarkerB.style.left = '62%';
+  } else {
+    if (lMarkerA) lMarkerA.style.left = '50%';
+    if (lMarkerB) lMarkerB.style.left = '50%';
+  }
+}
+function ensureAbCanvasPixels(){
+  if (!abCanvas || !abCtx) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = Math.max(1, abCanvas.clientWidth || 280);
+  const cssH = Math.max(1, abCanvas.clientHeight || cssW);
+  const w = Math.round(cssW * dpr);
+  const h = Math.round(cssH * dpr);
+  if (abCanvas.width !== w || abCanvas.height !== h){
+    abCanvas.width = w;
+    abCanvas.height = h;
+  }
+  // draw in CSS pixels
+  abCtx.setTransform(dpr,0,0,dpr,0,0);
+  return { cssW, cssH };
+}
+let _abFieldCacheKey = null;
+const _abFieldCanvas = document.createElement('canvas');
+const _abFieldCtx = _abFieldCanvas.getContext('2d', { willReadFrequently: true });
+
+function drawAbFieldBackground(L, w, h){
+  if (!abCtx) return;
+  const planeL = clamp(Number.isFinite(L) ? L : 50, 0, 100);
+  // Render to a square offscreen canvas at a moderate fixed resolution for speed.
+  const res = 260; // good balance of quality/perf; scaled to the visible grid
+  const key = `${res}@${Math.round(planeL*2)/2}`;
+  if (_abFieldCacheKey !== key){
+    _abFieldCacheKey = key;
+    _abFieldCanvas.width = res;
+    _abFieldCanvas.height = res;
+    const img = _abFieldCtx.createImageData(res, res);
+    const data = img.data;
+    const range = 128;
+    for (let y=0; y<res; y++){
+      const b = range - (y/(res-1)) * (2*range);
+      for (let x=0; x<res; x++){
+        const a = -range + (x/(res-1)) * (2*range);
+        const rgb = labToSrgb(planeL, a, b);
+        const i = (y*res + x) * 4;
+        data[i+0] = rgb.r;
+        data[i+1] = rgb.g;
+        data[i+2] = rgb.b;
+        data[i+3] = 255;
+      }
+    }
+    _abFieldCtx.putImageData(img, 0, 0);
+  }
+
+  abCtx.save();
+  // Subtle darken to keep grid lines/labels readable
+  abCtx.globalAlpha = 0.92;
+  abCtx.drawImage(_abFieldCanvas, 0, 0, w, h);
+  abCtx.globalAlpha = 1;
+  abCtx.fillStyle = 'rgba(0,0,0,0.18)';
+  abCtx.fillRect(0,0,w,h);
+  abCtx.restore();
+}
+
+function drawAbGrid(A, B){
+  if (!abCanvas || !abCtx) return;
+  const dims = ensureAbCanvasPixels();
+  if (!dims) return;
+  const { cssW:w, cssH:h } = dims;
+
+  abCtx.clearRect(0,0,w,h);
+
+  // Colour field in a*/b* at a fixed L*
+  const Lplane = LAB_AB_GRID_L;
+  drawAbFieldBackground(Lplane, w, h);
+
+// Border glow
+  abCtx.strokeStyle = 'rgba(255,255,255,0.10)';
+  abCtx.lineWidth = 1;
+  abCtx.strokeRect(0.5,0.5,w-1,h-1);
+
+  const range = 128;
+  const toX = (a)=> ( (a + range) / (2*range) ) * w;
+  const toY = (b)=> ( (range - b) / (2*range) ) * h;
+
+  // Grid lines every 32
+  abCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+  abCtx.lineWidth = 1;
+  for (let v=-128; v<=128; v+=32){
+    const x = toX(v);
+    abCtx.beginPath(); abCtx.moveTo(x,0); abCtx.lineTo(x,h); abCtx.stroke();
+
+    const y = toY(v);
+    abCtx.beginPath(); abCtx.moveTo(0,y); abCtx.lineTo(w,y); abCtx.stroke();
+  }
+
+  // Axes
+  abCtx.strokeStyle = 'rgba(255,255,255,0.35)';
+  abCtx.lineWidth = 1.5;
+  const x0 = toX(0);
+  const y0 = toY(0);
+  abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
+  abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
+
+  function drawPtDot(pt){
+    if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return null;
+    const rgb = labToSrgb(pt.L, pt.a, pt.b);
+    const x = toX(pt.a), y = toY(pt.b);
+
+    abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+    abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
+    abCtx.lineWidth = 2;
+    abCtx.beginPath();
+    abCtx.arc(x,y,6,0,Math.PI*2);
+    abCtx.fill();
+    abCtx.stroke();
+    return { x, y, rgb };
+  }
+
+  function drawPtLabel(text, x, y, side, dy){
+    const w = abCanvas.clientWidth || 280;
+    const h = abCanvas.clientHeight || 280;
+
+    let dx = side === 'left' ? -10 : 10;
+
+    // Avoid clipping at edges
+    if (side === 'left' && x < 38){ side = 'right'; dx = 10; }
+    if (side === 'right' && x > w - 38){ side = 'left'; dx = -10; }
+
+    abCtx.save();
+    abCtx.fillStyle = '#e5e7eb';
+    abCtx.font = '12px ui-sans-serif, system-ui';
+    abCtx.textBaseline = 'middle';
+    abCtx.textAlign = side === 'left' ? 'right' : 'left';
+    abCtx.shadowColor = 'rgba(0,0,0,.85)';
+    abCtx.shadowBlur = 6;
+    abCtx.shadowOffsetY = 1;
+    abCtx.fillText(text, x + dx, y + dy);
+    abCtx.restore();
+  }
+
+  const pA = drawPtDot(A);
+  const pB = drawPtDot(B);
+
+  let dyA = -12, dyB = -12;
+  if (pA && pB){
+    const d = Math.hypot(pA.x - pB.x, pA.y - pB.y);
+    if (d < 14){ dyA = -18; dyB = 10; }
+  }
+
+  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA);
+  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB);
+}
+function updateLabReadout(){
+  const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
+  const B = { L: parseFloat(document.getElementById('BL')?.value), a: parseFloat(document.getElementById('Ba')?.value), b: parseFloat(document.getElementById('Bb')?.value) };
+
+  const aOk = [A.L,A.a,A.b].every(Number.isFinite);
+  const bOk = [B.L,B.a,B.b].every(Number.isFinite);
+
+  if (labNumsA) labNumsA.textContent = formatLabLine(A.L,A.a,A.b);
+  if (labNumsB) labNumsB.textContent = formatLabLine(B.L,B.a,B.b);
+
+  // Colour the tags to match swatches (so the readout legend stays obvious)
+  if (labTagA && aOk){
+    const rgb = labToSrgb(A.L,A.a,A.b);
+    labTagA.style.borderColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`;
+    labTagA.style.boxShadow = `0 0 0 1px rgba(${rgb.r},${rgb.g},${rgb.b},0.25) inset`;
+  }
+  if (labTagB && bOk){
+    const rgb = labToSrgb(B.L,B.a,B.b);
+    labTagB.style.borderColor = `rgba(${rgb.r},${rgb.g},${rgb.b},0.55)`;
+    labTagB.style.boxShadow = `0 0 0 1px rgba(${rgb.r},${rgb.g},${rgb.b},0.25) inset`;
+  }
+
+  const rgbA = aOk ? labToSrgb(A.L,A.a,A.b) : null;
+  const rgbB = bOk ? labToSrgb(B.L,B.a,B.b) : null;
+  const yA = setLMarker(lMarkerA, aOk ? A.L : NaN, rgbA);
+  const yB = setLMarker(lMarkerB, bOk ? B.L : NaN, rgbB);
+  positionLMarkers(yA, yB);
+
+  drawAbGrid(aOk ? A : null, bOk ? B : null);
+}
+window.addEventListener('resize', ()=>{ updateLabReadout(); }, { passive:true });
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
 let dragging=false,lastX=0,lastY=0;
@@ -2620,6 +3304,7 @@ function requestLabDraw(){
   rafId = requestAnimationFrame(()=>{
     rafId=null;
     drawLabScene();
+    updateLabReadout();
   });
 }
 
@@ -3563,7 +4248,9 @@ $('#libAddBtn').addEventListener('click', ()=>{
       saveLibraries();
       $('#libName').value='';
       $('#libFile').value='';
+      setSettingsLibrary(id);
       renderLibraryList();
+      renderLibraryEditor();
       refreshLibrarySelects();
     }catch(err){
       alert('Error parsing CSV: ' + (err.message||err));
@@ -3592,6 +4279,87 @@ $('#libTemplateBtn').addEventListener('click', ()=>{
   a.remove();
   URL.revokeObjectURL(url);
 });
+
+
+// Library editor actions (Settings → Colour Sets)
+$('#libExportBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const rows = lib.colours || [];
+  const csv = ['Name,L,a,b'].concat(rows.map(c=>{
+    const name = (c.name||c.Name||'').replace(/"/g,'""');
+    const L = Number(c.L||0).toFixed(2);
+    const a = Number(c.a||0).toFixed(2);
+    const b = Number(c.b||0).toFixed(2);
+    return `"${name}",${L},${a},${b}`;
+  })).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const aEl = document.createElement('a');
+  aEl.href = url;
+  aEl.download = (lib.name||'library').replace(/[^\w\-]+/g,'_') + '.csv';
+  document.body.appendChild(aEl);
+  aEl.click();
+  aEl.remove();
+  URL.revokeObjectURL(url);
+});
+
+$('#libDeleteBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  if (!confirm(`Delete library "${lib.name}"? This cannot be undone.`)) return;
+  userLibraries = userLibraries.filter(l=>l.id !== lib.id);
+  saveLibraries();
+  if (activeLibraryId === lib.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  refreshLibrarySelects();
+  setSettingsLibrary(LIB_BASE_ID);
+});
+
+$('#libScanBtn')?.addEventListener('click', async ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  try{
+    const m = await spectroMeasureOnce();
+    if (!m) return;
+    $('#libColourL').value = Number(m.L||0).toFixed(2);
+    $('#libColourA').value = Number(m.a||0).toFixed(2);
+    $('#libColourB').value = Number(m.b||0).toFixed(2);
+    if (!($('#libColourName').value||'').trim()){
+      const t = new Date();
+      $('#libColourName').value = `Scan ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}${String(t.getMinutes()).padStart(2,'0')}`;
+    }
+  }catch(e){
+    alert('Scan failed: ' + (e.message||e));
+  }
+});
+
+$('#libAddColourBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+
+  const name = ($('#libColourName').value||'').trim();
+  const L = parseFloat($('#libColourL').value);
+  const a = parseFloat($('#libColourA').value);
+  const b = parseFloat($('#libColourB').value);
+
+  if (!name){
+    alert('Please enter a colour name.');
+    return;
+  }
+  if (![L,a,b].every(Number.isFinite)){
+    alert('Please enter valid L*, a*, b* values.');
+    return;
+  }
+
+  lib.ref.colours.push({ name:name, L:L, a:a, b:b });
+  scheduleSaveLibraries();
+  $('#libColourName').value='';
+  $('#libColourL').value='';
+  $('#libColourA').value='';
+  $('#libColourB').value='';
+  renderLibraryEditor();
+});
+
 
 // Compare tab quick-load
 // (We use a custom combobox so typing does not hide options like <datalist> does.)
@@ -3732,6 +4500,7 @@ Promise.all([
   refreshLibrarySelects();
   refreshActiveColours();
   renderLibraryList();
+  renderLibraryEditor();
 }).catch(err=>{
   alert('Error loading JSON: '+err);
 });
