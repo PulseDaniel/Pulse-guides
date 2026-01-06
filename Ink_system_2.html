@@ -733,7 +733,7 @@
         <div class="top" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap: wrap;">
           <div>
             <h1>Ink Colour Matcher</h1>
-            <div class="pill">Active library: <span id="activeLibLabel">Pantone (base)</span></div>
+            <div class="pill">Active library: <span id="activeLibLabel">Pantone</span></div>
           </div>
           <div style="min-width:200px;">
             <label for="librarySelect">Colour library</label>
@@ -815,7 +815,7 @@
       <div class="flex" style="justify-content:space-between;">
         <div>
           <h1>Compare Colours (ΔE2000)</h1>
-          <div class="pill">Using library: <span id="cmpLibLabel">Pantone (base)</span></div>
+          <div class="pill">Using library: <span id="cmpLibLabel">Pantone</span></div>
         </div>
       </div>
 
@@ -1763,7 +1763,7 @@ function loadLibraries(){
 }
 function libraryOptions(){
   const opts = [
-    {id: LIB_BASE_ID, label: 'Pantone (base)'}
+    {id: LIB_BASE_ID, label: 'Pantone'}
   ];
   userLibraries.forEach(l => opts.push({id: l.id, label: l.name}));
   if (userLibraries.length) opts.push({id: LIB_ALL_ID, label: 'All libraries (combined)'});
@@ -1786,7 +1786,7 @@ function refreshLibrarySelects(){
   };
   build(sel1);
   build(sel2);
-  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone (base)';
+  const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone';
   $('#activeLibLabel').textContent = activeLabel;
   $('#cmpLibLabel').textContent = activeLabel;
 }
@@ -1811,7 +1811,7 @@ function refreshActiveColours(){
 function renderLibraryList(){
   const wrap = $('#libList');
   const items = [
-    { id: LIB_BASE_ID, name: 'Pantone (base)', colours: BASE_COLOURS, readonly:true }
+    { id: LIB_BASE_ID, name: 'Pantone', colours: BASE_COLOURS, readonly:true }
   ].concat(userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false})));
 
   let out = '';
@@ -1875,10 +1875,10 @@ function setSettingsLibrary(id){
 
 function getSettingsLibrary(){
   if (settingsLibraryId === LIB_BASE_ID){
-    return { id:LIB_BASE_ID, name:'Pantone (base)', colours:BASE_COLOURS, readonly:true };
+    return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
   }
   const lib = userLibraries.find(l=>l.id === settingsLibraryId);
-  if (!lib) return { id:LIB_BASE_ID, name:'Pantone (base)', colours:BASE_COLOURS, readonly:true };
+  if (!lib) return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
   return { id:lib.id, name:lib.name, colours:lib.colours, readonly:false, ref:lib };
 }
 
