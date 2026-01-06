@@ -257,64 +257,121 @@
   }
 
   /* Libraries */
-  .lib-list{ margin-top:8px; border-top:1px dashed #2a2f3a; padding-top:8px; }
-  .lib-item{ display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-size:.9rem; }
-  .lib-item-name{ font-weight:600; }
-  .lib-badge{ font-size:.75rem; color:#9aa4b2; }
 
-  /* Library editor (Colour Sets) */
-  .lib-editor{
-    border:1px solid #1f2933;
-    border-radius:14px;
+  /* Libraries manager layout (Colour Sets tab) */
+  .lib-manager{
+    display:grid;
+    grid-template-columns: 1fr 220px;
+    gap:12px;
+    margin-top:12px;
+    align-items:stretch;
+  }
+  @media (max-width: 980px){
+    .lib-manager{ grid-template-columns: 1fr; }
+  }
+  .lib-sidebar{
+    border-left:1px solid #1f2430;
+    padding-left:12px;
+  }
+  @media (max-width: 980px){
+    .lib-sidebar{ border-left:none; padding-left:0; border-top:1px solid #1f2430; padding-top:12px; }
+  }
+  .lib-list{
+    margin-top:0;
+    border-top:none;
+    padding-top:0;
+  }
+  .lib-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:8px 8px;
+    border:1px solid #1f2430;
+    border-radius:12px;
+    margin-bottom:8px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .lib-item:hover{ border-color:#2a3142; background:#0f131b; }
+  .lib-item.selected{ border-color:#3b82f6; box-shadow:0 0 0 1px rgba(59,130,246,.25) inset; }
+  .lib-item .btn{ padding:6px 10px; }
+  .lib-item-left{ min-width:0; }
+  .lib-item-name{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+  .lib-badge{ font-size:.75rem; color:#9aa4b2; margin-top:2px; }
+
+  .lib-editor-pane{
+    border:1px solid #1f2430;
+    border-radius:16px;
     padding:12px;
-    background:rgba(10,12,18,.55);
+    background:rgba(10,12,16,.35);
+    min-height:520px;
+    display:flex;
+    flex-direction:column;
+  }
+  .lib-editor-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .lib-editor-title{
+    font-size:1.05rem;
+    font-weight:800;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .lib-editor-actions{ display:flex; gap:8px; align-items:center; }
+  .btn.danger{ border-color:#7f1d1d; color:#fecaca; background:rgba(127,29,29,.15); }
+  .btn.danger:hover{ background:rgba(127,29,29,.22); }
+  .lib-colour-table-wrap{
+    margin-top:12px;
+    border:1px solid #1f2430;
+    border-radius:14px;
+    overflow:auto;
+    flex:1;
     min-height:260px;
   }
-  .lib-item.active{
-    background:rgba(255,255,255,.03);
-    border-radius:12px;
-    padding:8px 10px;
+  table.lib-colour-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:.9rem;
   }
-  .lib-item-actions{ display:flex; gap:8px; align-items:center; }
-  .lib-swatch{
-    width:22px; height:22px; border-radius:8px;
-    border:1px solid rgba(255,255,255,.18);
-    box-shadow: 0 6px 18px rgba(0,0,0,.25) inset, 0 6px 18px rgba(0,0,0,.18);
-  }
-  table.lib-colours-table{ width:100%; border-collapse:collapse; font-size:.88rem; }
-  table.lib-colours-table thead th{
-    position:sticky; top:0; z-index:2;
-    background:#0f1320;
-    border-bottom:1px solid #1f2933;
-    padding:8px 8px;
-    text-align:left;
-    font-weight:700;
-  }
-  table.lib-colours-table td{
-    border-bottom:1px solid rgba(255,255,255,.06);
-    padding:6px 8px;
+  table.lib-colour-table th, table.lib-colour-table td{
+    padding:10px 10px;
+    border-bottom:1px solid #1f2430;
     vertical-align:middle;
   }
-  .lib-cell-tight{ width:78px; }
-  .lib-cell-actions{ width:84px; text-align:right; }
-  .lib-inline-input{
+  table.lib-colour-table th{
+    position:sticky;
+    top:0;
+    background:#0b0e14;
+    z-index:2;
+    text-align:left;
+    font-weight:800;
+    color:#e5e7eb;
+  }
+  .lib-swatch{
+    width:22px; height:22px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,.18);
+    box-shadow:0 6px 14px rgba(0,0,0,.35);
+  }
+  .lib-cell-flex{ display:flex; align-items:center; gap:10px; }
+  .lib-row-input{
     width:100%;
     padding:8px 10px;
     border-radius:10px;
-    border:1px solid #2a2f3a;
-    background:#101423;
-    color:#e6e6e6;
+    border:1px solid #1f2430;
+    background:#0b0e14;
+    color:#e5e7eb;
+    outline:none;
   }
-  .lib-inline-num{
-    width:120%;
-    padding:8px 10px;
-    border-radius:10px;
-    border:1px solid #2a2f3a;
-    background:#101423;
-    color:#e6e6e6;
-    font-variant-numeric: tabular-nums;
-  }
-  .lib-editor .mini{ opacity:.9; }
+  .lib-row-input:focus{ border-color:#3b82f6; box-shadow:0 0 0 1px rgba(59,130,246,.25) inset; }
+  .lib-row-num{ width:100px; font-variant-numeric:tabular-nums; }
+  .lib-row-actions{ text-align:right; white-space:nowrap; }
 
 
   .de-pass{ color:#86efac; font-weight:800; }
@@ -1036,19 +1093,59 @@
         <span class="mini">Files stay local to this browser (saved in localStorage).</span>
       </div>
 
-      <div class="row2" style="margin-top:12px; align-items:start; gap:14px;">
-        <div>
+      <div class="lib-manager">
+        <div class="lib-editor-pane" id="libEditorPane">
+          <div class="lib-editor-header">
+            <div class="lib-editor-title" id="libEditorTitle">Select a library</div>
+            <div class="lib-editor-actions">
+              <button class="btn" id="libExportBtn" disabled>Export CSV</button>
+              <button class="btn danger" id="libDeleteBtn" disabled>Delete</button>
+            </div>
+          </div>
+
+          <div class="row2" style="margin-top:12px;">
+            <div>
+              <label for="libColourName">Name</label>
+              <input id="libColourName" type="text" placeholder="e.g. Warm Red">
+            </div>
+            <div class="flex" style="align-items:flex-end; justify-content:flex-end; gap:8px;">
+              <button class="btn" id="libScanBtn" disabled>Scan</button>
+              <button class="btn" id="libAddColourBtn" disabled>Add</button>
+            </div>
+          </div>
+
+          <div class="row3" style="margin-top:10px;">
+            <div>
+              <label for="libColourL">L*</label>
+              <input id="libColourL" type="number" step="0.01" placeholder="50.00">
+            </div>
+            <div>
+              <label for="libColourA">a*</label>
+              <input id="libColourA" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div>
+              <label for="libColourB">b*</label>
+              <input id="libColourB" type="number" step="0.01" placeholder="0.00">
+            </div>
+          </div>
+
+          <div class="mini" id="libEditorHint" style="margin-top:10px;">
+            Click a library on the right to view/edit. Built-in Pantone is read-only.
+          </div>
+
+          <div class="lib-colour-table-wrap" id="libColourTableWrap">
+            <!-- Populated in JS -->
+          </div>
+        </div>
+
+        <div class="lib-sidebar">
           <div class="lib-list" id="libList">
             <!-- Populated in JS -->
           </div>
         </div>
-        <div>
-          <div class="lib-editor" id="libEditor">
-            <div class="muted">Select a library to view and edit its colours.</div>
-          </div>
-        </div>
       </div>
-    </div>
+
+</div>
 
     <!-- Spectro capture lives ONLY on this tab -->
     <div class="card" style="max-width:1200px; margin:16px auto 0;">
@@ -1305,6 +1402,7 @@
 (function(){
 'use strict';
 function $(sel){ return document.querySelector(sel); }
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
 function approx(a,b,eps){ if (eps==null) eps=1e-3; return Math.abs(a-b) <= eps; }
 
@@ -1572,8 +1670,7 @@ const LIB_BASE_ID = 'base';
 const LIB_ALL_ID = 'all';
 let userLibraries = []; // [{id,name,colours:[]}]
 let activeLibraryId = LIB_BASE_ID;
-let editLibraryId = null; // which custom library is open in the Colour Sets editor
-
+let settingsLibraryId = LIB_BASE_ID;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -1713,364 +1810,180 @@ function refreshActiveColours(){
 }
 function renderLibraryList(){
   const wrap = $('#libList');
-  const editor = $('#libEditor');
+  const items = [
+    { id: LIB_BASE_ID, name: 'Pantone (base)', colours: BASE_COLOURS, readonly:true }
+  ].concat(userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false})));
 
-  // Keep selection valid
-  if (editLibraryId && !userLibraries.find(l=>l.id===editLibraryId)) editLibraryId = null;
-  if (!editLibraryId && userLibraries.length) editLibraryId = userLibraries[0].id;
-
-  if (!userLibraries.length){
-    wrap.innerHTML = '<div class="muted">No custom libraries yet. Add one above.</div>';
-    if (editor) editor.innerHTML = '<div class="muted">Add a library to view and edit its colours.</div>';
-    return;
-  }
-
-  let html = '<h3 style="margin-top:8px;">Your libraries</h3>';
-  userLibraries.forEach(l=>{
-    const active = (l.id === editLibraryId) ? ' active' : '';
-    html += `<div class="lib-item${active}">
-      <div>
+  let out = '';
+  items.forEach(l=>{
+    const selected = (settingsLibraryId === l.id) ? ' selected' : '';
+    const badge = l.readonly ? 'Read-only' : `${l.colours.length} colours`;
+    out += `<div class="lib-item${selected}" data-lib-select="${l.id}">
+      <div class="lib-item-left">
         <div class="lib-item-name">${escapeHtml(l.name)}</div>
-        <div class="lib-badge">${l.colours.length} colours</div>
+        <div class="lib-badge">${badge}</div>
       </div>
-      <div class="lib-item-actions">
-        <button class="btn" data-edit-lib="${l.id}">View</button>
-        <button class="btn" data-del-lib="${l.id}">Delete</button>
-      </div>
+      ${l.readonly ? '' : `<button class="btn" data-del-lib="${l.id}" title="Delete library">Delete</button>`}
     </div>`;
   });
-  wrap.innerHTML = html;
 
-  // Wire actions
-  wrap.querySelectorAll('[data-edit-lib]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      editLibraryId = btn.getAttribute('data-edit-lib');
-      renderLibraryList();
-      renderLibraryEditor();
+  wrap.innerHTML = out || '<div class="muted">No libraries found.</div>';
+
+  wrap.querySelectorAll('[data-lib-select]').forEach(el=>{
+    el.addEventListener('click', (ev)=>{
+      const btn = ev.target.closest('[data-del-lib]');
+      if (btn) return; // let delete handler run
+      const id = el.getAttribute('data-lib-select');
+      setSettingsLibrary(id);
     });
   });
+
   wrap.querySelectorAll('[data-del-lib]').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      ev.stopPropagation();
       const id = btn.getAttribute('data-del-lib');
-      const lib = userLibraries.find(l=>l.id===id);
-      const ok = confirm(`Delete library "${(lib && lib.name) ? lib.name : 'Unnamed'}"? This cannot be undone.`);
-      if (!ok) return;
+      const lib = userLibraries.find(l=>l.id === id);
+      if (!lib) return;
+      if (!confirm(`Delete library "${lib.name}"? This cannot be undone.`)) return;
       userLibraries = userLibraries.filter(l=>l.id !== id);
       saveLibraries();
+      if (activeLibraryId === id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
       refreshLibrarySelects();
-      refreshActiveColours();
-
-      // Keep editor selection valid
-      if (editLibraryId === id) editLibraryId = userLibraries[0]?.id || null;
-
+      if (settingsLibraryId === id) settingsLibraryId = LIB_BASE_ID;
       renderLibraryList();
       renderLibraryEditor();
     });
   });
+}
 
+let _libSaveTimer = null;
+function scheduleSaveLibraries(){
+  if (_libSaveTimer) clearTimeout(_libSaveTimer);
+  _libSaveTimer = setTimeout(()=>{
+    saveLibraries();
+    refreshLibrarySelects();
+    if (activeLibraryId === settingsLibraryId || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  }, 200);
+}
+
+function setSettingsLibrary(id){
+  settingsLibraryId = id || LIB_BASE_ID;
+  renderLibraryList();
   renderLibraryEditor();
 }
 
-function csvFromColours(colours){
-  const header = 'Name,L,a,b';
-  const rows = (colours||[]).map(c=>{
-    const name = String(c.name||'').replace(/"/g,'""');
-    const L = Number(c.L);
-    const a = Number(c.a);
-    const b = Number(c.b);
-    return `"${name}",${(Number.isFinite(L)?L:0).toFixed(2)},${(Number.isFinite(a)?a:0).toFixed(2)},${(Number.isFinite(b)?b:0).toFixed(2)}`;
-  });
-  return [header, ...rows].join('\r\n');
+function getSettingsLibrary(){
+  if (settingsLibraryId === LIB_BASE_ID){
+    return { id:LIB_BASE_ID, name:'Pantone (base)', colours:BASE_COLOURS, readonly:true };
+  }
+  const lib = userLibraries.find(l=>l.id === settingsLibraryId);
+  if (!lib) return { id:LIB_BASE_ID, name:'Pantone (base)', colours:BASE_COLOURS, readonly:true };
+  return { id:lib.id, name:lib.name, colours:lib.colours, readonly:false, ref:lib };
 }
 
 function renderLibraryEditor(){
-  const editor = $('#libEditor');
-  if (!editor) return;
+  const title = $('#libEditorTitle');
+  const hint = $('#libEditorHint');
+  const wrap = $('#libColourTableWrap');
+  const btnExport = $('#libExportBtn');
+  const btnDelete = $('#libDeleteBtn');
+  const btnScan = $('#libScanBtn');
+  const btnAdd = $('#libAddColourBtn');
 
-  if (editLibraryId && !userLibraries.find(l=>l.id===editLibraryId)) editLibraryId = null;
-  if (!editLibraryId && userLibraries.length) editLibraryId = userLibraries[0].id;
+  if (!title || !wrap) return;
 
-  if (!userLibraries.length){
-    editor.innerHTML = '<div class="muted">Add a library to view and edit its colours.</div>';
+  const lib = getSettingsLibrary();
+  title.textContent = lib.name;
+
+  const editable = !lib.readonly;
+  btnExport.disabled = lib.readonly;
+  btnDelete.disabled = lib.readonly;
+  btnScan.disabled = lib.readonly;
+  btnAdd.disabled = lib.readonly;
+
+  if (!editable){
+    hint.textContent = 'Built-in Pantone is read-only. Select a custom library to edit.';
+    wrap.innerHTML = '';
     return;
   }
 
-  const lib = userLibraries.find(l=>l.id===editLibraryId) || userLibraries[0];
-  if (!lib) { editor.innerHTML = '<div class="muted">Add a library to view and edit its colours.</div>'; return; }
-  editLibraryId = lib.id;
+  hint.textContent = 'Edit values directly. Changes apply app-wide.';
 
-  const optionsHtml = userLibraries.map(l=>`<option value="${escapeHtml(l.id)}"${l.id===lib.id?' selected':''}>${escapeHtml(l.name)}</option>`).join('');
-
-  editor.innerHTML = `
-    <div class="flex" style="width:725px; gap:10px; align-items:flex-end; flex-wrap:wrap;">
-      <div style="min-width:220px; flex:1;">
-        <label for="libEditSelect">Library</label>
-        <select id="libEditSelect">${optionsHtml}</select>
-      </div>
-      <div style="min-width:240px; flex:2;">
-        <label for="libEditNameInput">Name</label>
-        <input id="libEditNameInput" class="lib-inline-input" type="text" value="${escapeHtml(lib.name)}" placeholder="Library name">
-      </div>
-      <div class="flex" style="gap:8px; align-items:center;">
-        <button class="btn" id="libExportSelectedBtn">Download CSV</button>
-      </div>
-      <span class="mini muted" id="libEditStatus" style="margin-left:auto;"></span>
-    </div>
-
-    <div style="margin-top:10px;">
-      <div class="flex" style="align-items:center;">
-        <h3 style="margin:0;">Colours</h3>
-        <span class="mini" id="libColourCount" style="margin-left:auto;">${lib.colours.length} total</span>
-      </div>
-
-      <div style="max-height:300px; overflow:auto; border:1px solid #1f2933; border-radius:12px; margin-top:8px;">
-        <table class="lib-colours-table">
-          <thead>
-            <tr>
-              <th style="width:44px;">&nbsp;</th>
-              <th>Name</th>
-              <th class="lib-cell-tight">L*</th>
-              <th class="lib-cell-tight">a*</th>
-              <th class="lib-cell-tight">b*</th>
-              <th class="lib-cell-actions">&nbsp;</th>
-            </tr>
-          </thead>
-          <tbody id="libColoursTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div style="margin-top:12px; border-top:1px dashed #2a2f3a; padding-top:12px;">
-      <h3 style="margin:0 0 8px 0;">Add colour</h3>
-
-      <div class="row2" style="gap:10px;">
-        <div>
-          <label for="libNewColourName">Name</label>
-          <input id="libNewColourName" class="lib-inline-input" type="text" placeholder="e.g. Customer Spot Red">
-        </div>
-        <div class="flex" style="gap:10px; align-items:flex-end; justify-content:flex-end;">
-          <button class="btn" id="libScanNewColourBtn">Scan</button>
-          <button class="btn" id="libAddNewColourBtn">Add</button>
-        </div>
-      </div>
-
-      <div class="flex" style="gap:10px; margin-top:10px; align-items:flex-end; flex-wrap:wrap;">
-        <div style="min-width:140px; flex:1;">
-          <label for="libNewColourL">L*</label>
-          <input id="libNewColourL" class="lib-inline-num" type="number" step="0.01" placeholder="50.00">
-        </div>
-        <div style="min-width:140px; flex:1;">
-          <label for="libNewColourA">a*</label>
-          <input id="libNewColourA" class="lib-inline-num" type="number" step="0.01" placeholder="0.00">
-        </div>
-        <div style="min-width:140px; flex:1;">
-          <label for="libNewColourB">b*</label>
-          <input id="libNewColourB" class="lib-inline-num" type="number" step="0.01" placeholder="0.00">
-        </div>
-        <div class="flex" style="gap:10px; align-items:center; margin-left:auto;">
-          <div id="libNewColourSwatch" class="lib-swatch" title="Preview"></div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  // Populate colour rows
-  const tbody = $('#libColoursTbody');
-  if (tbody){
-    tbody.innerHTML = lib.colours.map((c, idx)=>{
-      const L = Number(c.L), a = Number(c.a), b = Number(c.b);
-      const sw = labToRgbCssForSwatch(Number.isFinite(L)?L:0, Number.isFinite(a)?a:0, Number.isFinite(b)?b:0);
-      return `
-        <tr data-idx="${idx}">
-          <td><div class="lib-swatch" data-swatch="${idx}" style="background:${sw};"></div></td>
-          <td><input class="lib-inline-input" data-field="name" data-idx="${idx}" type="text" value="${escapeHtml(c.name||'')}"></td>
-          <td><input class="lib-inline-num" data-field="L" data-idx="${idx}" type="number" step="0.01" value="${Number.isFinite(L)?L.toFixed(2):'0.00'}"></td>
-          <td><input class="lib-inline-num" data-field="a" data-idx="${idx}" type="number" step="0.01" value="${Number.isFinite(a)?a.toFixed(2):'0.00'}"></td>
-          <td><input class="lib-inline-num" data-field="b" data-idx="${idx}" type="number" step="0.01" value="${Number.isFinite(b)?b.toFixed(2):'0.00'}"></td>
-          <td class="lib-cell-actions"><button class="btn" data-del-colour="${idx}">Del</button></td>
+  const rows = lib.colours || [];
+  const head = `
+    <table class="lib-colour-table">
+      <thead>
+        <tr>
+          <th style="width:44px;"></th>
+          <th>Name</th>
+          <th style="width:120px;">L*</th>
+          <th style="width:120px;">a*</th>
+          <th style="width:120px;">b*</th>
+          <th style="width:90px; text-align:right;"> </th>
         </tr>
-      `;
-    }).join('');
+      </thead>
+      <tbody>
+  `;
+  const body = rows.map((c, i)=>{
+    const L = Number(c.L ?? 0);
+    const a = Number(c.a ?? 0);
+    const b = Number(c.b ?? 0);
+    const css = labToRgbCssForSwatch(L,a,b);
+    return `
+      <tr data-lib-row="${i}">
+        <td><div class="lib-swatch" style="background:${css};"></div></td>
+        <td>
+          <input class="lib-row-input" data-lib-field="name" data-lib-idx="${i}" value="${escapeHtml(c.name||c.Name||'')}">
+        </td>
+        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="L" data-lib-idx="${i}" value="${Number.isFinite(L)?L.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="a" data-lib-idx="${i}" value="${Number.isFinite(a)?a.toFixed(2):'0.00'}"></td>
+        <td><input class="lib-row-input lib-row-num" type="number" step="0.01" data-lib-field="b" data-lib-idx="${i}" value="${Number.isFinite(b)?b.toFixed(2):'0.00'}"></td>
+        <td class="lib-row-actions"><button class="btn" data-lib-del-col="${i}">Remove</button></td>
+      </tr>
+    `;
+  }).join('');
 
-    // delete colour
-    tbody.querySelectorAll('[data-del-colour]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        const i = Number(btn.getAttribute('data-del-colour'));
-        if (!Number.isFinite(i)) return;
-        const c = lib.colours[i];
-        const ok = confirm(`Delete colour "${(c && c.name) ? c.name : 'Untitled'}" from "${lib.name}"?`);
-        if (!ok) return;
-        lib.colours.splice(i,1);
-        saveLibraries();
-        refreshLibrarySelects();
-        refreshActiveColours();
-        renderLibraryList(); // also re-renders editor
-      });
-    });
+  wrap.innerHTML = head + body + '</tbody></table>';
 
-    // inline edit
-    tbody.querySelectorAll('input[data-field]').forEach(inp=>{
-      inp.addEventListener('input', ()=>{
-        const i = Number(inp.getAttribute('data-idx'));
-        const field = inp.getAttribute('data-field');
-        const row = lib.colours[i];
-        if (!row || !field) return;
-
-        if (field === 'name'){
-          row.name = inp.value;
-          saveLibraries();
-          // Names affect how results display elsewhere; keep app state in sync without re-rendering the editor.
-          refreshActiveColours();
-          return;
+  // Wire edits
+  wrap.querySelectorAll('[data-lib-field]').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const idx = Number(inp.getAttribute('data-lib-idx'));
+      const field = inp.getAttribute('data-lib-field');
+      if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
+      const val = inp.value;
+      if (field === 'name'){
+        rows[idx].name = val;
+      }else{
+        const num = parseFloat(val);
+        rows[idx][field] = Number.isFinite(num) ? num : 0;
+      }
+      // update swatch immediately
+      const tr = inp.closest('tr');
+      if (tr){
+        const c = rows[idx];
+        const sw = tr.querySelector('.lib-swatch');
+        if (sw){
+          sw.style.background = labToRgbCssForSwatch(Number(c.L||0), Number(c.a||0), Number(c.b||0));
         }
-
-        const v = Number(inp.value);
-        row[field] = Number.isFinite(v) ? v : 0;
-        const sw = labToRgbCssForSwatch(Number(row.L)||0, Number(row.a)||0, Number(row.b)||0);
-        const swEl = tbody.querySelector(`[data-swatch="${i}"]`);
-        if (swEl) swEl.style.background = sw;
-
-        saveLibraries();
-        refreshActiveColours();
-      });
+      }
+      scheduleSaveLibraries();
     });
-  }
+  });
 
-  // Header controls
-  const sel = $('#libEditSelect');
-  if (sel){
-    sel.addEventListener('change', ()=>{
-      editLibraryId = sel.value;
-      renderLibraryList();
+  wrap.querySelectorAll('[data-lib-del-col]').forEach(btn=>{
+    btn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      const idx = Number(btn.getAttribute('data-lib-del-col'));
+      if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
+      rows.splice(idx, 1);
+      scheduleSaveLibraries();
       renderLibraryEditor();
     });
-  }
-  const nameInput = $('#libEditNameInput');
-  if (nameInput){
-    nameInput.addEventListener('input', ()=>{
-      lib.name = nameInput.value;
-      saveLibraries();
-
-      // Live-update the active list item label + the current option label without re-rendering.
-      const listWrap = $('#libList');
-      const activeNameEl = listWrap ? listWrap.querySelector('.lib-item.active .lib-item-name') : null;
-      if (activeNameEl) activeNameEl.textContent = lib.name;
-
-      const selEl = $('#libEditSelect');
-      if (selEl && selEl.selectedIndex >= 0){
-        selEl.options[selEl.selectedIndex].textContent = lib.name;
-      }
-    });
-
-    // On commit (blur / enter), refresh the rest of the app's library selectors.
-    nameInput.addEventListener('change', ()=>{
-      saveLibraries();
-      refreshLibrarySelects();
-      // Re-render list/editor to ensure consistent counts & ordering.
-      renderLibraryList();
-    });
-  }
-  const exportBtn = $('#libExportSelectedBtn');
-  if (exportBtn){
-    exportBtn.addEventListener('click', ()=>{
-      try{
-        const csv = csvFromColours(lib.colours);
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = (lib.name || 'library').replace(/[^\w\-]+/g,'_').slice(0,48) + '.csv';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-      }catch(err){
-        const s = $('#libEditStatus');
-        if (s) s.textContent = 'Export error: ' + (err.message || err);
-      }
-    });
-  }
-
-  // Add-colour preview + actions
-  const newL = $('#libNewColourL');
-  const newA = $('#libNewColourA');
-  const newB = $('#libNewColourB');
-  const newSw = $('#libNewColourSwatch');
-  const updatePreview = ()=>{
-    const L = Number(newL?.value), a = Number(newA?.value), b = Number(newB?.value);
-    if (newSw){
-      const sw = labToRgbCssForSwatch(Number.isFinite(L)?L:0, Number.isFinite(a)?a:0, Number.isFinite(b)?b:0);
-      newSw.style.background = sw;
-    }
-  };
-  [newL,newA,newB].forEach(el=> el && el.addEventListener('input', updatePreview));
-  updatePreview();
-
-  const scanBtn = $('#libScanNewColourBtn');
-  if (scanBtn){
-    scanBtn.addEventListener('click', async ()=>{
-      const s = $('#libEditStatus');
-      try{
-        if (s) s.textContent = 'Scanning…';
-        await spectroConnect();
-        const raw = await spectroMeasureOnce();
-        const meas = parseSpectroMeasurement(raw);
-        if ([meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
-          if (s) s.textContent = 'Scan: could not parse L*a*b*';
-          console.log('Raw spectro text:', raw);
-          return;
-        }
-        if (newL) newL.value = meas.L.toFixed(2);
-        if (newA) newA.value = meas.a.toFixed(2);
-        if (newB) newB.value = meas.b.toFixed(2);
-        updatePreview();
-        if (s) s.textContent = '';
-      }catch(err){
-        if (s) s.textContent = 'Scan error: ' + (err.message || err);
-      }
-    });
-  }
-
-  const addBtn = $('#libAddNewColourBtn');
-  if (addBtn){
-    addBtn.addEventListener('click', ()=>{
-      const name = ($('#libNewColourName')?.value || '').trim();
-      const L = Number(newL?.value);
-      const a = Number(newA?.value);
-      const b = Number(newB?.value);
-      if (!name){
-        alert('Please enter a colour name.');
-        return;
-      }
-      if (![L,a,b].every(v=>Number.isFinite(v))){
-        alert('Please enter valid L*, a*, b* values.');
-        return;
-      }
-      lib.colours.push({name:name, L:L, a:a, b:b});
-      saveLibraries();
-      refreshLibrarySelects();
-      refreshActiveColours();
-      // Clear
-      const nn = $('#libNewColourName'); 
-      if (nn) nn.value = '';
-      if (newL) newL.value = '';
-      if (newA) newA.value = '';
-      if (newB) newB.value = '';
-      updatePreview();
-      renderLibraryList();
-    });
-  }
+  });
 }
 
-// Small HTML escaper for editor templates
-function escapeHtml(s){
-  return String(s ?? '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;')
-    .replace(/'/g,'&#039;');
-}
 
 // parse CSV into colours
 function parseCsvColours(text){
@@ -4334,13 +4247,13 @@ $('#libAddBtn').addEventListener('click', ()=>{
       const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
       const lib = { id:id, name:name, colours:colours };
       userLibraries.push(lib);
-      editLibraryId = id;
       saveLibraries();
       $('#libName').value='';
       $('#libFile').value='';
-      refreshLibrarySelects();
-      refreshActiveColours();
+      setSettingsLibrary(id);
       renderLibraryList();
+      renderLibraryEditor();
+      refreshLibrarySelects();
     }catch(err){
       alert('Error parsing CSV: ' + (err.message||err));
     }
@@ -4368,6 +4281,87 @@ $('#libTemplateBtn').addEventListener('click', ()=>{
   a.remove();
   URL.revokeObjectURL(url);
 });
+
+
+// Library editor actions (Settings → Colour Sets)
+$('#libExportBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const rows = lib.colours || [];
+  const csv = ['Name,L,a,b'].concat(rows.map(c=>{
+    const name = (c.name||c.Name||'').replace(/"/g,'""');
+    const L = Number(c.L||0).toFixed(2);
+    const a = Number(c.a||0).toFixed(2);
+    const b = Number(c.b||0).toFixed(2);
+    return `"${name}",${L},${a},${b}`;
+  })).join('\r\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const aEl = document.createElement('a');
+  aEl.href = url;
+  aEl.download = (lib.name||'library').replace(/[^\w\-]+/g,'_') + '.csv';
+  document.body.appendChild(aEl);
+  aEl.click();
+  aEl.remove();
+  URL.revokeObjectURL(url);
+});
+
+$('#libDeleteBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  if (!confirm(`Delete library "${lib.name}"? This cannot be undone.`)) return;
+  userLibraries = userLibraries.filter(l=>l.id !== lib.id);
+  saveLibraries();
+  if (activeLibraryId === lib.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  refreshLibrarySelects();
+  setSettingsLibrary(LIB_BASE_ID);
+});
+
+$('#libScanBtn')?.addEventListener('click', async ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  try{
+    const m = await spectroMeasureOnce();
+    if (!m) return;
+    $('#libColourL').value = Number(m.L||0).toFixed(2);
+    $('#libColourA').value = Number(m.a||0).toFixed(2);
+    $('#libColourB').value = Number(m.b||0).toFixed(2);
+    if (!($('#libColourName').value||'').trim()){
+      const t = new Date();
+      $('#libColourName').value = `Scan ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}${String(t.getMinutes()).padStart(2,'0')}`;
+    }
+  }catch(e){
+    alert('Scan failed: ' + (e.message||e));
+  }
+});
+
+$('#libAddColourBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+
+  const name = ($('#libColourName').value||'').trim();
+  const L = parseFloat($('#libColourL').value);
+  const a = parseFloat($('#libColourA').value);
+  const b = parseFloat($('#libColourB').value);
+
+  if (!name){
+    alert('Please enter a colour name.');
+    return;
+  }
+  if (![L,a,b].every(Number.isFinite)){
+    alert('Please enter valid L*, a*, b* values.');
+    return;
+  }
+
+  lib.ref.colours.push({ name:name, L:L, a:a, b:b });
+  scheduleSaveLibraries();
+  $('#libColourName').value='';
+  $('#libColourL').value='';
+  $('#libColourA').value='';
+  $('#libColourB').value='';
+  renderLibraryEditor();
+});
+
 
 // Compare tab quick-load
 // (We use a custom combobox so typing does not hide options like <datalist> does.)
@@ -4508,6 +4502,7 @@ Promise.all([
   refreshLibrarySelects();
   refreshActiveColours();
   renderLibraryList();
+  renderLibraryEditor();
 }).catch(err=>{
   alert('Error loading JSON: '+err);
 });
