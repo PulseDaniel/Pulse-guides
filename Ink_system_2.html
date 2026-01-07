@@ -3534,7 +3534,8 @@ function requestLabDraw(){
 }
 
 // Spectro UI wiring (all tabs)
-const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
+const spectroConnectBtn = document.getElementById('spectroConnectBtn');      // Settings tab
+const spectroConnectBtnLib = document.getElementById('spectroConnectBtnLib'); // Colour Sets tab
 const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch');
 const spectroConnectBtnCompare = document.getElementById('spectroConnectBtnCompare');
 const spectroMeasureBtn = document.getElementById('spectroMeasureBtn');
@@ -3543,7 +3544,7 @@ const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
 const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
 const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
 
-[spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
+[spectroConnectBtn, spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
   if (!btn) return;
   btn.addEventListener('click', async ()=>{
     try{
