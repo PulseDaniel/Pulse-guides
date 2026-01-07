@@ -1291,6 +1291,15 @@
         <span class="mini" id="settingsStatus" style="margin-left:auto;"></span>
       </div>
     </div>
+
+
+<div class="card" style="max-width:1200px; margin:16px auto 0;">
+  <div class="flex" style="justify-content:space-between; align-items:center; gap:10px;">
+    <h2 style="margin:0;">Training export</h2>
+    <button class="btn" id="downloadTrainingCanonicalBtn">Download CSV</button>
+  </div>
+  <div class="mini" id="trainingExportStatus" style="margin-top:6px;"></div>
+</div>
   </section>
 
 <!-- Modal: Edit Formula -->
@@ -1452,6 +1461,175 @@ let COLOUR_TO_FORMULA = {};
 let _lastSuggestion = null;
 let _lastContextName = null;
 let _allInks = [];
+
+
+// ===== Canonical ink order for training export / logging =====
+// This matches the column order used by the existing training CSV.
+// If the API ever adds extra inks, they will be appended after these.
+const CANONICAL_INK_ORDER = [
+  'DC21-001 Extender',
+  'DC21-101 Bright Red',
+  'DC21-102 Rubine',
+  'DC21-114 Rhodamine',
+  'DC21-201 Orange',
+  'DC21-304 Yellow',
+  'DC21-402 Green',
+  'DC21-501 Process Blue',
+  'DC21-604 Violet',
+  'DC21-802 Black'
+];
+
+function getCanonicalInks(){
+  const apiInks = Array.isArray(_allInks) ? _allInks.slice() : [];
+  if (!apiInks.length) return CANONICAL_INK_ORDER.slice();
+  const apiSet = new Set(apiInks);
+  const hasAllCanonical = CANONICAL_INK_ORDER.every(n=>apiSet.has(n));
+  if (!hasAllCanonical) return apiInks.slice().sort();
+  const extras = apiInks.filter(n=>!CANONICAL_INK_ORDER.includes(n)).slice().sort();
+  return CANONICAL_INK_ORDER.concat(extras);
+}
+
+function expandFormulaToCanonical(formulaObj, canonicalInks){
+  const out = {};
+  (canonicalInks||[]).forEach(ink=>{
+    out[ink] = 0;
+  });
+  const src = (formulaObj && typeof formulaObj === 'object') ? formulaObj : {};
+  Object.entries(src).forEach(([k,v])=>{
+    if (!Object.prototype.hasOwnProperty.call(out,k)) return; // ignore unknown inks
+    const n = +v;
+    out[k] = Number.isFinite(n) ? +n.toFixed(2) : 0;
+  });
+  return out;
+}
+
+function csvEscape(v){
+  const s = (v==null) ? '' : String(v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function parseCsv(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"'){
+        inQuotes = true;
+      } else if (c === ','){
+        row.push(field);
+        field = '';
+      } else if (c === '\n'){
+        row.push(field.replace(/\r$/,''));
+        rows.push(row);
+        row = [];
+        field = '';
+      } else if (c === '\r'){
+        // ignore
+      } else {
+        field += c;
+      }
+    }
+  }
+  row.push(field.replace(/\r$/,''));
+  rows.push(row);
+  // drop trailing empty row if present
+  if (rows.length && rows[rows.length-1].every(v=>String(v||'').trim()==='')) rows.pop();
+  return rows;
+}
+
+function canonicaliseTrainingCsv(rawCsv){
+  const rows = parseCsv(String(rawCsv||''));
+  if (!rows.length) return '';
+  const header = rows[0].map(h=>String(h||'').trim());
+  const headerMap = new Map();
+  header.forEach((h,i)=>{ if(h) headerMap.set(h,i); });
+
+  const pantoneKey = headerMap.has('Pantone') ? 'Pantone' : (headerMap.has('Name') ? 'Name' : 'Pantone');
+  const LKey = headerMap.has('L*') ? 'L*' : (headerMap.has('L') ? 'L' : 'L*');
+  const aKey = headerMap.has('a*') ? 'a*' : (headerMap.has('a') ? 'a' : 'a*');
+  const bKey = headerMap.has('b*') ? 'b*' : (headerMap.has('b') ? 'b' : 'b*');
+
+  const canonicalInks = getCanonicalInks();
+  const baseSet = new Set([pantoneKey, LKey, aKey, bKey]);
+  const inksInInput = header.filter(h=>h && !baseSet.has(h));
+  const extras = inksInInput.filter(n=>!canonicalInks.includes(n)).slice().sort();
+
+  const outHeader = ['Pantone','L*','a*','b*'].concat(canonicalInks).concat(extras);
+  const outLines = [outHeader.map(csvEscape).join(',')];
+
+  function getCell(rowArr, colName){
+    const idx = headerMap.get(colName);
+    if (idx == null) return '';
+    return (idx < rowArr.length) ? rowArr[idx] : '';
+  }
+
+  for (let r=1; r<rows.length; r++){
+    const rowArr = rows[r] || [];
+    const pantone = String(getCell(rowArr, pantoneKey) || '').trim();
+    const L = String(getCell(rowArr, LKey) ?? '').trim();
+    const a = String(getCell(rowArr, aKey) ?? '').trim();
+    const b = String(getCell(rowArr, bKey) ?? '').trim();
+
+    const outRow = [
+      pantone,
+      L,
+      a,
+      b
+    ];
+
+    canonicalInks.forEach(ink=>{
+      const v = String(getCell(rowArr, ink) ?? '').trim();
+      outRow.push(v === '' ? '0' : v);
+    });
+    extras.forEach(ink=>{
+      const v = String(getCell(rowArr, ink) ?? '').trim();
+      outRow.push(v === '' ? '0' : v);
+    });
+
+    outLines.push(outRow.map(csvEscape).join(','));
+  }
+
+  return outLines.join('\r\n');
+}
+
+async function downloadCanonicalTrainingCsv(){
+  const btn = document.getElementById('downloadTrainingCanonicalBtn');
+  const status = document.getElementById('trainingExportStatus');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Fetching…';
+  try{
+    const res = await fetch(API_BASE + '/export_training');
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const j = await res.json();
+    const canonCsv = canonicaliseTrainingCsv(j && j.csv ? j.csv : '');
+    if (!canonCsv) throw new Error('No CSV returned.');
+    const blob = new Blob([canonCsv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'training_export_canonical.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (status) status.textContent = `Downloaded ${j && j.rows ? j.rows : ''}`.trim();
+  }catch(err){
+    if (status) status.textContent = 'Error: ' + (err.message || String(err));
+  }finally{
+    if (btn) btn.disabled = false;
+  }
+}
 
 // ===== Spectro capture state =====
 let spectroPort = null;
@@ -2297,21 +2475,30 @@ function addInk(){
 }
 async function saveCorrection(){
   if(!_lastSuggestion) return;
+
   const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
   if (!approx(sum,100,0.02)) normalise();
-  const corrected = {};
+
+  const correctedSparse = {};
   working.forEach(r=>{
-    if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2);
+    if ((+r.pct)>0) correctedSparse[r.ink] = +(+r.pct).toFixed(2);
   });
+
+  const canonicalInks = getCanonicalInks();
+  const originalFull = expandFormulaToCanonical(_lastSuggestion.formula || {}, canonicalInks);
+  const correctedFull = expandFormulaToCanonical(correctedSparse, canonicalInks);
+
   const payload = {
     target: _lastSuggestion.target,
     group: _lastSuggestion.group || null,
-    original: _lastSuggestion.formula,
-    corrected,
+    original: originalFull,
+    corrected: correctedFull,
+    inks_order: canonicalInks, // helps server keep consistent column order
     context_name: _lastContextName || null,
     note: ($('#corrNote').value||'').trim() || null,
     measured: null
   };
+
   try{
     const res = await fetch(API_BASE + '/log_correction', {
       method:'POST',
@@ -4211,6 +4398,8 @@ $('#addPct').addEventListener('keydown', e=>{
   }
 });
 $('#saveCorrection').addEventListener('click', saveCorrection);
+
+$('#downloadTrainingCanonicalBtn').addEventListener('click', downloadCanonicalTrainingCsv);
 
 // Library UI events
 $('#librarySelect').addEventListener('change', (e)=>{
