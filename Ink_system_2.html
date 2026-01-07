@@ -1853,7 +1853,7 @@ const LIB_BASE_ID = 'base';
 const LIB_ALL_ID = 'all';
 let userLibraries = []; // [{id,name,colours:[]}]
 let activeLibraryId = LIB_BASE_ID;
-let settingsLibraryId = LIB_BASE_ID;
+let settingsLibraryId = null;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -1993,9 +1993,7 @@ function refreshActiveColours(){
 }
 function renderLibraryList(){
   const wrap = $('#libList');
-  const items = [
-    { id: LIB_BASE_ID, name: 'Pantone', colours: BASE_COLOURS, readonly:true }
-  ].concat(userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false})));
+  const items = userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false}));
 
   let out = '';
   items.forEach(l=>{
@@ -2010,7 +2008,7 @@ function renderLibraryList(){
     </div>`;
   });
 
-  wrap.innerHTML = out || '<div class="muted">No libraries found.</div>';
+  wrap.innerHTML = out || '<div class="muted">No custom libraries yet.</div>';
 
   wrap.querySelectorAll('[data-lib-select]').forEach(el=>{
     el.addEventListener('click', (ev)=>{
@@ -2051,17 +2049,15 @@ function scheduleSaveLibraries(){
 }
 
 function setSettingsLibrary(id){
-  settingsLibraryId = id || LIB_BASE_ID;
+  if (id) settingsLibraryId = id;
+  else settingsLibraryId = (userLibraries && userLibraries.length) ? userLibraries[0].id : null;
   renderLibraryList();
   renderLibraryEditor();
 }
 
 function getSettingsLibrary(){
-  if (settingsLibraryId === LIB_BASE_ID){
-    return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
-  }
   const lib = userLibraries.find(l=>l.id === settingsLibraryId);
-  if (!lib) return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
+  if (!lib) return { id:null, name:'', colours:[], readonly:true, empty:true };
   return { id:lib.id, name:lib.name, colours:lib.colours, readonly:false, ref:lib };
 }
 
@@ -2077,6 +2073,16 @@ function renderLibraryEditor(){
   if (!title || !wrap) return;
 
   const lib = getSettingsLibrary();
+  if (lib.empty){
+    title.textContent = 'Colour sets';
+    hint.textContent = 'Select a custom library to edit.';
+    btnExport.disabled = true;
+    btnDelete.disabled = true;
+    btnScan.disabled = true;
+    btnAdd.disabled = true;
+    wrap.innerHTML = '<div class="muted" style="padding:12px;">Select a custom library to edit.</div>';
+    return;
+  }
   title.textContent = lib.name;
 
   const editable = !lib.readonly;
@@ -4594,7 +4600,7 @@ $('#libDeleteBtn')?.addEventListener('click', ()=>{
   saveLibraries();
   if (activeLibraryId === lib.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
   refreshLibrarySelects();
-  setSettingsLibrary(LIB_BASE_ID);
+  setSettingsLibrary();
 });
 
 $('#libScanBtn')?.addEventListener('click', async ()=>{
