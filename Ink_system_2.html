@@ -4867,23 +4867,28 @@ if (cmpExportLogBtn){
   <meta charset="utf-8">
   <title>QC Label</title>
   <style>
-    @page { size: 80mm 50mm; margin: 4mm; } /* adjust label size here */
+    @page { size: 80mm 50mm; margin: 0; }
+    html, body { margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     .label {
-      width: 78mm;
+      width: 80mm;
+      height: 50mm;
       border: 1px solid #000;
       border-radius: 3mm;
-      padding: 7mm;
+      padding: 4mm;
       box-sizing: border-box;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
     }
-    .title { font-size: 13pt; font-weight: 800; margin: 0 0 4mm; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 2.2mm; }
-    .line { display: flex; justify-content: space-between; gap: 6mm; }
+    .title { font-size: 11pt; font-weight: 800; margin: 0 0 2mm; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1.6mm; }
+    .line { display: flex; justify-content: space-between; gap: 4mm; }
     .k { font-weight: 800; }
     .v { font-variant-numeric: tabular-nums; text-align: right; }
-    .block { margin-top: 2mm; padding-top: 2mm; border-top: 1px solid #000; }
+    .block { margin-top: 1.6mm; padding-top: 1.6mm; border-top: 1px solid #000; }
     .status { font-weight: 900; }
-    .small { font-size: 9pt; }
+    .small { font-size: 8.5pt; }
   </style>
 </head>
 <body>
