@@ -718,7 +718,7 @@
       <div class="app-title"><span>Colour Bar</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
-    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
+    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Calculator</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
         
 <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
@@ -785,6 +785,7 @@
           <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
           <div class="flex" id="editRow" style="display:none; margin-top:8px;">
             <button class="btn" id="editFormulaBtn">Edit formula</button>
+            <button class="btn" id="toCalcFromSuggestedBtn" type="button">To Calculator</button>
             <span class="mini">Adjust, add/remove inks, then save correction to training log.</span>
           </div>
         </div>
@@ -805,6 +806,9 @@
           <tbody id="resultsTbody"></tbody>
         </table>
         <div id="formulaPanel" class="formula-box" style="display:none;"></div>
+        <div id="formulaPanelActions" style="display:none; margin-top:8px; text-align:right;">
+          <button class="btn" id="toCalcFromExistingBtn" type="button">To Calculator</button>
+        </div>
       </div>
     </div>
   </section>
@@ -1109,27 +1113,11 @@
               <input id="libColourName" type="text" placeholder="e.g. Warm Red">
             </div>
             <div class="flex" style="align-items:flex-end; justify-content:flex-end; gap:8px;">
-              <button class="btn" id="libScanBtn" disabled>Scan</button>
-              <button class="btn" id="libAddColourBtn" disabled>Add</button>
-            </div>
+              <button class="btn" id="spectroConnectBtnLib">Connect device</button>
+              <button class="btn" id="libScanBtn" disabled>Scan and Add</button>
+</div>
           </div>
-
-          <div class="row3" style="margin-top:10px;">
-            <div>
-              <label for="libColourL">L*</label>
-              <input id="libColourL" type="number" step="0.01" placeholder="50.00">
-            </div>
-            <div>
-              <label for="libColourA">a*</label>
-              <input id="libColourA" type="number" step="0.01" placeholder="0.00">
-            </div>
-            <div>
-              <label for="libColourB">b*</label>
-              <input id="libColourB" type="number" step="0.01" placeholder="0.00">
-            </div>
-          </div>
-
-          <div class="mini" id="libEditorHint" style="margin-top:10px;">
+<div class="mini" id="libEditorHint" style="margin-top:10px;">
             Click a library on the right to view/edit.
           </div>
 
@@ -1291,6 +1279,15 @@
         <span class="mini" id="settingsStatus" style="margin-left:auto;"></span>
       </div>
     </div>
+
+
+<div class="card" style="max-width:1200px; margin:16px auto 0;">
+  <div class="flex" style="justify-content:space-between; align-items:center; gap:10px;">
+    <h2 style="margin:0;">Training export</h2>
+    <button class="btn" id="downloadTrainingCanonicalBtn">Download CSV</button>
+  </div>
+  <div class="mini" id="trainingExportStatus" style="margin-top:6px;"></div>
+</div>
   </section>
 
 <!-- Modal: Edit Formula -->
@@ -1452,6 +1449,175 @@ let COLOUR_TO_FORMULA = {};
 let _lastSuggestion = null;
 let _lastContextName = null;
 let _allInks = [];
+
+
+// ===== Canonical ink order for training export / logging =====
+// This matches the column order used by the existing training CSV.
+// If the API ever adds extra inks, they will be appended after these.
+const CANONICAL_INK_ORDER = [
+  'DC21-001 Extender',
+  'DC21-101 Bright Red',
+  'DC21-102 Rubine',
+  'DC21-114 Rhodamine',
+  'DC21-201 Orange',
+  'DC21-304 Yellow',
+  'DC21-402 Green',
+  'DC21-501 Process Blue',
+  'DC21-604 Violet',
+  'DC21-802 Black'
+];
+
+function getCanonicalInks(){
+  const apiInks = Array.isArray(_allInks) ? _allInks.slice() : [];
+  if (!apiInks.length) return CANONICAL_INK_ORDER.slice();
+  const apiSet = new Set(apiInks);
+  const hasAllCanonical = CANONICAL_INK_ORDER.every(n=>apiSet.has(n));
+  if (!hasAllCanonical) return apiInks.slice().sort();
+  const extras = apiInks.filter(n=>!CANONICAL_INK_ORDER.includes(n)).slice().sort();
+  return CANONICAL_INK_ORDER.concat(extras);
+}
+
+function expandFormulaToCanonical(formulaObj, canonicalInks){
+  const out = {};
+  (canonicalInks||[]).forEach(ink=>{
+    out[ink] = 0;
+  });
+  const src = (formulaObj && typeof formulaObj === 'object') ? formulaObj : {};
+  Object.entries(src).forEach(([k,v])=>{
+    if (!Object.prototype.hasOwnProperty.call(out,k)) return; // ignore unknown inks
+    const n = +v;
+    out[k] = Number.isFinite(n) ? +n.toFixed(2) : 0;
+  });
+  return out;
+}
+
+function csvEscape(v){
+  const s = (v==null) ? '' : String(v);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g,'""') + '"';
+  return s;
+}
+
+function parseCsv(text){
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i=0;i<text.length;i++){
+    const c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if (c === '"'){
+        inQuotes = true;
+      } else if (c === ','){
+        row.push(field);
+        field = '';
+      } else if (c === '\n'){
+        row.push(field.replace(/\r$/,''));
+        rows.push(row);
+        row = [];
+        field = '';
+      } else if (c === '\r'){
+        // ignore
+      } else {
+        field += c;
+      }
+    }
+  }
+  row.push(field.replace(/\r$/,''));
+  rows.push(row);
+  // drop trailing empty row if present
+  if (rows.length && rows[rows.length-1].every(v=>String(v||'').trim()==='')) rows.pop();
+  return rows;
+}
+
+function canonicaliseTrainingCsv(rawCsv){
+  const rows = parseCsv(String(rawCsv||''));
+  if (!rows.length) return '';
+  const header = rows[0].map(h=>String(h||'').trim());
+  const headerMap = new Map();
+  header.forEach((h,i)=>{ if(h) headerMap.set(h,i); });
+
+  const pantoneKey = headerMap.has('Pantone') ? 'Pantone' : (headerMap.has('Name') ? 'Name' : 'Pantone');
+  const LKey = headerMap.has('L*') ? 'L*' : (headerMap.has('L') ? 'L' : 'L*');
+  const aKey = headerMap.has('a*') ? 'a*' : (headerMap.has('a') ? 'a' : 'a*');
+  const bKey = headerMap.has('b*') ? 'b*' : (headerMap.has('b') ? 'b' : 'b*');
+
+  const canonicalInks = getCanonicalInks();
+  const baseSet = new Set([pantoneKey, LKey, aKey, bKey]);
+  const inksInInput = header.filter(h=>h && !baseSet.has(h));
+  const extras = inksInInput.filter(n=>!canonicalInks.includes(n)).slice().sort();
+
+  const outHeader = ['Pantone','L*','a*','b*'].concat(canonicalInks).concat(extras);
+  const outLines = [outHeader.map(csvEscape).join(',')];
+
+  function getCell(rowArr, colName){
+    const idx = headerMap.get(colName);
+    if (idx == null) return '';
+    return (idx < rowArr.length) ? rowArr[idx] : '';
+  }
+
+  for (let r=1; r<rows.length; r++){
+    const rowArr = rows[r] || [];
+    const pantone = String(getCell(rowArr, pantoneKey) || '').trim();
+    const L = String(getCell(rowArr, LKey) ?? '').trim();
+    const a = String(getCell(rowArr, aKey) ?? '').trim();
+    const b = String(getCell(rowArr, bKey) ?? '').trim();
+
+    const outRow = [
+      pantone,
+      L,
+      a,
+      b
+    ];
+
+    canonicalInks.forEach(ink=>{
+      const v = String(getCell(rowArr, ink) ?? '').trim();
+      outRow.push(v === '' ? '0' : v);
+    });
+    extras.forEach(ink=>{
+      const v = String(getCell(rowArr, ink) ?? '').trim();
+      outRow.push(v === '' ? '0' : v);
+    });
+
+    outLines.push(outRow.map(csvEscape).join(','));
+  }
+
+  return outLines.join('\r\n');
+}
+
+async function downloadCanonicalTrainingCsv(){
+  const btn = document.getElementById('downloadTrainingCanonicalBtn');
+  const status = document.getElementById('trainingExportStatus');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Fetching…';
+  try{
+    const res = await fetch(API_BASE + '/export_training');
+    if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+    const j = await res.json();
+    const canonCsv = canonicaliseTrainingCsv(j && j.csv ? j.csv : '');
+    if (!canonCsv) throw new Error('No CSV returned.');
+    const blob = new Blob([canonCsv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'training_export_canonical.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (status) status.textContent = `Downloaded ${j && j.rows ? j.rows : ''}`.trim();
+  }catch(err){
+    if (status) status.textContent = 'Error: ' + (err.message || String(err));
+  }finally{
+    if (btn) btn.disabled = false;
+  }
+}
 
 // ===== Spectro capture state =====
 let spectroPort = null;
@@ -1670,7 +1836,7 @@ const LIB_BASE_ID = 'base';
 const LIB_ALL_ID = 'all';
 let userLibraries = []; // [{id,name,colours:[]}]
 let activeLibraryId = LIB_BASE_ID;
-let settingsLibraryId = LIB_BASE_ID;
+let settingsLibraryId = null;
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -1810,9 +1976,7 @@ function refreshActiveColours(){
 }
 function renderLibraryList(){
   const wrap = $('#libList');
-  const items = [
-    { id: LIB_BASE_ID, name: 'Pantone', colours: BASE_COLOURS, readonly:true }
-  ].concat(userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false})));
+  const items = userLibraries.map(l=>({id:l.id, name:l.name, colours:l.colours, readonly:false}));
 
   let out = '';
   items.forEach(l=>{
@@ -1827,7 +1991,7 @@ function renderLibraryList(){
     </div>`;
   });
 
-  wrap.innerHTML = out || '<div class="muted">No libraries found.</div>';
+  wrap.innerHTML = out || '<div class="muted">No custom libraries yet.</div>';
 
   wrap.querySelectorAll('[data-lib-select]').forEach(el=>{
     el.addEventListener('click', (ev)=>{
@@ -1863,22 +2027,22 @@ function scheduleSaveLibraries(){
   _libSaveTimer = setTimeout(()=>{
     saveLibraries();
     refreshLibrarySelects();
+    // Keep the sidebar counts ("X colours") in sync after add/remove/edit.
+    renderLibraryList();
     if (activeLibraryId === settingsLibraryId || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
   }, 200);
 }
 
 function setSettingsLibrary(id){
-  settingsLibraryId = id || LIB_BASE_ID;
+  if (id) settingsLibraryId = id;
+  else settingsLibraryId = (userLibraries && userLibraries.length) ? userLibraries[0].id : null;
   renderLibraryList();
   renderLibraryEditor();
 }
 
 function getSettingsLibrary(){
-  if (settingsLibraryId === LIB_BASE_ID){
-    return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
-  }
   const lib = userLibraries.find(l=>l.id === settingsLibraryId);
-  if (!lib) return { id:LIB_BASE_ID, name:'Pantone', colours:BASE_COLOURS, readonly:true };
+  if (!lib) return { id:null, name:'', colours:[], readonly:true, empty:true };
   return { id:lib.id, name:lib.name, colours:lib.colours, readonly:false, ref:lib };
 }
 
@@ -1889,20 +2053,25 @@ function renderLibraryEditor(){
   const btnExport = $('#libExportBtn');
   const btnDelete = $('#libDeleteBtn');
   const btnScan = $('#libScanBtn');
-  const btnAdd = $('#libAddColourBtn');
-
-  if (!title || !wrap) return;
+if (!title || !wrap) return;
 
   const lib = getSettingsLibrary();
+  if (lib.empty){
+    title.textContent = 'Colour sets';
+    hint.textContent = 'Select a custom library to edit.';
+    btnExport.disabled = true;
+    btnDelete.disabled = true;
+    btnScan.disabled = true;
+wrap.innerHTML = '<div class="muted" style="padding:12px;">Select a custom library to edit.</div>';
+    return;
+  }
   title.textContent = lib.name;
 
   const editable = !lib.readonly;
   btnExport.disabled = lib.readonly;
   btnDelete.disabled = lib.readonly;
   btnScan.disabled = lib.readonly;
-  btnAdd.disabled = lib.readonly;
-
-  hint.textContent = editable
+hint.textContent = editable
     ? 'Edit values directly. Changes apply app-wide.'
     : 'Select a custom library to edit.';
 
@@ -1916,7 +2085,7 @@ function renderLibraryEditor(){
           <th style="width:120px;">L*</th>
           <th style="width:120px;">a*</th>
           <th style="width:120px;">b*</th>
-          <th style="width:90px; text-align:right;"> </th>
+          <th style="width:110px; text-align:right;"><button class="btn" id="libManualAddBtn" ${editable ? "" : "disabled"}>Add</button></th>
         </tr>
       </thead>
       <tbody>
@@ -1941,6 +2110,25 @@ function renderLibraryEditor(){
   }).join('');
 
   wrap.innerHTML = head + body + '</tbody></table>';
+
+  const libManualAddBtn = wrap.querySelector('#libManualAddBtn');
+  if (libManualAddBtn && editable){
+    libManualAddBtn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      // Add a blank editable row (manual entry)
+      rows.push({ name:'', L:0, a:0, b:0 });
+      scheduleSaveLibraries();
+      renderLibraryList();
+      renderLibraryEditor();
+      // Try focus the new row name field
+      setTimeout(()=>{
+        const lastIdx = rows.length - 1;
+        const el = wrap.querySelector('[data-lib-field="name"][data-lib-idx="'+lastIdx+'"]');
+        if (el){ el.focus(); el.select?.(); }
+      }, 0);
+    });
+  }
+
 
   if (editable){
   // Wire edits
@@ -1976,6 +2164,7 @@ function renderLibraryEditor(){
       if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
       rows.splice(idx, 1);
       scheduleSaveLibraries();
+      renderLibraryList();
       renderLibraryEditor();
     });
   });
@@ -2068,9 +2257,25 @@ function showFormulaFor(colourName){
   }
   if(!list||!list.length){
     panel.style.display='none';
+    const actions = document.getElementById('formulaPanelActions');
+    if (actions) actions.style.display = 'none';
     return;
   }
-  let html=`<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
+
+  const formulaObj = {};
+  list.forEach(item=>{
+    const name=item.ink||item.Ink||'Ink';
+    const pctNum = Number(item.percent);
+    formulaObj[name] = Number.isFinite(pctNum) ? pctNum : 0;
+  });
+  window.LAST_EXISTING_FORMULA = { name: colourName, formula: formulaObj };
+
+  let html = `
+    <div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h2 style="margin:0;">Existing Formula: ${colourName}</h2>
+      </div>
+    <div class="formula-grid">
+  `;
   list.forEach(item=>{
     const name=item.ink||item.Ink||'Ink';
     const pct=item.percent!==''?(item.percent+'%'):'';
@@ -2079,6 +2284,13 @@ function showFormulaFor(colourName){
   html+='</div>';
   panel.innerHTML=html;
   panel.style.display='block';
+
+  const actions = document.getElementById('formulaPanelActions');
+  if (actions) actions.style.display = 'block';
+  const btn = document.getElementById('toCalcFromExistingBtn');
+  if (btn){
+    btn.onclick = ()=>{ mixSetManualFormulaFromOutside(colourName, formulaObj); };
+  }
 }
 function findByPms(){
   const qRaw=($('#pms').value||'').trim().toUpperCase();
@@ -2183,7 +2395,9 @@ async function suggestFormula(){
     const formula = (data && typeof data.formula === 'object') ? data.formula : {};
     const pairs=formulaPairs(formula);
 
-    let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
+    let html=`<div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h2 style="margin:0;">Suggested Formula</h2>
+      </div><div class="formula-grid" id="suggestedFormulaGrid">`;
     if (pairs.length === 0) {
       html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
     } else {
@@ -2194,6 +2408,14 @@ async function suggestFormula(){
     html+='</div>';
     box.innerHTML=html;
     box.style.display='block';
+    window.LAST_SUGGESTED_FORMULA = { name: 'Suggested', formula: formula };
+    const toBtn = document.getElementById('toCalcFromSuggestedBtn');
+    if (toBtn){
+      toBtn.onclick = ()=>{
+        mixSetManualFormulaFromOutside('Suggested', formula);
+      };
+    }
+
     msg.textContent='';
 
     _lastSuggestion={ target:t, formula, group: (group||null) };
@@ -2297,21 +2519,30 @@ function addInk(){
 }
 async function saveCorrection(){
   if(!_lastSuggestion) return;
+
   const sum = working.reduce((s,r)=> s + (+r.pct||0), 0);
   if (!approx(sum,100,0.02)) normalise();
-  const corrected = {};
+
+  const correctedSparse = {};
   working.forEach(r=>{
-    if ((+r.pct)>0) corrected[r.ink] = +(+r.pct).toFixed(2);
+    if ((+r.pct)>0) correctedSparse[r.ink] = +(+r.pct).toFixed(2);
   });
+
+  const canonicalInks = getCanonicalInks();
+  const originalFull = expandFormulaToCanonical(_lastSuggestion.formula || {}, canonicalInks);
+  const correctedFull = expandFormulaToCanonical(correctedSparse, canonicalInks);
+
   const payload = {
     target: _lastSuggestion.target,
     group: _lastSuggestion.group || null,
-    original: _lastSuggestion.formula,
-    corrected,
+    original: originalFull,
+    corrected: correctedFull,
+    inks_order: canonicalInks, // helps server keep consistent column order
     context_name: _lastContextName || null,
     note: ($('#corrNote').value||'').trim() || null,
     measured: null
   };
+
   try{
     const res = await fetch(API_BASE + '/log_correction', {
       method:'POST',
@@ -2331,7 +2562,7 @@ async function saveCorrection(){
 // ===== Spectro (Web Serial) integration & ink curve table =====
 function setSpectroConnectedUI(connected){
   spectroConnected = !!connected;
-  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare'];
+  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare','spectroConnectBtnLib'];
   ids.forEach(id=>{
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -3309,7 +3540,8 @@ function requestLabDraw(){
 }
 
 // Spectro UI wiring (all tabs)
-const spectroConnectBtnLib = document.getElementById('spectroConnectBtn');
+const spectroConnectBtn = document.getElementById('spectroConnectBtn');      // Settings tab
+const spectroConnectBtnLib = document.getElementById('spectroConnectBtnLib'); // Colour Sets tab
 const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch');
 const spectroConnectBtnCompare = document.getElementById('spectroConnectBtnCompare');
 const spectroMeasureBtn = document.getElementById('spectroMeasureBtn');
@@ -3318,7 +3550,7 @@ const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
 const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
 const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
 
-[spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
+[spectroConnectBtn, spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
   if (!btn) return;
   btn.addEventListener('click', async ()=>{
     try{
@@ -3403,6 +3635,7 @@ if (spectroScanTargetBtn){
         aInput.value = meas.a;
         bInput.value = meas.b;
         updateTargetEcho();
+        findClosest();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
@@ -3757,6 +3990,7 @@ let MIX_ACTIVE_PANTONE = '';
 // Sync helper: when a Pantone is selected in the Mixing Guide, mirror it back into Match & Predict.
 function matchSetPantoneFromOutside(name){
   const nm = (name||'').trim();
+  mixClearManualRecipe();
   if (!nm) return;
 
   const matchInput = document.getElementById('matchColourSelect');
@@ -3915,6 +4149,31 @@ function mixRenderFormula(){
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  if (MIX_MANUAL_RECIPE && Array.isArray(MIX_MANUAL_RECIPE.ingredients)) {
+    if (deEl) deEl.textContent = '—';
+    if (sheetEl) sheetEl.textContent = 'Manual';
+
+    const q = (Number.isFinite(qtyKg) && qtyKg > 0) ? qtyKg : 0;
+    const frag = document.createDocumentFragment();
+
+    for (const row of MIX_MANUAL_RECIPE.ingredients){
+      const pct = Number(row.pct)||0;
+      const grams = pct * q * 10; // (% * kg * 1000 / 100)
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${String(row.ink).replace(/</g,'&lt;')}</td>
+        <td style="text-align:right;">${pct.toFixed(3).replace(/\.?0+$/,'')}</td>
+        <td style="text-align:right;">${(Math.round(grams*10)/10).toFixed(1)}</td>
+      `;
+      frag.appendChild(tr);
+    }
+
+    tbody.appendChild(frag);
+    mixSetStatus('', 'ok');
+    mixUpdateSwatch();
+    return;
+  }
+
   const { table } = mixGetActiveTable();
   if (!table){
     if (deEl) deEl.textContent = '—';
@@ -4005,6 +4264,7 @@ function mixRefreshPantoneCombo(){
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
         input.value = x.name;
+        mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = x.name;
         mixRenderFormula();
         
@@ -4032,6 +4292,7 @@ function mixRefreshPantoneCombo(){
       const best = allNames.length ? (allNames.find(n=>mixNormalisePantoneName(n)===mixNormalisePantoneName(input.value)) || allNames[0]) : '';
       if (best){
         input.value = best;
+        mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = best;
         mixRenderFormula();
         // Mirror selection back into Match & Predict
@@ -4054,8 +4315,34 @@ function mixRefreshPantoneCombo(){
 
 // Sync: when a Pantone is selected elsewhere (Match & Predict), mirror it here.
 let MIX_PENDING_PANTONE = '';
+let MIX_MANUAL_RECIPE = null; // { name: string, ingredients: [{ink:string, pct:number}] }
+
+function mixSetManualFormulaFromOutside(name, formulaObj){
+  const nm = (name||'').trim() || 'Manual';
+  const entries = Object.entries(formulaObj||{});
+  const ingredients = entries
+    .map(([ink, pct])=>({ ink: String(ink), pct: Number(pct)||0 }))
+    .filter(x=>x.pct>0)
+    .sort((a,b)=>b.pct-a.pct);
+
+  MIX_MANUAL_RECIPE = { name: nm, ingredients };
+
+  const input = document.getElementById('mixPantoneSelect');
+  if (input) input.value = nm;
+  MIX_ACTIVE_PANTONE = nm;
+
+  showTab('mix');
+  mixRenderFormula();
+  mixUpdateSwatch();
+}
+
+function mixClearManualRecipe(){
+  MIX_MANUAL_RECIPE = null;
+}
+
 function mixSetPantoneFromOutside(name){
   const nm = (name||'').trim();
+  mixClearManualRecipe();
   if (!nm) return;
   const input = document.getElementById('mixPantoneSelect');
   if (!input){
@@ -4212,6 +4499,8 @@ $('#addPct').addEventListener('keydown', e=>{
 });
 $('#saveCorrection').addEventListener('click', saveCorrection);
 
+$('#downloadTrainingCanonicalBtn').addEventListener('click', downloadCanonicalTrainingCsv);
+
 // Library UI events
 $('#librarySelect').addEventListener('change', (e)=>{
   activeLibraryId = e.target.value || LIB_BASE_ID;
@@ -4312,53 +4601,50 @@ $('#libDeleteBtn')?.addEventListener('click', ()=>{
   saveLibraries();
   if (activeLibraryId === lib.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
   refreshLibrarySelects();
-  setSettingsLibrary(LIB_BASE_ID);
+  setSettingsLibrary();
 });
 
 $('#libScanBtn')?.addEventListener('click', async ()=>{
   const lib = getSettingsLibrary();
   if (lib.readonly) return;
+
   try{
-    const m = await spectroMeasureOnce();
-    if (!m) return;
-    $('#libColourL').value = Number(m.L||0).toFixed(2);
-    $('#libColourA').value = Number(m.a||0).toFixed(2);
-    $('#libColourB').value = Number(m.b||0).toFixed(2);
-    if (!($('#libColourName').value||'').trim()){
-      const t = new Date();
-      $('#libColourName').value = `Scan ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}${String(t.getMinutes()).padStart(2,'0')}`;
+    await spectroConnect();
+    const raw = await spectroMeasureOnce();
+    const meas = parseSpectroMeasurement(raw);
+    if (!meas || [meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+      alert('Got a response but could not parse L*a*b*.');
+      console.log('Raw spectro text:', raw);
+      return;
     }
+
+    let name = ($('#libColourName').value||'').trim();
+    if (!name){
+      const t = new Date();
+      const yyyy = t.getFullYear();
+      const mm = String(t.getMonth()+1).padStart(2,'0');
+      const dd = String(t.getDate()).padStart(2,'0');
+      const hh = String(t.getHours()).padStart(2,'0');
+      const mi = String(t.getMinutes()).padStart(2,'0');
+      name = `Scan ${yyyy}-${mm}-${dd} ${hh}${mi}`;
+    }
+
+    lib.ref.colours.push({
+      name,
+      L: Number(meas.L),
+      a: Number(meas.a),
+      b: Number(meas.b),
+    });
+
+    scheduleSaveLibraries();
+    renderLibraryList();
+    renderLibraryEditor();
   }catch(e){
     alert('Scan failed: ' + (e.message||e));
   }
 });
 
-$('#libAddColourBtn')?.addEventListener('click', ()=>{
-  const lib = getSettingsLibrary();
-  if (lib.readonly) return;
 
-  const name = ($('#libColourName').value||'').trim();
-  const L = parseFloat($('#libColourL').value);
-  const a = parseFloat($('#libColourA').value);
-  const b = parseFloat($('#libColourB').value);
-
-  if (!name){
-    alert('Please enter a colour name.');
-    return;
-  }
-  if (![L,a,b].every(Number.isFinite)){
-    alert('Please enter valid L*, a*, b* values.');
-    return;
-  }
-
-  lib.ref.colours.push({ name:name, L:L, a:a, b:b });
-  scheduleSaveLibraries();
-  $('#libColourName').value='';
-  $('#libColourL').value='';
-  $('#libColourA').value='';
-  $('#libColourB').value='';
-  renderLibraryEditor();
-});
 
 
 // Compare tab quick-load
