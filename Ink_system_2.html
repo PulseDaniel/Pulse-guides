@@ -4867,7 +4867,7 @@ if (cmpExportLogBtn){
   <meta charset="utf-8">
   <title>QC Label</title>
   <style>
-    @page { margin: 8mm; }
+    @page { size: 80mm 50mm; margin: 4mm; } /* adjust label size here */
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     .label {
       width: 78mm;
@@ -4904,7 +4904,6 @@ if (cmpExportLogBtn){
 
       <div class="block">
         <div class="line"><div class="k">ΔE2000</div><div class="v">${de.toFixed(2)} <span class="status">${pass ? 'PASS' : 'FAIL'}</span></div></div>
-        <div class="line"><div class="k">Pass dE</div><div class="v">${passSpec.toFixed(1)}</div></div>
       </div>
     </div>
   </div>
