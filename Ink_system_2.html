@@ -2289,7 +2289,7 @@ function showFormulaFor(colourName){
   if (actions) actions.style.display = 'block';
   const btn = document.getElementById('toCalcFromExistingBtn');
   if (btn){
-    btn.onclick = ()=>{ mixSetManualFormulaFromOutside(colourName, formulaObj); };
+    btn.onclick = ()=>{ mixGoToCalculatorFromExisting(colourName, formulaObj); };
   }
 }
 function findByPms(){
@@ -3812,6 +3812,7 @@ function refreshCompareStandardCombo(){
       div.addEventListener('mousedown', (e)=>{
         // mousedown to avoid blur closing before click
         e.preventDefault();
+        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
         CMP_STANDARD_NAME = x.name;
         loadCompareByQuery('A', x.name);
@@ -3891,6 +3892,7 @@ function refreshCompareStandardCombo(){
 
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
+        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
 
         const c = bestColourByQuery(x.name);
@@ -4263,6 +4265,7 @@ function mixRefreshPantoneCombo(){
 
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
+        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
         mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = x.name;
@@ -4291,6 +4294,7 @@ function mixRefreshPantoneCombo(){
     if (e.key === 'Enter'){
       const best = allNames.length ? (allNames.find(n=>mixNormalisePantoneName(n)===mixNormalisePantoneName(input.value)) || allNames[0]) : '';
       if (best){
+        MIX_PANTONE_FALLBACK = null;
         input.value = best;
         mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = best;
@@ -4317,7 +4321,48 @@ function mixRefreshPantoneCombo(){
 let MIX_PENDING_PANTONE = '';
 let MIX_MANUAL_RECIPE = null; // { name: string, ingredients: [{ink:string, pct:number}] }
 
+let MIX_PANTONE_FALLBACK = null; // { key: string, recipe: { name:string, ingredients:[{ink:string, pct:number}] } }
+
+function mixEnsureRangeAnilox(range, anilox){
+  const rangeEl = document.getElementById('mixInkRange');
+  if (rangeEl && range){
+    if (rangeEl.value !== range){
+      rangeEl.value = range;
+      rangeEl.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+  const aniloxEl = document.getElementById('mixAnilox');
+  if (aniloxEl && anilox){
+    if (aniloxEl.value !== anilox){
+      aniloxEl.value = anilox;
+      aniloxEl.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+  }
+}
+
+function mixSetPantoneFallback(name, formulaObj){
+  const nm = (name||'').trim();
+  if (!nm){ MIX_PANTONE_FALLBACK = null; return; }
+  const entries = Object.entries(formulaObj||{});
+  const ingredients = entries
+    .map(([ink,pct])=>({ ink: String(ink), pct: Number(pct)||0 }))
+    .filter(x=>x.pct>0)
+    .sort((a,b)=>b.pct-a.pct);
+  MIX_PANTONE_FALLBACK = { key: mixNormalisePantoneName(nm), recipe: { name: nm, ingredients } };
+}
+
+function mixGoToCalculatorFromExisting(pantoneName, formulaObj){
+  const nm = (pantoneName||'').trim();
+  mixEnsureRangeAnilox('D', '5v');
+  showTab('mix');
+  mixSetPantoneFallback(nm, formulaObj);
+  mixSetPantoneFromOutside(nm);
+}
+
+
+
 function mixSetManualFormulaFromOutside(name, formulaObj){
+  MIX_PANTONE_FALLBACK = null;
   const nm = (name||'').trim() || 'Manual';
   const entries = Object.entries(formulaObj||{});
   const ingredients = entries
@@ -4358,9 +4403,30 @@ function mixSetPantoneFromOutside(name){
   }
   MIX_ACTIVE_PANTONE = nm;
   mixRenderFormula();
-
   mixUpdateSwatch();
+
+  // If this Pantone isn't in the active guide table, fall back to a manual recipe (when provided).
+  try{
+    const { table } = mixGetActiveTable();
+    const key = mixNormalisePantoneName(nm);
+    const rec = (table && table.byPantone) ? table.byPantone.get(key) : null;
+
+    if (rec){
+      if (MIX_PANTONE_FALLBACK && MIX_PANTONE_FALLBACK.key === key){
+        MIX_PANTONE_FALLBACK = null;
+      }
+      return;
+    }
+
+    if (MIX_PANTONE_FALLBACK && MIX_PANTONE_FALLBACK.key === key){
+      MIX_MANUAL_RECIPE = MIX_PANTONE_FALLBACK.recipe;
+      MIX_PANTONE_FALLBACK = null;
+      mixRenderFormula();
+      mixUpdateSwatch();
+    }
+  }catch(e){}
 }
+
 
 async function mixInit(){
   const fileEl = document.getElementById('mixGuideFile');
