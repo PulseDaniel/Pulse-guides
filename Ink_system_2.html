@@ -2027,6 +2027,8 @@ function scheduleSaveLibraries(){
   _libSaveTimer = setTimeout(()=>{
     saveLibraries();
     refreshLibrarySelects();
+    // Keep the sidebar counts ("X colours") in sync after add/remove/edit.
+    renderLibraryList();
     if (activeLibraryId === settingsLibraryId || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
   }, 200);
 }
@@ -2116,6 +2118,7 @@ hint.textContent = editable
       // Add a blank editable row (manual entry)
       rows.push({ name:'', L:0, a:0, b:0 });
       scheduleSaveLibraries();
+      renderLibraryList();
       renderLibraryEditor();
       // Try focus the new row name field
       setTimeout(()=>{
@@ -2161,6 +2164,7 @@ hint.textContent = editable
       if (!Number.isFinite(idx) || idx < 0 || idx >= rows.length) return;
       rows.splice(idx, 1);
       scheduleSaveLibraries();
+      renderLibraryList();
       renderLibraryEditor();
     });
   });
@@ -4632,6 +4636,7 @@ $('#libScanBtn')?.addEventListener('click', async ()=>{
     });
 
     scheduleSaveLibraries();
+    renderLibraryList();
     renderLibraryEditor();
   }catch(e){
     alert('Scan failed: ' + (e.message||e));
