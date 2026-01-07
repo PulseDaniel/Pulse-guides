@@ -718,7 +718,7 @@
       <div class="app-title"><span>Colour Bar</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
-    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Mixing guide</button>
+    <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Calculator</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
         
 <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
@@ -2248,7 +2248,22 @@ function showFormulaFor(colourName){
     panel.style.display='none';
     return;
   }
-  let html=`<h2>Existing Formula: ${colourName}</h2><div class="formula-grid">`;
+
+  const formulaObj = {};
+  list.forEach(item=>{
+    const name=item.ink||item.Ink||'Ink';
+    const pctNum = Number(item.percent);
+    formulaObj[name] = Number.isFinite(pctNum) ? pctNum : 0;
+  });
+  window.LAST_EXISTING_FORMULA = { name: colourName, formula: formulaObj };
+
+  let html = `
+    <div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h2 style="margin:0;">Existing Formula: ${colourName}</h2>
+      <button class="btn" id="toCalcFromExistingBtn" type="button">To Calculator</button>
+    </div>
+    <div class="formula-grid">
+  `;
   list.forEach(item=>{
     const name=item.ink||item.Ink||'Ink';
     const pct=item.percent!==''?(item.percent+'%'):'';
@@ -2257,6 +2272,13 @@ function showFormulaFor(colourName){
   html+='</div>';
   panel.innerHTML=html;
   panel.style.display='block';
+
+  const btn = document.getElementById('toCalcFromExistingBtn');
+  if (btn){
+    btn.onclick = ()=>{
+      mixSetManualFormulaFromOutside(colourName, formulaObj);
+    };
+  }
 }
 function findByPms(){
   const qRaw=($('#pms').value||'').trim().toUpperCase();
@@ -2361,7 +2383,10 @@ async function suggestFormula(){
     const formula = (data && typeof data.formula === 'object') ? data.formula : {};
     const pairs=formulaPairs(formula);
 
-    let html='<h2>Suggested Formula</h2><div class="formula-grid" id="suggestedFormulaGrid">';
+    let html=`<div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+      <h2 style="margin:0;">Suggested Formula</h2>
+      <button class="btn" id="toCalcFromSuggestedBtn" type="button">To Calculator</button>
+    </div><div class="formula-grid" id="suggestedFormulaGrid">`;
     if (pairs.length === 0) {
       html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
     } else {
@@ -2372,6 +2397,14 @@ async function suggestFormula(){
     html+='</div>';
     box.innerHTML=html;
     box.style.display='block';
+    window.LAST_SUGGESTED_FORMULA = { name: 'Suggested', formula: formula };
+    const toBtn = document.getElementById('toCalcFromSuggestedBtn');
+    if (toBtn){
+      toBtn.onclick = ()=>{
+        mixSetManualFormulaFromOutside('Suggested', formula);
+      };
+    }
+
     msg.textContent='';
 
     _lastSuggestion={ target:t, formula, group: (group||null) };
@@ -3944,6 +3977,7 @@ let MIX_ACTIVE_PANTONE = '';
 // Sync helper: when a Pantone is selected in the Mixing Guide, mirror it back into Match & Predict.
 function matchSetPantoneFromOutside(name){
   const nm = (name||'').trim();
+  mixClearManualRecipe();
   if (!nm) return;
 
   const matchInput = document.getElementById('matchColourSelect');
@@ -4102,6 +4136,31 @@ function mixRenderFormula(){
   if (!tbody) return;
   tbody.innerHTML = '';
 
+  if (MIX_MANUAL_RECIPE && Array.isArray(MIX_MANUAL_RECIPE.ingredients)) {
+    if (deEl) deEl.textContent = '—';
+    if (sheetEl) sheetEl.textContent = 'Manual';
+
+    const q = (Number.isFinite(qtyKg) && qtyKg > 0) ? qtyKg : 0;
+    const frag = document.createDocumentFragment();
+
+    for (const row of MIX_MANUAL_RECIPE.ingredients){
+      const pct = Number(row.pct)||0;
+      const grams = pct * q * 10; // (% * kg * 1000 / 100)
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${String(row.ink).replace(/</g,'&lt;')}</td>
+        <td style="text-align:right;">${pct.toFixed(3).replace(/\.?0+$/,'')}</td>
+        <td style="text-align:right;">${(Math.round(grams*10)/10).toFixed(1)}</td>
+      `;
+      frag.appendChild(tr);
+    }
+
+    tbody.appendChild(frag);
+    mixSetStatus('', 'ok');
+    mixUpdateSwatch();
+    return;
+  }
+
   const { table } = mixGetActiveTable();
   if (!table){
     if (deEl) deEl.textContent = '—';
@@ -4192,6 +4251,7 @@ function mixRefreshPantoneCombo(){
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
         input.value = x.name;
+        mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = x.name;
         mixRenderFormula();
         
@@ -4219,6 +4279,7 @@ function mixRefreshPantoneCombo(){
       const best = allNames.length ? (allNames.find(n=>mixNormalisePantoneName(n)===mixNormalisePantoneName(input.value)) || allNames[0]) : '';
       if (best){
         input.value = best;
+        mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = best;
         mixRenderFormula();
         // Mirror selection back into Match & Predict
@@ -4241,8 +4302,34 @@ function mixRefreshPantoneCombo(){
 
 // Sync: when a Pantone is selected elsewhere (Match & Predict), mirror it here.
 let MIX_PENDING_PANTONE = '';
+let MIX_MANUAL_RECIPE = null; // { name: string, ingredients: [{ink:string, pct:number}] }
+
+function mixSetManualFormulaFromOutside(name, formulaObj){
+  const nm = (name||'').trim() || 'Manual';
+  const entries = Object.entries(formulaObj||{});
+  const ingredients = entries
+    .map(([ink, pct])=>({ ink: String(ink), pct: Number(pct)||0 }))
+    .filter(x=>x.pct>0)
+    .sort((a,b)=>b.pct-a.pct);
+
+  MIX_MANUAL_RECIPE = { name: nm, ingredients };
+
+  const input = document.getElementById('mixPantoneSelect');
+  if (input) input.value = nm;
+  MIX_ACTIVE_PANTONE = nm;
+
+  showTab('mix');
+  mixRenderFormula();
+  mixUpdateSwatch();
+}
+
+function mixClearManualRecipe(){
+  MIX_MANUAL_RECIPE = null;
+}
+
 function mixSetPantoneFromOutside(name){
   const nm = (name||'').trim();
+  mixClearManualRecipe();
   if (!nm) return;
   const input = document.getElementById('mixPantoneSelect');
   if (!input){
