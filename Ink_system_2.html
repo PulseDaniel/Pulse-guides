@@ -911,6 +911,7 @@
 
       <div class="flex" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn" id="cmpHistoryBtn">History</button>
+        <button class="btn" id="cmpPrintLabelBtn" style="margin-left:8px;">Print label</button>
       </div>
 
 </div>
@@ -1092,7 +1093,8 @@
       </div>
 
       <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="libAddBtn">Add library</button>
+        <button class="btn" id="libAddBtn">Add library From File</button>
+        <button class="btn" id="libCreateBtn">Create New Library</button>
         <button class="btn" id="libTemplateBtn">Download example CSV</button>
         <span class="mini">Files stay local to this browser (saved in localStorage).</span>
       </div>
@@ -4615,6 +4617,24 @@ $('#libAddBtn').addEventListener('click', ()=>{
   reader.readAsText(file);
 });
 
+$('#libCreateBtn').addEventListener('click', ()=>{
+  const name = ($('#libName').value||'').trim();
+  if (!name){
+    alert('Please enter a library name.');
+    return;
+  }
+  const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
+  const lib = { id:id, name:name, colours:[] };
+  userLibraries.push(lib);
+  saveLibraries();
+  $('#libName').value='';
+  $('#libFile').value='';
+  setSettingsLibrary(id);
+  renderLibraryList();
+  renderLibraryEditor();
+  refreshLibrarySelects();
+});
+
 // Download example CSV
 $('#libTemplateBtn').addEventListener('click', ()=>{
   const csv = [
@@ -4805,6 +4825,101 @@ if (cmpExportLogBtn){
     if (!el) return;
     el.addEventListener('input', ()=> renderCompareLog());
     el.addEventListener('change', ()=> renderCompareLog());
+  });
+})();
+
+
+// QC: Print label for Standard + Batch
+(function wireComparePrintLabel(){
+  const btn = document.getElementById('cmpPrintLabelBtn');
+  if (!btn) return;
+
+  function fmt3(x){
+    return Number.isFinite(x) ? x.toFixed(2) : '—';
+  }
+
+  btn.addEventListener('click', () => {
+    const libSel = document.getElementById('cmpLibrarySelect');
+    const libName = libSel && libSel.selectedOptions && libSel.selectedOptions[0]
+      ? libSel.selectedOptions[0].textContent.trim()
+      : '—';
+
+    const std = { L: parseFloat($('#AL')?.value), a: parseFloat($('#Aa')?.value), b: parseFloat($('#Ab')?.value) };
+    const bat = { L: parseFloat($('#BL')?.value), a: parseFloat($('#Ba')?.value), b: parseFloat($('#Bb')?.value) };
+    if ([std.L,std.a,std.b,bat.L,bat.a,bat.b].some(v => !Number.isFinite(v))){
+      alert('Please scan or enter both Standard and Batch LAB values first.');
+      return;
+    }
+
+    const de = deltaE2000(std, bat);
+    const passSpec = 1.5;
+    const pass = de < passSpec;
+
+    const dt = new Date();
+    const dtStr = dt.toLocaleString('en-GB', {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit'
+    });
+
+    const labelHtml = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>QC Label</title>
+  <style>
+    @page { margin: 8mm; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .label {
+      width: 78mm;
+      border: 1px solid #000;
+      border-radius: 3mm;
+      padding: 7mm;
+      box-sizing: border-box;
+    }
+    .title { font-size: 13pt; font-weight: 800; margin: 0 0 4mm; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 2.2mm; }
+    .line { display: flex; justify-content: space-between; gap: 6mm; }
+    .k { font-weight: 800; }
+    .v { font-variant-numeric: tabular-nums; text-align: right; }
+    .block { margin-top: 2mm; padding-top: 2mm; border-top: 1px solid #000; }
+    .status { font-weight: 900; }
+    .small { font-size: 9pt; }
+  </style>
+</head>
+<body>
+  <div class="label">
+    <div class="title">QC Label</div>
+    <div class="grid small">
+      <div class="line"><div class="k">Library</div><div class="v">${libName}</div></div>
+
+      <div class="block">
+        <div class="line"><div class="k">LAB standard</div><div class="v">L ${fmt3(std.L)}  a ${fmt3(std.a)}  b ${fmt3(std.b)}</div></div>
+        <div class="line"><div class="k">LAB batch</div><div class="v">L ${fmt3(bat.L)}  a ${fmt3(bat.a)}  b ${fmt3(bat.b)}</div></div>
+      </div>
+
+      <div class="block">
+        <div class="line"><div class="k">Date/time</div><div class="v">${dtStr}</div></div>
+        <div class="line"><div class="k">User</div><div class="v">GSeward</div></div>
+      </div>
+
+      <div class="block">
+        <div class="line"><div class="k">ΔE2000</div><div class="v">${de.toFixed(2)} <span class="status">${pass ? 'PASS' : 'FAIL'}</span></div></div>
+        <div class="line"><div class="k">Pass dE</div><div class="v">${passSpec.toFixed(1)}</div></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    window.onload = () => { window.print(); };
+    window.onafterprint = () => { window.close(); };
+  </script>
+</body>
+</html>`;
+
+    const w = window.open('', '_blank', 'width=560,height=720');
+    if (!w) { alert('Popup blocked — please allow popups to print the label.'); return; }
+    w.document.open();
+    w.document.write(labelHtml);
+    w.document.close();
   });
 })();
 
