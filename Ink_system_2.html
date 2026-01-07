@@ -785,6 +785,7 @@
           <div id="suggestedFormula" class="formula-box" style="display:none; margin-top:12px;"></div>
           <div class="flex" id="editRow" style="display:none; margin-top:8px;">
             <button class="btn" id="editFormulaBtn">Edit formula</button>
+            <button class="btn" id="toCalcFromSuggestedBtn" type="button">To Calculator</button>
             <span class="mini">Adjust, add/remove inks, then save correction to training log.</span>
           </div>
         </div>
@@ -805,6 +806,9 @@
           <tbody id="resultsTbody"></tbody>
         </table>
         <div id="formulaPanel" class="formula-box" style="display:none;"></div>
+        <div id="formulaPanelActions" style="display:none; margin-top:8px; text-align:right;">
+          <button class="btn" id="toCalcFromExistingBtn" type="button">To Calculator</button>
+        </div>
       </div>
     </div>
   </section>
@@ -2246,6 +2250,8 @@ function showFormulaFor(colourName){
   }
   if(!list||!list.length){
     panel.style.display='none';
+    const actions = document.getElementById('formulaPanelActions');
+    if (actions) actions.style.display = 'none';
     return;
   }
 
@@ -2260,8 +2266,7 @@ function showFormulaFor(colourName){
   let html = `
     <div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
       <h2 style="margin:0;">Existing Formula: ${colourName}</h2>
-      <button class="btn" id="toCalcFromExistingBtn" type="button">To Calculator</button>
-    </div>
+      </div>
     <div class="formula-grid">
   `;
   list.forEach(item=>{
@@ -2273,11 +2278,11 @@ function showFormulaFor(colourName){
   panel.innerHTML=html;
   panel.style.display='block';
 
+  const actions = document.getElementById('formulaPanelActions');
+  if (actions) actions.style.display = 'block';
   const btn = document.getElementById('toCalcFromExistingBtn');
   if (btn){
-    btn.onclick = ()=>{
-      mixSetManualFormulaFromOutside(colourName, formulaObj);
-    };
+    btn.onclick = ()=>{ mixSetManualFormulaFromOutside(colourName, formulaObj); };
   }
 }
 function findByPms(){
@@ -2385,8 +2390,7 @@ async function suggestFormula(){
 
     let html=`<div class="flex" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
       <h2 style="margin:0;">Suggested Formula</h2>
-      <button class="btn" id="toCalcFromSuggestedBtn" type="button">To Calculator</button>
-    </div><div class="formula-grid" id="suggestedFormulaGrid">`;
+      </div><div class="formula-grid" id="suggestedFormulaGrid">`;
     if (pairs.length === 0) {
       html += '<div class="fg-ink">—</div><div class="fg-pct">0.00%</div>';
     } else {
