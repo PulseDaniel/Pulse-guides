@@ -4875,14 +4875,17 @@ if (cmpExportLogBtn){
       height: 50mm;
       border: 1px solid #000;
       border-radius: 3mm;
-      padding: 4mm;
+      padding: 3.2mm 3.2mm 2.2mm 3.2mm;
       box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
       page-break-inside: avoid;
       break-inside: avoid;
       overflow: hidden;
     }
-    .title { font-size: 11pt; font-weight: 800; margin: 0 0 2mm; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 1.6mm; }
+    .title { font-size: 11pt; font-weight: 800; margin: 0 0 1.6mm; }
+    .grid { display: flex; flex-direction: column; gap: 1.6mm; flex: 1; }
+    .grid .block:last-child { margin-top: auto; }
     .line { display: flex; justify-content: space-between; gap: 4mm; }
     .k { font-weight: 800; }
     .v { font-variant-numeric: tabular-nums; text-align: right; }
