@@ -1113,6 +1113,7 @@
               <input id="libColourName" type="text" placeholder="e.g. Warm Red">
             </div>
             <div class="flex" style="align-items:flex-end; justify-content:flex-end; gap:8px;">
+              <button class="btn" id="spectroConnectBtnLib">Connect device</button>
               <button class="btn" id="libScanBtn" disabled>Scan</button>
               <button class="btn" id="libAddColourBtn" disabled>Add</button>
             </div>
@@ -2555,7 +2556,7 @@ async function saveCorrection(){
 // ===== Spectro (Web Serial) integration & ink curve table =====
 function setSpectroConnectedUI(connected){
   spectroConnected = !!connected;
-  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare'];
+  const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare','spectroConnectBtnLib'];
   ids.forEach(id=>{
     const btn = document.getElementById(id);
     if (!btn) return;
@@ -4599,11 +4600,17 @@ $('#libScanBtn')?.addEventListener('click', async ()=>{
   const lib = getSettingsLibrary();
   if (lib.readonly) return;
   try{
-    const m = await spectroMeasureOnce();
-    if (!m) return;
-    $('#libColourL').value = Number(m.L||0).toFixed(2);
-    $('#libColourA').value = Number(m.a||0).toFixed(2);
-    $('#libColourB').value = Number(m.b||0).toFixed(2);
+    await spectroConnect();
+    const raw = await spectroMeasureOnce();
+    const meas = parseSpectroMeasurement(raw);
+    if (!meas || [meas.L,meas.a,meas.b].some(v=>!Number.isFinite(v))){
+      alert('Got a response but could not parse L*a*b*.');
+      console.log('Raw spectro text:', raw);
+      return;
+    }
+    $('#libColourL').value = Number(meas.L).toFixed(2);
+    $('#libColourA').value = Number(meas.a).toFixed(2);
+    $('#libColourB').value = Number(meas.b).toFixed(2);
     if (!($('#libColourName').value||'').trim()){
       const t = new Date();
       $('#libColourName').value = `Scan ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}${String(t.getMinutes()).padStart(2,'0')}`;
