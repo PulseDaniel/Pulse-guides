@@ -1114,27 +1114,10 @@
             </div>
             <div class="flex" style="align-items:flex-end; justify-content:flex-end; gap:8px;">
               <button class="btn" id="spectroConnectBtnLib">Connect device</button>
-              <button class="btn" id="libScanBtn" disabled>Scan</button>
-              <button class="btn" id="libAddColourBtn" disabled>Add</button>
-            </div>
+              <button class="btn" id="libScanBtn" disabled>Scan and Add</button>
+</div>
           </div>
-
-          <div class="row3" style="margin-top:10px;">
-            <div>
-              <label for="libColourL">L*</label>
-              <input id="libColourL" type="number" step="0.01" placeholder="50.00">
-            </div>
-            <div>
-              <label for="libColourA">a*</label>
-              <input id="libColourA" type="number" step="0.01" placeholder="0.00">
-            </div>
-            <div>
-              <label for="libColourB">b*</label>
-              <input id="libColourB" type="number" step="0.01" placeholder="0.00">
-            </div>
-          </div>
-
-          <div class="mini" id="libEditorHint" style="margin-top:10px;">
+<div class="mini" id="libEditorHint" style="margin-top:10px;">
             Click a library on the right to view/edit.
           </div>
 
@@ -2068,9 +2051,7 @@ function renderLibraryEditor(){
   const btnExport = $('#libExportBtn');
   const btnDelete = $('#libDeleteBtn');
   const btnScan = $('#libScanBtn');
-  const btnAdd = $('#libAddColourBtn');
-
-  if (!title || !wrap) return;
+if (!title || !wrap) return;
 
   const lib = getSettingsLibrary();
   if (lib.empty){
@@ -2079,8 +2060,7 @@ function renderLibraryEditor(){
     btnExport.disabled = true;
     btnDelete.disabled = true;
     btnScan.disabled = true;
-    btnAdd.disabled = true;
-    wrap.innerHTML = '<div class="muted" style="padding:12px;">Select a custom library to edit.</div>';
+wrap.innerHTML = '<div class="muted" style="padding:12px;">Select a custom library to edit.</div>';
     return;
   }
   title.textContent = lib.name;
@@ -2089,9 +2069,7 @@ function renderLibraryEditor(){
   btnExport.disabled = lib.readonly;
   btnDelete.disabled = lib.readonly;
   btnScan.disabled = lib.readonly;
-  btnAdd.disabled = lib.readonly;
-
-  hint.textContent = editable
+hint.textContent = editable
     ? 'Edit values directly. Changes apply app-wide.'
     : 'Select a custom library to edit.';
 
@@ -2105,7 +2083,7 @@ function renderLibraryEditor(){
           <th style="width:120px;">L*</th>
           <th style="width:120px;">a*</th>
           <th style="width:120px;">b*</th>
-          <th style="width:90px; text-align:right;"> </th>
+          <th style="width:110px; text-align:right;"><button class="btn" id="libManualAddBtn" ${editable ? "" : "disabled"}>Add</button></th>
         </tr>
       </thead>
       <tbody>
@@ -2130,6 +2108,24 @@ function renderLibraryEditor(){
   }).join('');
 
   wrap.innerHTML = head + body + '</tbody></table>';
+
+  const libManualAddBtn = wrap.querySelector('#libManualAddBtn');
+  if (libManualAddBtn && editable){
+    libManualAddBtn.addEventListener('click', (ev)=>{
+      ev.preventDefault();
+      // Add a blank editable row (manual entry)
+      rows.push({ name:'', L:0, a:0, b:0 });
+      scheduleSaveLibraries();
+      renderLibraryEditor();
+      // Try focus the new row name field
+      setTimeout(()=>{
+        const lastIdx = rows.length - 1;
+        const el = wrap.querySelector('[data-lib-field="name"][data-lib-idx="'+lastIdx+'"]');
+        if (el){ el.focus(); el.select?.(); }
+      }, 0);
+    });
+  }
+
 
   if (editable){
   // Wire edits
@@ -4606,6 +4602,7 @@ $('#libDeleteBtn')?.addEventListener('click', ()=>{
 $('#libScanBtn')?.addEventListener('click', async ()=>{
   const lib = getSettingsLibrary();
   if (lib.readonly) return;
+
   try{
     await spectroConnect();
     const raw = await spectroMeasureOnce();
@@ -4615,44 +4612,33 @@ $('#libScanBtn')?.addEventListener('click', async ()=>{
       console.log('Raw spectro text:', raw);
       return;
     }
-    $('#libColourL').value = Number(meas.L).toFixed(2);
-    $('#libColourA').value = Number(meas.a).toFixed(2);
-    $('#libColourB').value = Number(meas.b).toFixed(2);
-    if (!($('#libColourName').value||'').trim()){
+
+    let name = ($('#libColourName').value||'').trim();
+    if (!name){
       const t = new Date();
-      $('#libColourName').value = `Scan ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} ${String(t.getHours()).padStart(2,'0')}${String(t.getMinutes()).padStart(2,'0')}`;
+      const yyyy = t.getFullYear();
+      const mm = String(t.getMonth()+1).padStart(2,'0');
+      const dd = String(t.getDate()).padStart(2,'0');
+      const hh = String(t.getHours()).padStart(2,'0');
+      const mi = String(t.getMinutes()).padStart(2,'0');
+      name = `Scan ${yyyy}-${mm}-${dd} ${hh}${mi}`;
     }
+
+    lib.ref.colours.push({
+      name,
+      L: Number(meas.L),
+      a: Number(meas.a),
+      b: Number(meas.b),
+    });
+
+    scheduleSaveLibraries();
+    renderLibraryEditor();
   }catch(e){
     alert('Scan failed: ' + (e.message||e));
   }
 });
 
-$('#libAddColourBtn')?.addEventListener('click', ()=>{
-  const lib = getSettingsLibrary();
-  if (lib.readonly) return;
 
-  const name = ($('#libColourName').value||'').trim();
-  const L = parseFloat($('#libColourL').value);
-  const a = parseFloat($('#libColourA').value);
-  const b = parseFloat($('#libColourB').value);
-
-  if (!name){
-    alert('Please enter a colour name.');
-    return;
-  }
-  if (![L,a,b].every(Number.isFinite)){
-    alert('Please enter valid L*, a*, b* values.');
-    return;
-  }
-
-  lib.ref.colours.push({ name:name, L:L, a:a, b:b });
-  scheduleSaveLibraries();
-  $('#libColourName').value='';
-  $('#libColourL').value='';
-  $('#libColourA').value='';
-  $('#libColourB').value='';
-  renderLibraryEditor();
-});
 
 
 // Compare tab quick-load
