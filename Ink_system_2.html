@@ -3635,6 +3635,7 @@ if (spectroScanTargetBtn){
         aInput.value = meas.a;
         bInput.value = meas.b;
         updateTargetEcho();
+        findClosest();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
