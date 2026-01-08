@@ -865,6 +865,33 @@ tbody tr:hover{
   *{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
 }
 
+
+  /* --- Navbar brand/logo layout (added) --- */
+  .appbar-inner{ justify-content:space-between; }
+  .tabs{ flex:1 1 auto; min-width: 420px; }
+  .app-brand{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding-left:8px;
+  }
+  .app-logo{
+    height:22px;
+    width:auto;
+    display:block;
+    border-radius:10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,.35);
+    filter: saturate(1.05) contrast(1.05);
+  }
+  @media (max-width: 760px){
+    .tabs{ min-width: 260px; }
+    .app-logo{ height:18px; }
+  }
+  @media (max-width: 560px){
+    .app-brand .app-title{ display:none; }
+  }
+
 </style>
 </head>
 <body>
@@ -889,7 +916,6 @@ tbody tr:hover{
   <div id="appRoot" class="app-hidden">
   <div class="appbar">
     <div class="appbar-inner">
-      <div class="app-title"><span>Colour Bar</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Calculator</button>
@@ -897,6 +923,10 @@ tbody tr:hover{
         
 <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
+      <div class="app-brand" aria-label="Colour Bar">
+        <div class="app-title"><span>Colour Bar</span></div>
+        <img class="app-logo" src="./ColourBarLogo.png" alt="Colour Bar" draggable="false">
+      </div>
     </div>
   </div>
 
