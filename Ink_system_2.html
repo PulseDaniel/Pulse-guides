@@ -135,10 +135,8 @@
   .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
-.dot.isBatch{ border-radius:0; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
-
-
-  /* LAB 2D readout (a/b grid + L slider) */
+.dot.isBatch{ border-radius:50%; clip-path:none; }
+/* LAB 2D readout (a/b grid + L slider) */
   .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
   .lab3dWrap{ min-width:0; }
   @media (max-width: 980px){
@@ -206,14 +204,11 @@
 }
 
 .lMarker.isBatch{
-  border-radius:0;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  /* Box-shadow on clipped shapes can render as a rectangle in some browsers */
-  box-shadow: none !important;
-  /* Give it a subtle outline/shadow that respects the clip */
-  filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+  border-radius:999px;
+  clip-path:none;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
+  filter:none;
 }
-
 .lMarker.isBatch.isHover{
   border-color: rgba(255,255,255,.9);
   filter: drop-shadow(0 0 0 rgba(255,255,255,.85)) drop-shadow(0 0 12px rgba(255,255,255,.25));
@@ -3328,15 +3323,7 @@ function drawAbGrid(A, B){
 
     const r = 6;
     abCtx.beginPath();
-    if (role === 'batch'){
-      // Up-pointing triangle
-      abCtx.moveTo(x, y - r);
-      abCtx.lineTo(x - r, y + r);
-      abCtx.lineTo(x + r, y + r);
-      abCtx.closePath();
-    } else {
-      abCtx.arc(x,y,r,0,Math.PI*2);
-    }
+    abCtx.arc(x,y,r,0,Math.PI*2);
     abCtx.fill();
     abCtx.lineWidth = isHi ? 2.5 : 2;
     abCtx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : abCtx.strokeStyle;
@@ -3612,14 +3599,7 @@ function drawPointLab(L,a,b,label,role){
 
   const r = 6*p.k;
   ctx.beginPath();
-  if (role === 'batch'){
-    ctx.moveTo(p.u, p.v - r);
-    ctx.lineTo(p.u - r, p.v + r);
-    ctx.lineTo(p.u + r, p.v + r);
-    ctx.closePath();
-  } else {
-    ctx.arc(p.u,p.v,r,0,Math.PI*2);
-  }
+  ctx.arc(p.u,p.v,r,0,Math.PI*2);
   ctx.fill();
   ctx.lineWidth = isHi ? 2.2 : 1;
   ctx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : ctx.strokeStyle;
@@ -3630,10 +3610,7 @@ function drawPointLab(L,a,b,label,role){
   if (role === 'batch') _orbLastPts.batch = { x:p.u, y:p.v, r:Math.max(8, r) };
 
   ctx.restore();
-  ctx.fillStyle='#e5e7eb';
-  ctx.font='12px ui-sans-serif, system-ui';
-  ctx.fillText(label, p.u+8, p.v-8);
-  return p;
+return p;
 }
 function drawLineLab(A,B){
   const p1=proj(rot3(normLab(A.L,A.a,A.b)));
