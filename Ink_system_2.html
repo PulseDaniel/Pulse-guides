@@ -712,6 +712,159 @@
     .lTrack{ flex: 1 1 auto; height:auto; }
   }
 
+
+
+
+/* =========================
+   Professional polish pass
+   ========================= */
+:root{
+  --accent:#3b82f6;
+  --accent-soft: rgba(59,130,246,.18);
+  --surface:#0f1219;
+  --surface-2:#111623;
+  --surface-3:#141a2a;
+  --border:rgba(255,255,255,.10);
+  --border-2:rgba(255,255,255,.14);
+  --text:#e6e6e6;
+  --muted:#9aa4b2;
+}
+
+html{
+  overflow-y:scroll;            /* prevent layout shift when scrollbar appears */
+  scrollbar-gutter:stable;      /* supported in Chromium/Firefox */
+}
+
+body{
+  letter-spacing:.1px;
+  text-rendering:optimizeLegibility;
+}
+
+/* App bar + tabs */
+.appbar{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(11,12,16,.78);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.appbar-inner{ gap:12px; }
+
+.tabs{
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.075);
+  padding:6px;
+  border-radius:16px;
+  gap:6px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.25) inset;
+}
+
+.tabbtn{
+  position:relative;
+  border:1px solid transparent;
+  background:transparent;
+  transition: transform .12s ease, background-color .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease;
+  outline:none;
+}
+.tabbtn:hover{
+  background:rgba(255,255,255,.06);
+}
+.tabbtn[aria-selected="true"]{
+  background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
+  border-color:rgba(255,255,255,.16);
+  color:#ffffff;
+  box-shadow: 0 8px 22px rgba(0,0,0,.35);
+  transform: translateY(-1px);
+}
+.tabbtn[aria-selected="true"]::after{
+  content:"";
+  position:absolute;
+  left:12px;
+  right:12px;
+  bottom:-7px;
+  height:3px;
+  border-radius:4px;
+  background:var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+/* Cards/panels */
+.card, .panel, .modal{
+  border-color: rgba(255,255,255,.10) !important;
+}
+.card{
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35) !important;
+}
+.card:hover{
+  border-color: rgba(255,255,255,.14) !important;
+}
+
+/* Inputs & buttons */
+input, select, textarea{
+  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
+}
+input:hover, select:hover, textarea:hover{
+  border-color: rgba(255,255,255,.16);
+}
+input:focus, select:focus, textarea:focus{
+  border-color: rgba(59,130,246,.55);
+  box-shadow: 0 0 0 4px rgba(59,130,246,.18);
+  outline:none;
+}
+:focus-visible{
+  outline: 2px solid rgba(59,130,246,.65);
+  outline-offset: 2px;
+  border-radius: 10px;
+}
+
+.btn{
+  transition: transform .12s ease, filter .12s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
+}
+.btn:hover{
+  transform: translateY(-1px);
+}
+.btn:active{
+  transform: translateY(0);
+}
+.btn:disabled, .btn[disabled]{
+  opacity:.55;
+  cursor:not-allowed;
+  filter:none !important;
+  transform:none !important;
+}
+
+/* Better table readability (used in libraries) */
+table{
+  border-collapse:separate;
+  border-spacing:0;
+}
+thead th{
+  position:sticky;
+  top:0;
+  background: rgba(11,12,16,.85);
+  backdrop-filter: blur(10px);
+  z-index:1;
+}
+tbody tr:hover{
+  background: rgba(255,255,255,.03);
+}
+
+/* Subtle scrollbars (Chromium/WebKit) */
+::-webkit-scrollbar{ width: 10px; height:10px; }
+::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.14);
+  border: 2px solid rgba(11,12,16,.75);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,.20); }
+::-webkit-scrollbar-corner{ background: rgba(11,12,16,.75); }
+
+@media (prefers-reduced-motion: reduce){
+  *{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
+}
+
 </style>
 </head>
 <body>
