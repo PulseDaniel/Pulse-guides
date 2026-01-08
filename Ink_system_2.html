@@ -199,8 +199,23 @@
   border:2px solid rgba(0,0,0,.55);
   background:#e5e7eb;
   box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
-  pointer-events:none;
+  pointer-events:auto;
+  cursor:pointer;
 }
+
+.lMarker.isBatch{
+  border-radius:0;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+.lMarker.isHover{
+  box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 0 14px rgba(255,255,255,.20);
+}
+.labNumRow{ transition: filter .12s ease, opacity .12s ease; }
+.labNumRow.isHover .labTag{
+  filter: brightness(1.25);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.20) inset, 0 0 12px rgba(255,255,255,.10);
+}
+.labNumRow.isDim{ opacity: .45; }
 .lDot{ }
 .lMarkerTag{
   position:absolute;
@@ -691,61 +706,6 @@
     .lTrack{ flex: 1 1 auto; height:auto; }
   }
 
-
-  /* QC hover: link Std/Batch bits (grid dot, L marker, labels) */
-  .labReadout .labNumRow{ cursor:pointer; }
-  .lTrack{ cursor:pointer; }
-
-  /* Make L markers hoverable + easier to hit */
-  .lMarker{ pointer-events:auto; cursor:pointer; }
-  .lMarker::after{
-    content:'';
-    position:absolute;
-    inset:-10px;
-    border-radius:999px;
-  }
-
-  .lMarker.qc-hl{
-    transform:translateX(-50%) scale(1.25);
-    border-color: rgba(255,255,255,.65);
-    box-shadow:
-      0 0 0 2px rgba(0,0,0,.55),
-      0 0 0 1px rgba(255,255,255,.28) inset,
-      0 0 14px rgba(255,255,255,.25);
-  }
-
-  .labReadout.qc-hover-a #labTagA,
-  .labReadout.qc-hover-a #labNumsA{
-    color:#ffffff;
-  }
-  .labReadout.qc-hover-a #labTagA{
-    font-weight:900;
-    background: rgba(255,255,255,.12);
-    border-color: rgba(255,255,255,.22);
-    box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset, 0 0 16px rgba(255,255,255,.10);
-  }
-  .labReadout.qc-hover-a #labNumsA{ font-weight:800; }
-  .labReadout.qc-hover-a #labTagB,
-  .labReadout.qc-hover-a #labNumsB{
-    opacity:.55;
-  }
-
-  .labReadout.qc-hover-b #labTagB,
-  .labReadout.qc-hover-b #labNumsB{
-    color:#ffffff;
-  }
-  .labReadout.qc-hover-b #labTagB{
-    font-weight:900;
-    background: rgba(255,255,255,.12);
-    border-color: rgba(255,255,255,.22);
-    box-shadow: 0 0 0 1px rgba(255,255,255,.18) inset, 0 0 16px rgba(255,255,255,.10);
-  }
-  .labReadout.qc-hover-b #labNumsB{ font-weight:800; }
-  .labReadout.qc-hover-b #labTagA,
-  .labReadout.qc-hover-b #labNumsA{
-    opacity:.55;
-  }
-
 </style>
 </head>
 <body>
@@ -996,7 +956,7 @@
               <div class="lReadoutWrap">
                 <div class="lTrack" id="lTrack">
                   <div class="lMarker lDot" id="lMarkerA" title="Std"></div>
-                  <div class="lMarker lDot" id="lMarkerB" title="Batch"></div>
+                  <div class="lMarker lDot isBatch" id="lMarkerB" title="Batch"></div>
                 </div>
                 <div class="lAxisLabel">L*</div>
               </div>
@@ -3127,27 +3087,81 @@ const labNumsB = document.getElementById('labNumsB');
 const labTagA = document.getElementById('labTagA');
 const labTagB = document.getElementById('labTagB');
 
-let _qcHover = null; // 'A' | 'B' | null
-let _abHitPts = { A: null, B: null }; // updated each drawAbGrid (CSS px coords)
+// Linked hover highlighting across QC readout (grid, L bar, orb, rows)
+let _labHoverRole = null; // 'std' | 'batch' | null
+let _labHoverSource = null; // 'ui' | 'ab' | 'l' | 'orb' | null
+let _abLastPts = { std: null, batch: null }; // {x,y,r}
+let _orbLastPts = { std: null, batch: null }; // {x,y,r}
 
-function _labReadoutEl(){
-  return document.querySelector('#tab-compare .labReadout') || document.querySelector('.labReadout');
-}
-function setQcHover(which){
-  const next = (which === 'A' || which === 'B') ? which : null;
-  if (_qcHover === next) return;
-  _qcHover = next;
+function _applyLabHoverClasses(){
+  const rowA = labTagA?.closest('.labNumRow');
+  const rowB = labTagB?.closest('.labNumRow');
 
-  const ro = _labReadoutEl();
-  if (ro){
-    ro.classList.toggle('qc-hover-a', _qcHover === 'A');
-    ro.classList.toggle('qc-hover-b', _qcHover === 'B');
+  // rows
+  if (rowA){
+    rowA.classList.toggle('isHover', _labHoverRole === 'std');
+    rowA.classList.toggle('isDim', _labHoverRole && _labHoverRole !== 'std');
   }
-  if (lMarkerA) lMarkerA.classList.toggle('qc-hl', _qcHover === 'A');
-  if (lMarkerB) lMarkerB.classList.toggle('qc-hl', _qcHover === 'B');
+  if (rowB){
+    rowB.classList.toggle('isHover', _labHoverRole === 'batch');
+    rowB.classList.toggle('isDim', _labHoverRole && _labHoverRole !== 'batch');
+  }
 
-  // Redraw a/b grid so the hovered dot/label is emphasised
-  try { updateLabReadout(); } catch(_) {}
+  // L markers
+  if (lMarkerA){
+    lMarkerA.classList.toggle('isHover', _labHoverRole === 'std');
+    lMarkerA.style.opacity = (_labHoverRole && _labHoverRole !== 'std') ? '0.45' : '1';
+  }
+  if (lMarkerB){
+    lMarkerB.classList.toggle('isHover', _labHoverRole === 'batch');
+    lMarkerB.style.opacity = (_labHoverRole && _labHoverRole !== 'batch') ? '0.45' : '1';
+  }
+}
+
+function setLabHover(role, source){
+  if (role !== 'std' && role !== 'batch' && role !== null) role = null;
+  // If another UI element is actively hovered, ignore canvas clear attempts.
+  if (role === null && _labHoverSource === 'ui' && source !== 'ui') return;
+
+  const changed = (_labHoverRole !== role) || (_labHoverSource !== source);
+  _labHoverRole = role;
+  _labHoverSource = role ? (source || null) : null;
+
+  _applyLabHoverClasses();
+  if (changed) requestLabDraw();
+}
+
+function _wireHover(el, role){
+  if (!el) return;
+  el.addEventListener('mouseenter', ()=>setLabHover(role,'ui'));
+  el.addEventListener('mouseleave', ()=>setLabHover(null,'ui'));
+}
+
+// UI hover wiring
+_wireHover(labTagA?.closest('.labNumRow') || labTagA, 'std');
+_wireHover(labTagB?.closest('.labNumRow') || labTagB, 'batch');
+_wireHover(lMarkerA, 'std');
+_wireHover(lMarkerB, 'batch');
+
+// AB grid hover (canvas)
+if (abCanvas){
+  abCanvas.addEventListener('mousemove', (e)=>{
+    const rect = abCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Hit test both, pick closest within radius
+    let best = null;
+    for (const role of ['std','batch']){
+      const p = _abLastPts[role];
+      if (!p) continue;
+      const d = Math.hypot(mx - p.x, my - p.y);
+      const hitR = Math.max(10, (p.r || 6) + 6);
+      if (d <= hitR && (!best || d < best.d)) best = { role, d };
+    }
+    setLabHover(best ? best.role : null, 'ab');
+  }, { passive:true });
+  abCanvas.addEventListener('mouseleave', ()=>setLabHover(null,'ab'));
 }
 
 
@@ -3283,41 +3297,44 @@ function drawAbGrid(A, B){
   abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
   abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
 
-    function drawPtDot(pt, key){
+  function drawPtDot(pt, role){
     if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return null;
     const rgb = labToSrgb(pt.L, pt.a, pt.b);
     const x = toX(pt.a), y = toY(pt.b);
 
-    const isHover = (_qcHover === key);
-    const isDim = (_qcHover && _qcHover !== key);
-
-    const r = isHover ? 8 : 6;
-    const rHit = 12; // hover hit radius in CSS px
-
+    abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+    abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
+    abCtx.lineWidth = 2;
+    const active = _labHoverRole;
+    const isDim = active && active !== role;
+    const isHi = active === role;
     abCtx.save();
-    abCtx.globalAlpha = isDim ? 0.62 : 1;
-    if (isHover){
-      abCtx.shadowColor = 'rgba(255,255,255,.28)';
+    if (isDim) abCtx.globalAlpha = 0.45;
+    if (isHi){
+      abCtx.shadowColor = 'rgba(255,255,255,0.35)';
       abCtx.shadowBlur = 14;
-    } else {
-      abCtx.shadowColor = 'rgba(0,0,0,0)';
-      abCtx.shadowBlur = 0;
     }
 
-    abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
-    abCtx.strokeStyle = isHover ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.60)';
-    abCtx.lineWidth = isHover ? 3 : 2;
-
+    const r = 6;
     abCtx.beginPath();
-    abCtx.arc(x,y,r,0,Math.PI*2);
+    if (role === 'batch'){
+      // Up-pointing triangle
+      abCtx.moveTo(x, y - r);
+      abCtx.lineTo(x - r, y + r);
+      abCtx.lineTo(x + r, y + r);
+      abCtx.closePath();
+    } else {
+      abCtx.arc(x,y,r,0,Math.PI*2);
+    }
     abCtx.fill();
+    abCtx.lineWidth = isHi ? 2.5 : 2;
+    abCtx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : abCtx.strokeStyle;
     abCtx.stroke();
     abCtx.restore();
-
-    return { x, y, rgb, rHit };
+    return { x, y, r:6, rgb };
   }
 
-  function drawPtLabel(text, x, y, side, dy, key){
+  function drawPtLabel(text, x, y, side, dy, role){
     const w = abCanvas.clientWidth || 280;
     const h = abCanvas.clientHeight || 280;
 
@@ -3328,10 +3345,8 @@ function drawAbGrid(A, B){
     if (side === 'right' && x > w - 38){ side = 'left'; dx = -10; }
 
     abCtx.save();
-    const isHover = (_qcHover === key);
-    const isDim = (_qcHover && _qcHover !== key);
-    abCtx.fillStyle = isHover ? '#ffffff' : (isDim ? 'rgba(229,231,235,0.65)' : '#e5e7eb');
-    abCtx.font = (isHover ? '800 12px ui-sans-serif, system-ui' : '12px ui-sans-serif, system-ui');
+    abCtx.fillStyle = '#e5e7eb';
+    abCtx.font = '12px ui-sans-serif, system-ui';
     abCtx.textBaseline = 'middle';
     abCtx.textAlign = side === 'left' ? 'right' : 'left';
     abCtx.shadowColor = 'rgba(0,0,0,.85)';
@@ -3341,8 +3356,11 @@ function drawAbGrid(A, B){
     abCtx.restore();
   }
 
-  const pA = drawPtDot(A, 'A');
-  const pB = drawPtDot(B, 'B');
+  const pA = drawPtDot(A,'std');
+  const pB = drawPtDot(B,'batch');
+
+  _abLastPts.std = pA;
+  _abLastPts.batch = pB;
 
   let dyA = -12, dyB = -12;
   if (pA && pB){
@@ -3350,11 +3368,8 @@ function drawAbGrid(A, B){
     if (d < 14){ dyA = -18; dyB = 10; }
   }
 
-  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA, 'A');
-  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB, 'B');
-
-  _abHitPts.A = pA ? { x: pA.x, y: pA.y, r: pA.rHit } : null;
-  _abHitPts.B = pB ? { x: pB.x, y: pB.y, r: pB.rHit } : null;
+  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA, 'std');
+  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB, 'batch');
 }
 function updateLabReadout(){
   const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
@@ -3386,84 +3401,6 @@ function updateLabReadout(){
 
   drawAbGrid(aOk ? A : null, bOk ? B : null);
 }
-
-function initQcHoverLinking(){
-  // a*/b* grid hover
-  if (abCanvas){
-    abCanvas.addEventListener('mousemove', (ev)=>{
-      const rect = abCanvas.getBoundingClientRect();
-      const x = ev.clientX - rect.left;
-      const y = ev.clientY - rect.top;
-
-      let hit = null;
-      let bestD = Infinity;
-
-      if (_abHitPts.A){
-        const dA = Math.hypot(x - _abHitPts.A.x, y - _abHitPts.A.y);
-        if (dA <= _abHitPts.A.r && dA < bestD){ hit = 'A'; bestD = dA; }
-      }
-      if (_abHitPts.B){
-        const dB = Math.hypot(x - _abHitPts.B.x, y - _abHitPts.B.y);
-        if (dB <= _abHitPts.B.r && dB < bestD){ hit = 'B'; bestD = dB; }
-      }
-
-      abCanvas.style.cursor = hit ? 'pointer' : '';
-      setQcHover(hit);
-    });
-    abCanvas.addEventListener('mouseleave', ()=>{
-      abCanvas.style.cursor = '';
-      setQcHover(null);
-    });
-  }
-
-  // L* marker hover (more forgiving: checks proximity, not just pointer-events)
-  if (lTrack){
-    const hoverFromLTrack = (ev)=>{
-      const rect = lTrack.getBoundingClientRect();
-      const mx = ev.clientX;
-      const my = ev.clientY;
-
-      function distTo(el){
-        if (!el || el.style.display === 'none') return Infinity;
-        const r = el.getBoundingClientRect();
-        const cx = (r.left + r.right)/2;
-        const cy = (r.top + r.bottom)/2;
-        return Math.hypot(mx - cx, my - cy);
-      }
-
-      const dA = distTo(lMarkerA);
-      const dB = distTo(lMarkerB);
-      const thr = 18; // generous hit radius
-      let hit = null;
-      if (dA <= thr && dA <= dB) hit = 'A';
-      else if (dB <= thr) hit = 'B';
-
-      lTrack.style.cursor = hit ? 'pointer' : '';
-      setQcHover(hit);
-    };
-
-    lTrack.addEventListener('mousemove', hoverFromLTrack);
-    lTrack.addEventListener('mouseleave', ()=>{
-      lTrack.style.cursor = '';
-      setQcHover(null);
-    });
-  }
-
-  // Labels under the grid
-  const rowA = labTagA ? labTagA.closest('.labNumRow') : null;
-  const rowB = labTagB ? labTagB.closest('.labNumRow') : null;
-
-  if (rowA){
-    rowA.addEventListener('mouseenter', ()=>setQcHover('A'));
-    rowA.addEventListener('mouseleave', ()=>setQcHover(null));
-  }
-  if (rowB){
-    rowB.addEventListener('mouseenter', ()=>setQcHover('B'));
-    rowB.addEventListener('mouseleave', ()=>setQcHover(null));
-  }
-}
-initQcHoverLinking();
-
 window.addEventListener('resize', ()=>{ updateLabReadout(); }, { passive:true });
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
@@ -3484,6 +3421,26 @@ window.addEventListener('mousemove',e=>{
   rotX -= dy*0.005;
   requestLabDraw();
 });
+
+// Hover hit-testing for Std/Batch points on the orb (when not dragging)
+canvas.addEventListener('mousemove', (e)=>{
+  if (dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  let best = null;
+  for (const role of ['std','batch']){
+    const p = _orbLastPts[role];
+    if (!p) continue;
+    const d = Math.hypot(mx - p.x, my - p.y);
+    const hitR = Math.max(10, (p.r || 10));
+    if (d <= hitR && (!best || d < best.d)) best = { role, d };
+  }
+  setLabHover(best ? best.role : null, 'orb');
+}, { passive:true });
+canvas.addEventListener('mouseleave', ()=>setLabHover(null,'orb'));
+
 canvas.addEventListener('wheel', e=>{
   // Leave wheel scrolling to the page; no zooming on the orb view.
 }, {passive:true});
@@ -3625,17 +3582,43 @@ function drawSphere(){
     }
   }
 }
-function drawPointLab(L,a,b,label){
+function drawPointLab(L,a,b,label,role){
   const p=proj(rot3(normLab(L,a,b)));
   const rgb=labToSrgb(L,a,b);
   const col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
   ctx.fillStyle=col;
   ctx.strokeStyle='rgba(0,0,0,0.55)';
+  const active = _labHoverRole;
+  const isDim = active && active !== role;
+  const isHi = active === role;
+
+  ctx.save();
+  if (isDim) ctx.globalAlpha = 0.45;
+  if (isHi){
+    ctx.shadowColor = 'rgba(255,255,255,0.35)';
+    ctx.shadowBlur = 16;
+  }
+
+  const r = 6*p.k;
   ctx.beginPath();
-  ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2);
+  if (role === 'batch'){
+    ctx.moveTo(p.u, p.v - r);
+    ctx.lineTo(p.u - r, p.v + r);
+    ctx.lineTo(p.u + r, p.v + r);
+    ctx.closePath();
+  } else {
+    ctx.arc(p.u,p.v,r,0,Math.PI*2);
+  }
   ctx.fill();
-  ctx.lineWidth=1;
+  ctx.lineWidth = isHi ? 2.2 : 1;
+  ctx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : ctx.strokeStyle;
   ctx.stroke();
+
+  // store projected point for hover hit-testing
+  if (role === 'std') _orbLastPts.std = { x:p.u, y:p.v, r:Math.max(8, r) };
+  if (role === 'batch') _orbLastPts.batch = { x:p.u, y:p.v, r:Math.max(8, r) };
+
+  ctx.restore();
   ctx.fillStyle='#e5e7eb';
   ctx.font='12px ui-sans-serif, system-ui';
   ctx.fillText(label, p.u+8, p.v-8);
@@ -3700,8 +3683,8 @@ function drawLabScene(){
   const bValid=[b.L,b.a,b.b].every(Number.isFinite);
   if (aValid && bValid){
     drawLineLab(a,b);
-    drawPointLab(a.L,a.a,a.b,'Std');
-    drawPointLab(b.L,b.a,b.b,'Batch');
+    drawPointLab(a.L,a.a,a.b,'Std','std');
+    drawPointLab(b.L,b.a,b.b,'Batch','batch');
     const de=deltaE2000(a,b);
     ctx.fillStyle='#e5e7eb';
     ctx.font='13px ui-sans-serif, system-ui';
