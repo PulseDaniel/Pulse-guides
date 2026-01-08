@@ -135,6 +135,8 @@
   .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
+.dot.isBatch{ border-radius:0; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+
 
   /* LAB 2D readout (a/b grid + L slider) */
   .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
@@ -206,6 +208,15 @@
 .lMarker.isBatch{
   border-radius:0;
   clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  /* Box-shadow on clipped shapes can render as a rectangle in some browsers */
+  box-shadow: none !important;
+  /* Give it a subtle outline/shadow that respects the clip */
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+}
+
+.lMarker.isBatch.isHover{
+  border-color: rgba(255,255,255,.9);
+  filter: drop-shadow(0 0 0 rgba(255,255,255,.85)) drop-shadow(0 0 12px rgba(255,255,255,.25));
 }
 .lMarker.isHover{
   box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 0 14px rgba(255,255,255,.20);
@@ -934,7 +945,7 @@
       <div class="canvasWrap">
         <div class="legend">
           <span class="nowrap">Standard:</span><span id="legendA" class="dot"></span>
-          <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot"></span>
+          <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot isBatch"></span>
           <span style="margin-left:auto;"></span>
           <button class="btn" id="resetView">Reset view</button>
           <span style="font-size:.8rem; opacity:.8;">Drag to rotate</span>
