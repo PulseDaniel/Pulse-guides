@@ -135,8 +135,8 @@
   .canvasWrap{ margin-top:12px; background:#0f1219; border:1px solid #2a2f3a; border-radius:12px; overflow:hidden; }
   .legend{ display:flex; gap:12px; align-items:center; font-size:.9rem; color:#9aa4b2; padding:8px 10px; background:#0d1016; border-bottom:1px solid #242938; flex-wrap:wrap; }
   .dot{ width:10px; height:10px; border-radius:50%; display:inline-block; border:1px solid rgba(255,255,255,.25); }
-
-  /* LAB 2D readout (a/b grid + L slider) */
+.dot.isBatch{ border-radius:50%; clip-path:none; }
+/* LAB 2D readout (a/b grid + L slider) */
   .labVizRow{ display:grid; grid-template-columns: 1fr 320px; gap:12px; padding:12px; align-items:start; }
   .lab3dWrap{ min-width:0; }
   @media (max-width: 980px){
@@ -199,8 +199,29 @@
   border:2px solid rgba(0,0,0,.55);
   background:#e5e7eb;
   box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
-  pointer-events:none;
+  pointer-events:auto;
+  cursor:pointer;
 }
+
+.lMarker.isBatch{
+  border-radius:999px;
+  clip-path:none;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
+  filter:none;
+}
+.lMarker.isBatch.isHover{
+  border-color: rgba(255,255,255,.9);
+  filter: drop-shadow(0 0 0 rgba(255,255,255,.85)) drop-shadow(0 0 12px rgba(255,255,255,.25));
+}
+.lMarker.isHover{
+  box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 0 14px rgba(255,255,255,.20);
+}
+.labNumRow{ transition: filter .12s ease, opacity .12s ease; }
+.labNumRow.isHover .labTag{
+  filter: brightness(1.25);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.20) inset, 0 0 12px rgba(255,255,255,.10);
+}
+.labNumRow.isDim{ opacity: .45; }
 .lDot{ }
 .lMarkerTag{
   position:absolute;
@@ -919,7 +940,7 @@
       <div class="canvasWrap">
         <div class="legend">
           <span class="nowrap">Standard:</span><span id="legendA" class="dot"></span>
-          <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot"></span>
+          <span style="margin-left:10px;" class="nowrap">Batch:</span><span id="legendB" class="dot isBatch"></span>
           <span style="margin-left:auto;"></span>
           <button class="btn" id="resetView">Reset view</button>
           <span style="font-size:.8rem; opacity:.8;">Drag to rotate</span>
@@ -941,7 +962,7 @@
               <div class="lReadoutWrap">
                 <div class="lTrack" id="lTrack">
                   <div class="lMarker lDot" id="lMarkerA" title="Std"></div>
-                  <div class="lMarker lDot" id="lMarkerB" title="Batch"></div>
+                  <div class="lMarker lDot isBatch" id="lMarkerB" title="Batch"></div>
                 </div>
                 <div class="lAxisLabel">L*</div>
               </div>
@@ -3072,6 +3093,84 @@ const labNumsB = document.getElementById('labNumsB');
 const labTagA = document.getElementById('labTagA');
 const labTagB = document.getElementById('labTagB');
 
+// Linked hover highlighting across QC readout (grid, L bar, orb, rows)
+let _labHoverRole = null; // 'std' | 'batch' | null
+let _labHoverSource = null; // 'ui' | 'ab' | 'l' | 'orb' | null
+let _abLastPts = { std: null, batch: null }; // {x,y,r}
+let _orbLastPts = { std: null, batch: null }; // {x,y,r}
+
+function _applyLabHoverClasses(){
+  const rowA = labTagA?.closest('.labNumRow');
+  const rowB = labTagB?.closest('.labNumRow');
+
+  // rows
+  if (rowA){
+    rowA.classList.toggle('isHover', _labHoverRole === 'std');
+    rowA.classList.toggle('isDim', _labHoverRole && _labHoverRole !== 'std');
+  }
+  if (rowB){
+    rowB.classList.toggle('isHover', _labHoverRole === 'batch');
+    rowB.classList.toggle('isDim', _labHoverRole && _labHoverRole !== 'batch');
+  }
+
+  // L markers
+  if (lMarkerA){
+    lMarkerA.classList.toggle('isHover', _labHoverRole === 'std');
+    lMarkerA.style.opacity = (_labHoverRole && _labHoverRole !== 'std') ? '0.45' : '1';
+  }
+  if (lMarkerB){
+    lMarkerB.classList.toggle('isHover', _labHoverRole === 'batch');
+    lMarkerB.style.opacity = (_labHoverRole && _labHoverRole !== 'batch') ? '0.45' : '1';
+  }
+}
+
+function setLabHover(role, source){
+  if (role !== 'std' && role !== 'batch' && role !== null) role = null;
+  // If another UI element is actively hovered, ignore canvas clear attempts.
+  if (role === null && _labHoverSource === 'ui' && source !== 'ui') return;
+
+  const changed = (_labHoverRole !== role) || (_labHoverSource !== source);
+  _labHoverRole = role;
+  _labHoverSource = role ? (source || null) : null;
+
+  _applyLabHoverClasses();
+  if (changed) requestLabDraw();
+}
+
+function _wireHover(el, role){
+  if (!el) return;
+  el.addEventListener('mouseenter', ()=>setLabHover(role,'ui'));
+  el.addEventListener('mouseleave', ()=>setLabHover(null,'ui'));
+}
+
+// UI hover wiring
+_wireHover(labTagA?.closest('.labNumRow') || labTagA, 'std');
+_wireHover(labTagB?.closest('.labNumRow') || labTagB, 'batch');
+_wireHover(lMarkerA, 'std');
+_wireHover(lMarkerB, 'batch');
+
+// AB grid hover (canvas)
+if (abCanvas){
+  abCanvas.addEventListener('mousemove', (e)=>{
+    const rect = abCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+
+    // Hit test both, pick closest within radius
+    let best = null;
+    for (const role of ['std','batch']){
+      const p = _abLastPts[role];
+      if (!p) continue;
+      const d = Math.hypot(mx - p.x, my - p.y);
+      const hitR = Math.max(10, (p.r || 6) + 6);
+      if (d <= hitR && (!best || d < best.d)) best = { role, d };
+    }
+    setLabHover(best ? best.role : null, 'ab');
+  }, { passive:true });
+  abCanvas.addEventListener('mouseleave', ()=>setLabHover(null,'ab'));
+}
+
+
 function formatLabLine(L,a,b){
   if (![L,a,b].every(Number.isFinite)) return 'L —  a —  b —';
   return `L ${L.toFixed(2)}  a ${a.toFixed(2)}  b ${b.toFixed(2)}`;
@@ -3204,7 +3303,7 @@ function drawAbGrid(A, B){
   abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
   abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
 
-  function drawPtDot(pt){
+  function drawPtDot(pt, role){
     if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return null;
     const rgb = labToSrgb(pt.L, pt.a, pt.b);
     const x = toX(pt.a), y = toY(pt.b);
@@ -3212,14 +3311,28 @@ function drawAbGrid(A, B){
     abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
     abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
     abCtx.lineWidth = 2;
+    const active = _labHoverRole;
+    const isDim = active && active !== role;
+    const isHi = active === role;
+    abCtx.save();
+    if (isDim) abCtx.globalAlpha = 0.45;
+    if (isHi){
+      abCtx.shadowColor = 'rgba(255,255,255,0.35)';
+      abCtx.shadowBlur = 14;
+    }
+
+    const r = 6;
     abCtx.beginPath();
-    abCtx.arc(x,y,6,0,Math.PI*2);
+    abCtx.arc(x,y,r,0,Math.PI*2);
     abCtx.fill();
+    abCtx.lineWidth = isHi ? 2.5 : 2;
+    abCtx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : abCtx.strokeStyle;
     abCtx.stroke();
-    return { x, y, rgb };
+    abCtx.restore();
+    return { x, y, r:6, rgb };
   }
 
-  function drawPtLabel(text, x, y, side, dy){
+  function drawPtLabel(text, x, y, side, dy, role){
     const w = abCanvas.clientWidth || 280;
     const h = abCanvas.clientHeight || 280;
 
@@ -3241,8 +3354,11 @@ function drawAbGrid(A, B){
     abCtx.restore();
   }
 
-  const pA = drawPtDot(A);
-  const pB = drawPtDot(B);
+  const pA = drawPtDot(A,'std');
+  const pB = drawPtDot(B,'batch');
+
+  _abLastPts.std = pA;
+  _abLastPts.batch = pB;
 
   let dyA = -12, dyB = -12;
   if (pA && pB){
@@ -3250,8 +3366,8 @@ function drawAbGrid(A, B){
     if (d < 14){ dyA = -18; dyB = 10; }
   }
 
-  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA);
-  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB);
+  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA, 'std');
+  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB, 'batch');
 }
 function updateLabReadout(){
   const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
@@ -3303,6 +3419,26 @@ window.addEventListener('mousemove',e=>{
   rotX -= dy*0.005;
   requestLabDraw();
 });
+
+// Hover hit-testing for Std/Batch points on the orb (when not dragging)
+canvas.addEventListener('mousemove', (e)=>{
+  if (dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  let best = null;
+  for (const role of ['std','batch']){
+    const p = _orbLastPts[role];
+    if (!p) continue;
+    const d = Math.hypot(mx - p.x, my - p.y);
+    const hitR = Math.max(10, (p.r || 10));
+    if (d <= hitR && (!best || d < best.d)) best = { role, d };
+  }
+  setLabHover(best ? best.role : null, 'orb');
+}, { passive:true });
+canvas.addEventListener('mouseleave', ()=>setLabHover(null,'orb'));
+
 canvas.addEventListener('wheel', e=>{
   // Leave wheel scrolling to the page; no zooming on the orb view.
 }, {passive:true});
@@ -3444,21 +3580,37 @@ function drawSphere(){
     }
   }
 }
-function drawPointLab(L,a,b,label){
+function drawPointLab(L,a,b,label,role){
   const p=proj(rot3(normLab(L,a,b)));
   const rgb=labToSrgb(L,a,b);
   const col=`rgb(${rgb.r},${rgb.g},${rgb.b})`;
   ctx.fillStyle=col;
   ctx.strokeStyle='rgba(0,0,0,0.55)';
+  const active = _labHoverRole;
+  const isDim = active && active !== role;
+  const isHi = active === role;
+
+  ctx.save();
+  if (isDim) ctx.globalAlpha = 0.45;
+  if (isHi){
+    ctx.shadowColor = 'rgba(255,255,255,0.35)';
+    ctx.shadowBlur = 16;
+  }
+
+  const r = 6*p.k;
   ctx.beginPath();
-  ctx.arc(p.u,p.v,6*p.k,0,Math.PI*2);
+  ctx.arc(p.u,p.v,r,0,Math.PI*2);
   ctx.fill();
-  ctx.lineWidth=1;
+  ctx.lineWidth = isHi ? 2.2 : 1;
+  ctx.strokeStyle = isHi ? 'rgba(255,255,255,0.75)' : ctx.strokeStyle;
   ctx.stroke();
-  ctx.fillStyle='#e5e7eb';
-  ctx.font='12px ui-sans-serif, system-ui';
-  ctx.fillText(label, p.u+8, p.v-8);
-  return p;
+
+  // store projected point for hover hit-testing
+  if (role === 'std') _orbLastPts.std = { x:p.u, y:p.v, r:Math.max(8, r) };
+  if (role === 'batch') _orbLastPts.batch = { x:p.u, y:p.v, r:Math.max(8, r) };
+
+  ctx.restore();
+return p;
 }
 function drawLineLab(A,B){
   const p1=proj(rot3(normLab(A.L,A.a,A.b)));
@@ -3519,8 +3671,8 @@ function drawLabScene(){
   const bValid=[b.L,b.a,b.b].every(Number.isFinite);
   if (aValid && bValid){
     drawLineLab(a,b);
-    drawPointLab(a.L,a.a,a.b,'Std');
-    drawPointLab(b.L,b.a,b.b,'Batch');
+    drawPointLab(a.L,a.a,a.b,'Std','std');
+    drawPointLab(b.L,b.a,b.b,'Batch','batch');
     const de=deltaE2000(a,b);
     ctx.fillStyle='#e5e7eb';
     ctx.font='13px ui-sans-serif, system-ui';
