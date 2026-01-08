@@ -199,8 +199,10 @@
   border:2px solid rgba(0,0,0,.55);
   background:#e5e7eb;
   box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset;
-  pointer-events:none;
+  pointer-events:auto;
+  cursor:pointer;
 }
+
 .lDot{ }
 .lMarkerTag{
   position:absolute;
@@ -251,7 +253,22 @@
     color:#e5e7eb;
   }
   .labNumsText{ font-size:12px; color:#e5e7eb; }
-  @media (max-width: 980px){
+  
+  .labIsHover{
+    font-weight:800;
+    color:#ffffff !important;
+    border-color: rgba(255,255,255,.40) !important;
+    background: rgba(255,255,255,.16) !important;
+    box-shadow: 0 0 0 1px rgba(255,255,255,.18), 0 0 18px rgba(255,255,255,.10);
+  }
+  .labIsDim{ opacity:.55; }
+  .lMarker.labIsHover{
+    width:14px;
+    height:14px;
+    border-width:2px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.35), 0 0 14px rgba(255,255,255,.12);
+  }
+@media (max-width: 980px){
     .labVizRow{ grid-template-columns: 1fr; }
     .lTrack{ height:260px; max-height:260px; }
   }
@@ -911,7 +928,6 @@
 
       <div class="flex" style="margin-top:10px; justify-content:flex-start;">
         <button class="btn" id="cmpHistoryBtn">History</button>
-        <button class="btn" id="cmpPrintLabelBtn" style="margin-left:8px;">Print label</button>
       </div>
 
 </div>
@@ -1093,8 +1109,7 @@
       </div>
 
       <div class="flex" style="margin-top:12px;">
-        <button class="btn" id="libAddBtn">Add library From File</button>
-        <button class="btn" id="libCreateBtn">Create New Library</button>
+        <button class="btn" id="libAddBtn">Add library</button>
         <button class="btn" id="libTemplateBtn">Download example CSV</button>
         <span class="mini">Files stay local to this browser (saved in localStorage).</span>
       </div>
@@ -2291,7 +2306,7 @@ function showFormulaFor(colourName){
   if (actions) actions.style.display = 'block';
   const btn = document.getElementById('toCalcFromExistingBtn');
   if (btn){
-    btn.onclick = ()=>{ mixGoToCalculatorFromExisting(colourName, formulaObj); };
+    btn.onclick = ()=>{ mixSetManualFormulaFromOutside(colourName, formulaObj); };
   }
 }
 function findByPms(){
@@ -3072,6 +3087,98 @@ const labNumsB = document.getElementById('labNumsB');
 const labTagA = document.getElementById('labTagA');
 const labTagB = document.getElementById('labTagB');
 
+let _labHover = null;          // 'A' | 'B' | null
+let _labHoverLock = null;      // set when hovering non-canvas elements
+let _labLastA = null;
+let _labLastB = null;
+let _abPtA = null;
+let _abPtB = null;
+
+function _toggle(el, cls, on){
+  if (!el) return;
+  el.classList.toggle(cls, !!on);
+}
+
+function setLabHover(kind){
+  if (_labHover === kind) return;
+  _labHover = kind;
+
+  const rowA = labTagA ? labTagA.closest('.labNumRow') : null;
+  const rowB = labTagB ? labTagB.closest('.labNumRow') : null;
+
+  const isA = kind === 'A';
+  const isB = kind === 'B';
+  const dim = kind === 'A' || kind === 'B';
+
+  _toggle(labTagA, 'labIsHover', isA);
+  _toggle(labNumsA, 'labIsHover', isA);
+  _toggle(lMarkerA, 'labIsHover', isA);
+  _toggle(rowA, 'labIsHover', isA);
+
+  _toggle(labTagB, 'labIsHover', isB);
+  _toggle(labNumsB, 'labIsHover', isB);
+  _toggle(lMarkerB, 'labIsHover', isB);
+  _toggle(rowB, 'labIsHover', isB);
+
+  _toggle(labTagA, 'labIsDim', dim && !isA);
+  _toggle(labNumsA, 'labIsDim', dim && !isA);
+  _toggle(lMarkerA, 'labIsDim', dim && !isA);
+  _toggle(rowA, 'labIsDim', dim && !isA);
+
+  _toggle(labTagB, 'labIsDim', dim && !isB);
+  _toggle(labNumsB, 'labIsDim', dim && !isB);
+  _toggle(lMarkerB, 'labIsDim', dim && !isB);
+  _toggle(rowB, 'labIsDim', dim && !isB);
+
+  if (typeof drawAbGrid === 'function'){
+    drawAbGrid(_labLastA, _labLastB);
+  }
+}
+
+function setupLabReadoutHover(){
+  const rowA = labTagA ? labTagA.closest('.labNumRow') : null;
+  const rowB = labTagB ? labTagB.closest('.labNumRow') : null;
+
+  const lockEnter = (kind)=>()=>{ _labHoverLock = kind; setLabHover(kind); };
+  const lockLeave = (kind)=>()=>{ if (_labHoverLock === kind){ _labHoverLock = null; setLabHover(null); } };
+
+  const bind = (els, kind)=>{
+    els.filter(Boolean).forEach(el=>{
+      el.addEventListener('mouseenter', lockEnter(kind), { passive:true });
+      el.addEventListener('mouseleave', lockLeave(kind), { passive:true });
+    });
+  };
+
+  bind([rowA, labTagA, labNumsA, lMarkerA], 'A');
+  bind([rowB, labTagB, labNumsB, lMarkerB], 'B');
+
+  if (abCanvas){
+    abCanvas.addEventListener('mousemove', (e)=>{
+      if (_labHoverLock) return;
+      if ((!_abPtA && !_abPtB)) { setLabHover(null); return; }
+      const rect = abCanvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+
+      // map mouse to the same CSS-space coordinates used for drawing
+      const x = ((e.clientX - rect.left) / rect.width) * (abCanvas.clientWidth || rect.width);
+      const y = ((e.clientY - rect.top)  / rect.height) * (abCanvas.clientHeight || rect.height);
+
+      const hitR = 10; // hit radius (px)
+      const hitA = _abPtA ? (Math.hypot(x - _abPtA.x, y - _abPtA.y) <= hitR) : false;
+      const hitB = _abPtB ? (Math.hypot(x - _abPtB.x, y - _abPtB.y) <= hitR) : false;
+
+      if (hitA && !hitB) setLabHover('A');
+      else if (hitB && !hitA) setLabHover('B');
+      else if (hitA && hitB) setLabHover('B'); // prefer Batch when perfectly overlapped
+      else setLabHover(null);
+    }, { passive:true });
+
+    abCanvas.addEventListener('mouseleave', ()=>{
+      if (!_labHoverLock) setLabHover(null);
+    }, { passive:true });
+  }
+}
+
 function formatLabLine(L,a,b){
   if (![L,a,b].every(Number.isFinite)) return 'L —  a —  b —';
   return `L ${L.toFixed(2)}  a ${a.toFixed(2)}  b ${b.toFixed(2)}`;
@@ -3204,10 +3311,25 @@ function drawAbGrid(A, B){
   abCtx.beginPath(); abCtx.moveTo(x0,0); abCtx.lineTo(x0,h); abCtx.stroke();
   abCtx.beginPath(); abCtx.moveTo(0,y0); abCtx.lineTo(w,y0); abCtx.stroke();
 
-  function drawPtDot(pt){
+  function drawPtDot(pt, kind){
     if (!pt || ![pt.a, pt.b].every(Number.isFinite)) return null;
     const rgb = labToSrgb(pt.L, pt.a, pt.b);
     const x = toX(pt.a), y = toY(pt.b);
+
+    const hovered = (_labHover && kind === _labHover);
+    const dimmed = (_labHover && kind && kind !== _labHover);
+
+    abCtx.save();
+    if (dimmed) abCtx.globalAlpha = 0.50;
+    if (hovered){
+      abCtx.beginPath();
+      abCtx.arc(x,y,11,0,Math.PI*2);
+      abCtx.fillStyle = 'rgba(255,255,255,0.18)';
+      abCtx.fill();
+      abCtx.strokeStyle = 'rgba(255,255,255,0.55)';
+      abCtx.lineWidth = 2;
+      abCtx.stroke();
+    }
 
     abCtx.fillStyle = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
     abCtx.strokeStyle = 'rgba(0,0,0,0.60)';
@@ -3216,10 +3338,11 @@ function drawAbGrid(A, B){
     abCtx.arc(x,y,6,0,Math.PI*2);
     abCtx.fill();
     abCtx.stroke();
+    abCtx.restore();
     return { x, y, rgb };
   }
 
-  function drawPtLabel(text, x, y, side, dy){
+  function drawPtLabel(text, x, y, side, dy, kind){
     const w = abCanvas.clientWidth || 280;
     const h = abCanvas.clientHeight || 280;
 
@@ -3229,9 +3352,13 @@ function drawAbGrid(A, B){
     if (side === 'left' && x < 38){ side = 'right'; dx = 10; }
     if (side === 'right' && x > w - 38){ side = 'left'; dx = -10; }
 
+    const hovered = (_labHover && kind === _labHover);
+    const dimmed = (_labHover && kind && kind !== _labHover);
+
     abCtx.save();
-    abCtx.fillStyle = '#e5e7eb';
-    abCtx.font = '12px ui-sans-serif, system-ui';
+    if (dimmed) abCtx.globalAlpha = 0.55;
+    abCtx.fillStyle = hovered ? '#ffffff' : '#e5e7eb';
+    abCtx.font = hovered ? '700 13px ui-sans-serif, system-ui' : '12px ui-sans-serif, system-ui';
     abCtx.textBaseline = 'middle';
     abCtx.textAlign = side === 'left' ? 'right' : 'left';
     abCtx.shadowColor = 'rgba(0,0,0,.85)';
@@ -3241,8 +3368,11 @@ function drawAbGrid(A, B){
     abCtx.restore();
   }
 
-  const pA = drawPtDot(A);
-  const pB = drawPtDot(B);
+  const pA = drawPtDot(A,'A');
+  const pB = drawPtDot(B,'B');
+
+  _abPtA = pA; _abPtB = pB;
+  _labLastA = A; _labLastB = B;
 
   let dyA = -12, dyB = -12;
   if (pA && pB){
@@ -3250,12 +3380,15 @@ function drawAbGrid(A, B){
     if (d < 14){ dyA = -18; dyB = 10; }
   }
 
-  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA);
-  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB);
+  if (pA) drawPtLabel('Std', pA.x, pA.y, 'left', dyA, 'A');
+  if (pB) drawPtLabel('Batch', pB.x, pB.y, 'right', dyB, 'B');
 }
 function updateLabReadout(){
   const A = { L: parseFloat(document.getElementById('AL')?.value), a: parseFloat(document.getElementById('Aa')?.value), b: parseFloat(document.getElementById('Ab')?.value) };
   const B = { L: parseFloat(document.getElementById('BL')?.value), a: parseFloat(document.getElementById('Ba')?.value), b: parseFloat(document.getElementById('Bb')?.value) };
+
+  const aOk =
+  _labLastA = A; _labLastB = B;
 
   const aOk = [A.L,A.a,A.b].every(Number.isFinite);
   const bOk = [B.L,B.a,B.b].every(Number.isFinite);
@@ -3283,7 +3416,8 @@ function updateLabReadout(){
 
   drawAbGrid(aOk ? A : null, bOk ? B : null);
 }
-window.addEventListener('resize', ()=>{ updateLabReadout(); }, { passive:true });
+window.addEventListener('resize', ()=>{ updateLabReadout();
+setupLabReadoutHover(); }, { passive:true });
 const DEFAULT_VIEW={rx:-0.6, ry:0.8, s:220};
 let rotX=DEFAULT_VIEW.rx, rotY=DEFAULT_VIEW.ry, scale3d=DEFAULT_VIEW.s;
 let dragging=false,lastX=0,lastY=0;
@@ -3814,7 +3948,6 @@ function refreshCompareStandardCombo(){
       div.addEventListener('mousedown', (e)=>{
         // mousedown to avoid blur closing before click
         e.preventDefault();
-        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
         CMP_STANDARD_NAME = x.name;
         loadCompareByQuery('A', x.name);
@@ -3894,7 +4027,6 @@ function refreshCompareStandardCombo(){
 
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
-        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
 
         const c = bestColourByQuery(x.name);
@@ -4267,7 +4399,6 @@ function mixRefreshPantoneCombo(){
 
       div.addEventListener('mousedown', (e)=>{
         e.preventDefault();
-        MIX_PANTONE_FALLBACK = null;
         input.value = x.name;
         mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = x.name;
@@ -4296,7 +4427,6 @@ function mixRefreshPantoneCombo(){
     if (e.key === 'Enter'){
       const best = allNames.length ? (allNames.find(n=>mixNormalisePantoneName(n)===mixNormalisePantoneName(input.value)) || allNames[0]) : '';
       if (best){
-        MIX_PANTONE_FALLBACK = null;
         input.value = best;
         mixClearManualRecipe();
         MIX_ACTIVE_PANTONE = best;
@@ -4323,48 +4453,7 @@ function mixRefreshPantoneCombo(){
 let MIX_PENDING_PANTONE = '';
 let MIX_MANUAL_RECIPE = null; // { name: string, ingredients: [{ink:string, pct:number}] }
 
-let MIX_PANTONE_FALLBACK = null; // { key: string, recipe: { name:string, ingredients:[{ink:string, pct:number}] } }
-
-function mixEnsureRangeAnilox(range, anilox){
-  const rangeEl = document.getElementById('mixInkRange');
-  if (rangeEl && range){
-    if (rangeEl.value !== range){
-      rangeEl.value = range;
-      rangeEl.dispatchEvent(new Event('change', {bubbles:true}));
-    }
-  }
-  const aniloxEl = document.getElementById('mixAnilox');
-  if (aniloxEl && anilox){
-    if (aniloxEl.value !== anilox){
-      aniloxEl.value = anilox;
-      aniloxEl.dispatchEvent(new Event('change', {bubbles:true}));
-    }
-  }
-}
-
-function mixSetPantoneFallback(name, formulaObj){
-  const nm = (name||'').trim();
-  if (!nm){ MIX_PANTONE_FALLBACK = null; return; }
-  const entries = Object.entries(formulaObj||{});
-  const ingredients = entries
-    .map(([ink,pct])=>({ ink: String(ink), pct: Number(pct)||0 }))
-    .filter(x=>x.pct>0)
-    .sort((a,b)=>b.pct-a.pct);
-  MIX_PANTONE_FALLBACK = { key: mixNormalisePantoneName(nm), recipe: { name: nm, ingredients } };
-}
-
-function mixGoToCalculatorFromExisting(pantoneName, formulaObj){
-  const nm = (pantoneName||'').trim();
-  mixEnsureRangeAnilox('D', '5v');
-  showTab('mix');
-  mixSetPantoneFallback(nm, formulaObj);
-  mixSetPantoneFromOutside(nm);
-}
-
-
-
 function mixSetManualFormulaFromOutside(name, formulaObj){
-  MIX_PANTONE_FALLBACK = null;
   const nm = (name||'').trim() || 'Manual';
   const entries = Object.entries(formulaObj||{});
   const ingredients = entries
@@ -4405,30 +4494,9 @@ function mixSetPantoneFromOutside(name){
   }
   MIX_ACTIVE_PANTONE = nm;
   mixRenderFormula();
+
   mixUpdateSwatch();
-
-  // If this Pantone isn't in the active guide table, fall back to a manual recipe (when provided).
-  try{
-    const { table } = mixGetActiveTable();
-    const key = mixNormalisePantoneName(nm);
-    const rec = (table && table.byPantone) ? table.byPantone.get(key) : null;
-
-    if (rec){
-      if (MIX_PANTONE_FALLBACK && MIX_PANTONE_FALLBACK.key === key){
-        MIX_PANTONE_FALLBACK = null;
-      }
-      return;
-    }
-
-    if (MIX_PANTONE_FALLBACK && MIX_PANTONE_FALLBACK.key === key){
-      MIX_MANUAL_RECIPE = MIX_PANTONE_FALLBACK.recipe;
-      MIX_PANTONE_FALLBACK = null;
-      mixRenderFormula();
-      mixUpdateSwatch();
-    }
-  }catch(e){}
 }
-
 
 async function mixInit(){
   const fileEl = document.getElementById('mixGuideFile');
@@ -4615,24 +4683,6 @@ $('#libAddBtn').addEventListener('click', ()=>{
   };
   reader.onerror = ()=> alert('Error reading file.');
   reader.readAsText(file);
-});
-
-$('#libCreateBtn').addEventListener('click', ()=>{
-  const name = ($('#libName').value||'').trim();
-  if (!name){
-    alert('Please enter a library name.');
-    return;
-  }
-  const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
-  const lib = { id:id, name:name, colours:[] };
-  userLibraries.push(lib);
-  saveLibraries();
-  $('#libName').value='';
-  $('#libFile').value='';
-  setSettingsLibrary(id);
-  renderLibraryList();
-  renderLibraryEditor();
-  refreshLibrarySelects();
 });
 
 // Download example CSV
@@ -4825,108 +4875,6 @@ if (cmpExportLogBtn){
     if (!el) return;
     el.addEventListener('input', ()=> renderCompareLog());
     el.addEventListener('change', ()=> renderCompareLog());
-  });
-})();
-
-
-// QC: Print label for Standard + Batch
-(function wireComparePrintLabel(){
-  const btn = document.getElementById('cmpPrintLabelBtn');
-  if (!btn) return;
-
-  function fmt3(x){
-    return Number.isFinite(x) ? x.toFixed(2) : '—';
-  }
-
-  btn.addEventListener('click', () => {
-    const libSel = document.getElementById('cmpLibrarySelect');
-    const libName = libSel && libSel.selectedOptions && libSel.selectedOptions[0]
-      ? libSel.selectedOptions[0].textContent.trim()
-      : '—';
-
-    const std = { L: parseFloat($('#AL')?.value), a: parseFloat($('#Aa')?.value), b: parseFloat($('#Ab')?.value) };
-    const bat = { L: parseFloat($('#BL')?.value), a: parseFloat($('#Ba')?.value), b: parseFloat($('#Bb')?.value) };
-    if ([std.L,std.a,std.b,bat.L,bat.a,bat.b].some(v => !Number.isFinite(v))){
-      alert('Please scan or enter both Standard and Batch LAB values first.');
-      return;
-    }
-
-    const de = deltaE2000(std, bat);
-    const passSpec = 1.5;
-    const pass = de < passSpec;
-
-    const dt = new Date();
-    const dtStr = dt.toLocaleString('en-GB', {
-      year:'numeric', month:'2-digit', day:'2-digit',
-      hour:'2-digit', minute:'2-digit'
-    });
-
-    const labelHtml = `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>QC Label</title>
-  <style>
-    @page { size: 80mm 50mm; margin: 0; }
-    html, body { margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-    .label {
-      width: 80mm;
-      height: 50mm;
-      border: 1px solid #000;
-      border-radius: 3mm;
-      padding: 3.2mm;
-      box-sizing: border-box;
-      display: flex;
-      flex-direction: column;
-      page-break-inside: avoid;
-      break-inside: avoid;
-      overflow: hidden;
-    }
-    .title { font-size: 11pt; font-weight: 800; margin: 0 0 1.6mm; }
-    .grid { display: flex; flex-direction: column; gap: 1.6mm; flex: 1; }
-    .grid .block:last-child { margin-top: auto; padding-bottom: 1.6mm; }
-    .line { display: flex; justify-content: space-between; gap: 4mm; }
-    .k { font-weight: 800; }
-    .v { font-variant-numeric: tabular-nums; text-align: right; }
-    .block { margin-top: 1.6mm; padding-top: 1.6mm; border-top: 1px solid #000; }
-    .status { font-weight: 900; }
-    .small { font-size: 8.5pt; }
-  </style>
-</head>
-<body>
-  <div class="label">
-    <div class="title">QC Label</div>
-    <div class="grid small">
-      <div class="line"><div class="k">Library</div><div class="v">${libName}</div></div>
-
-      <div class="block">
-        <div class="line"><div class="k">LAB standard</div><div class="v">L ${fmt3(std.L)}  a ${fmt3(std.a)}  b ${fmt3(std.b)}</div></div>
-        <div class="line"><div class="k">LAB batch</div><div class="v">L ${fmt3(bat.L)}  a ${fmt3(bat.a)}  b ${fmt3(bat.b)}</div></div>
-      </div>
-
-      <div class="block">
-        <div class="line"><div class="k">Date/time</div><div class="v">${dtStr}</div></div>
-        <div class="line"><div class="k">User</div><div class="v">GSeward</div></div>
-      </div>
-
-      <div class="block">
-        <div class="line"><div class="k">ΔE2000</div><div class="v">${de.toFixed(2)} <span class="status">${pass ? 'PASS' : 'FAIL'}</span></div></div>
-      </div>
-    </div>
-  </div>
-  <script>
-    window.onload = () => { window.print(); };
-    window.onafterprint = () => { window.close(); };
-  <\/script>
-</body>
-</html>`;
-
-    const w = window.open('', '_blank', 'width=560,height=720');
-    if (!w) { alert('Popup blocked — please allow popups to print the label.'); return; }
-    w.document.open();
-    w.document.write(labelHtml);
-    w.document.close();
   });
 })();
 
