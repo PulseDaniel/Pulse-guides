@@ -29,7 +29,7 @@
     align-items:center;
     justify-content:flex-start;
     gap:12px;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
   }
   .app-title{
     font-weight:800;
@@ -866,24 +866,55 @@ tbody tr:hover{
 }
 
 
-  /* --- Navbar brand/logo layout (added) --- */
-  .appbar-inner{ justify-content:space-between; }
-  .tabs{ flex:1 1 auto; min-width: 420px; }
+  /* --- Navbar brand/logo layout (refined) --- */
+  /* Make the app bar feel like a single cohesive header and keep brand pinned right */
+  .appbar{ max-width:none; margin:0 0 14px; }
+  .appbar-inner{
+    justify-content:space-between;
+    flex-wrap:nowrap;
+    gap:14px;
+  }
+  /* Tabs stay on one line; if many, they can scroll horizontally */
+  .tabs{
+    flex:0 1 auto;
+    min-width:0;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;
+    padding-bottom:2px; /* room for underline */
+  }
+  .tabs::-webkit-scrollbar{ height:6px; }
+  .tabs::-webkit-scrollbar-thumb{ background:#2b2f3b; border-radius:999px; }
+  .tabs::-webkit-scrollbar-track{ background:transparent; }
+
   .app-brand{
     margin-left:auto;
+    flex:0 0 auto;
     display:flex;
     align-items:center;
-    gap:10px;
-    padding-left:8px;
+    gap:12px;
+    padding-left:0;
   }
+  .app-title{ font-size:1.05rem; }
+
   .app-logo{
-    height:22px;
+    height:34px;
     width:auto;
     display:block;
-    border-radius:10px;
-    box-shadow: 0 8px 20px rgba(0,0,0,.35);
-    filter: saturate(1.05) contrast(1.05);
+    border-radius:12px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.40);
+    filter: saturate(1.08) contrast(1.08);
   }
+  @media (max-width: 760px){
+    .app-title{ font-size:1rem; }
+    .app-logo{ height:28px; border-radius:10px; }
+  }
+  @media (max-width: 560px){
+    .app-title{ display:none; }
+    .app-logo{ height:26px; }
+  }
+
   @media (max-width: 760px){
     .tabs{ min-width: 260px; }
     .app-logo{ height:18px; }
@@ -978,7 +1009,7 @@ html{ overflow-y: scroll; } /* keep stable scrollbar */
 
 /* Responsive: allow wrap when needed */
 @media (max-width: 780px){
-  .appbar-inner{ flex-wrap:wrap; }
+  .appbar-inner{ flex-wrap:nowrap; }
   .tabs{ flex-wrap:wrap; }
   .app-brand{ width:100%; }
   .app-brand .app-logo{ height:24px; }
