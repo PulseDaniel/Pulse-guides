@@ -4963,26 +4963,15 @@ if (cmpExportLogBtn){
     });
   };
 
-  const getCompareLibraryId = ()=>{
-    // Prefer the library selector used in the QC/Compare colours container,
-    // fall back to the main library selector if present.
-    const cmp = document.getElementById('cmpLibrarySelect');
-    const main = document.getElementById('librarySelect');
-    return (cmp && cmp.value) || (main && main.value) || '';
-  };
-
   const open = ()=>{
     rebuildLibraryFilter();
 
-    // Pre-set history library filter to the currently selected library in the compare colours container
-    const histSel = document.getElementById('histLibrary');
-    if (histSel){
-      const libId = getCompareLibraryId();
-      if (libId && Array.from(histSel.options).some(o=>o.value===libId)){
-        histSel.value = libId;
-      }else{
-        histSel.value = '';
-      }
+    // Preset History -> Library filter to whatever is selected in the Compare Colours section.
+    const src = document.getElementById('cmpLibrarySelect');
+    const dst = document.getElementById('histLibrary');
+    if (src && dst) {
+      const v = (src.value || '').trim();
+      if (v) dst.value = v; // if blank, keep "— any —"
     }
 
     modal.style.display = 'flex';
