@@ -120,6 +120,13 @@
 
   /* QC history modal wider */
   #cmpHistoryModal .modal{ width:min(950px, 96vw); }
+  /* Library modals */
+  #libMergeModal .modal{ width:min(760px, 96vw); }
+  #libChangeLogModal .modal{ width:min(980px, 96vw); }
+
+  /* Clickable rows */
+  tr.clickRow{ cursor:pointer; }
+  tr.clickRow:hover{ background:#121827; }
   .modal h3{ margin:0 0 8px; }
   .edit-row{ display:grid; grid-template-columns: 1fr 100px 32px; gap:8px; align-items:center; }
   .pct-input{ text-align:right; font-variant-numeric:tabular-nums; }
@@ -1128,6 +1135,11 @@
           <div class="lib-editor-header">
             <div class="lib-editor-title" id="libEditorTitle">Select a library</div>
             <div class="lib-editor-actions">
+              <button class="btn" id="libRenameBtn" disabled>Rename</button>
+              <button class="btn" id="libDuplicateBtn" disabled>Duplicate</button>
+              <button class="btn" id="libMergeBtn" disabled>Merge</button>
+              <button class="btn" id="libChangeLogBtn" disabled>Change log</button>
+              <button class="btn" id="libSnapshotBtn" disabled>Snapshot</button>
               <button class="btn" id="libExportBtn" disabled>Export CSV</button>
               <button class="btn danger" id="libDeleteBtn" disabled>Delete</button>
             </div>
@@ -1307,6 +1319,33 @@
     </div>
 
 
+
+    <div class="card" style="max-width:1200px; margin:16px auto 0;">
+      <h1>Backup &amp; Restore</h1>
+      <p class="muted">
+        Download a single JSON backup of your <strong>libraries</strong>, <strong>QC history</strong>, <strong>ink curves</strong>, and <strong>settings</strong>.
+        Restoring will replace the data in this browser.
+      </p>
+
+      <div class="row2" style="margin-top:12px; align-items:end;">
+        <div>
+          <label class="nowrap">Backup</label>
+          <button class="btn" id="backupDownloadBtn" type="button">Download backup JSON</button>
+          <div class="mini" id="backupStatus" style="margin-top:6px;"></div>
+        </div>
+
+        <div>
+          <label class="nowrap">Restore</label>
+          <div class="flex" style="gap:10px; align-items:center; flex-wrap:wrap;">
+            <input id="backupRestoreFile" type="file" accept="application/json">
+            <button class="btn danger" id="backupRestoreBtn" type="button">Restore (replace)</button>
+          </div>
+          <div class="mini" id="restoreStatus" style="margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
+
+
 <div class="card" style="max-width:1200px; margin:16px auto 0;">
   <div class="flex" style="justify-content:space-between; align-items:center; gap:10px;">
     <h2 style="margin:0;">Training export</h2>
@@ -1419,6 +1458,75 @@
       </div>
     </div>
   </div>
+
+
+  <!-- Library merge modal -->
+  <div class="modalBack hide" id="libMergeModal" aria-hidden="true">
+    <div class="modal">
+      <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
+        <h3 style="margin:0;">Merge libraries</h3>
+        <button class="btn" id="libMergeClose" type="button">Close</button>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label for="libMergeDest">Merge INTO (destination)</label>
+          <select id="libMergeDest"></select>
+        </div>
+        <div>
+          <label for="libMergeSrc">Merge FROM (source)</label>
+          <select id="libMergeSrc"></select>
+        </div>
+      </div>
+
+      <div class="row2" style="margin-top:12px;">
+        <div>
+          <label class="nowrap" for="libMergeOverwrite">Name collisions</label>
+          <div class="flex" style="gap:10px; align-items:center;">
+            <input id="libMergeOverwrite" type="checkbox">
+            <span class="mini">If checked, source colours overwrite destination colours with the same name.</span>
+          </div>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="flex" style="margin-top:12px; justify-content:flex-end; gap:10px;">
+        <button class="btn" id="libMergeRun" type="button">Run merge</button>
+      </div>
+
+      <div class="mini" id="libMergeMsg" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Library change log modal -->
+  <div class="modalBack hide" id="libChangeLogModal" aria-hidden="true">
+    <div class="modal">
+      <div class="flex" style="justify-content:space-between; align-items:center; gap:8px;">
+        <h3 style="margin:0;">Library change log</h3>
+        <button class="btn" id="libChangeLogClose" type="button">Close</button>
+      </div>
+
+      <div class="mini" id="libChangeLogHeader" style="margin-top:8px;"></div>
+
+      <div style="max-height:60vh; overflow:auto; border:1px solid #1f2933; border-radius:10px; margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Action</th>
+              <th>Notes</th>
+              <th>Colours</th>
+              <th>Restore</th>
+            </tr>
+          </thead>
+          <tbody id="libChangeLogTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="mini" id="libChangeLogMsg" style="margin-top:10px;"></div>
+    </div>
+  </div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -1757,6 +1865,8 @@ function renderCompareLog(){
 
   rows.forEach(r=>{
     const tr = document.createElement('tr');
+    const __idx = CMP_LOG.indexOf(r);
+    if (__idx >= 0){ tr.setAttribute('data-log-idx', String(__idx)); tr.classList.add('clickRow'); }
     const pass = Number.isFinite(+r.deltaE) ? (+r.deltaE < SETTINGS.deltaEThreshold) : null;
     const cls = (pass===true) ? 'de-pass' : (pass===false ? 'de-fail' : 'de-neutral');
     const resTxt = (pass===true) ? 'PASS' : (pass===false ? 'FAIL' : '—');
@@ -1775,6 +1885,52 @@ function renderCompareLog(){
     tb.appendChild(tr);
   });
 }
+
+// Click a history row to reload the compare inputs
+document.getElementById('cmpLogTbody')?.addEventListener('click', (ev)=>{
+  const tr = ev.target.closest('tr[data-log-idx]');
+  if (!tr) return;
+  const idx = parseInt(tr.getAttribute('data-log-idx'), 10);
+  if (!Number.isFinite(idx)) return;
+  const rec = CMP_LOG[idx];
+  if (!rec) return;
+
+  // switch to QC tab and close history modal
+  try{ showTab('compare'); }catch(_){}
+  const modal = document.getElementById('cmpHistoryModal');
+  if (modal){ modal.classList.add('hide'); modal.setAttribute('aria-hidden','true'); }
+
+  // apply library first so the standard combo uses the right set
+  if (rec.libraryId){
+    activeLibraryId = String(rec.libraryId);
+    refreshLibrarySelects();
+    refreshActiveColours();
+  }
+
+  // job refs
+  const job = String(rec.jobRef||'');
+  const jt = document.getElementById('cmpJobRefTop');
+  const jb = document.getElementById('cmpJobRef');
+  if (jt) jt.value = job;
+  if (jb) jb.value = job;
+
+  // standard label + LABs
+  const std = String(rec.standardName||'');
+  const aSel = document.getElementById('cmpASelect');
+  if (aSel) aSel.value = std;
+
+  const A = rec.A || {};
+  const B = rec.B || {};
+  const setNum = (id,v)=>{ const el=document.getElementById(id); if(!el) return; el.value = (Number.isFinite(+v) ? (+v).toFixed(2) : ''); };
+
+  setNum('AL', A.L); setNum('Aa', A.a); setNum('Ab', A.b);
+  setNum('BL', B.L); setNum('Ba', B.a); setNum('Bb', B.b);
+
+  computeCompareDE();
+
+  // focus standard input for quick adjustments
+  try{ aSel && aSel.focus(); }catch(_){}
+});
 function exportCompareLogCsv(){
   if (!CMP_LOG.length){ alert('No saved comparisons yet.'); return; }
   const header = ['Date','JobRef','StandardName','Library','A_L','A_a','A_b','B_L','B_a','B_b','DeltaE2000','Threshold','Result'];
@@ -1863,6 +2019,67 @@ const LIB_ALL_ID = 'all';
 let userLibraries = []; // [{id,name,colours:[]}]
 let activeLibraryId = LIB_BASE_ID;
 let settingsLibraryId = null;
+
+const LIB_VERSIONS_KEY = 'ink_user_libraries_versions_v1';
+let LIB_VERSIONS = {}; // { [libId]: [ {vid,ts,action,notes,name,colourCount,snapshot?} ] }
+
+function loadLibraryVersions(){
+  try{
+    const raw = localStorage.getItem(LIB_VERSIONS_KEY);
+    if (!raw){ LIB_VERSIONS = {}; return; }
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== 'object'){ LIB_VERSIONS = {}; return; }
+    // tolerate either {libs:{...}} or direct map
+    const libs = obj.libs && typeof obj.libs === 'object' ? obj.libs : obj;
+    LIB_VERSIONS = libs && typeof libs === 'object' ? libs : {};
+  }catch(_){
+    LIB_VERSIONS = {};
+  }
+}
+function saveLibraryVersions(){
+  try{
+    localStorage.setItem(LIB_VERSIONS_KEY, JSON.stringify({ schema:'lib_versions_v1', libs: LIB_VERSIONS }));
+  }catch(_){}
+}
+function deepCopyColours(cols){
+  return (cols||[]).map(c=>({
+    name: String(c.name || c.Name || c.Colour || c.color || 'Untitled'),
+    L: Number(c.L ?? 0),
+    a: Number(c.a ?? 0),
+    b: Number(c.b ?? 0)
+  }));
+}
+function logLibraryVersion(libId, action, opts){
+  const id = String(libId||'');
+  if (!id) return;
+  const lib = userLibraries.find(l=>String(l.id)===id);
+  const entry = {
+    vid: (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('v_'+Date.now()+'_'+Math.random().toString(16).slice(2)),
+    ts: Date.now(),
+    action: String(action||''),
+    notes: (opts && opts.notes) ? String(opts.notes) : '',
+    name: lib ? String(lib.name||'') : (opts && opts.name ? String(opts.name) : ''),
+    colourCount: lib ? (Array.isArray(lib.colours) ? lib.colours.length : 0) : (opts && Number.isFinite(opts.colourCount) ? opts.colourCount : 0)
+  };
+  if (opts && opts.snapshot && lib){
+    entry.snapshot = { id: lib.id, name: lib.name, colours: deepCopyColours(lib.colours) };
+  }else if (opts && opts.snapshot && opts.snapshotData){
+    entry.snapshot = opts.snapshotData;
+  }
+  if (!Array.isArray(LIB_VERSIONS[id])) LIB_VERSIONS[id] = [];
+  LIB_VERSIONS[id].unshift(entry);
+  // cap to avoid localStorage bloat
+  if (LIB_VERSIONS[id].length > 50) LIB_VERSIONS[id] = LIB_VERSIONS[id].slice(0, 50);
+  saveLibraryVersions();
+}
+function formatTs(ts){
+  try{
+    const d = new Date(ts);
+    return d.toLocaleString(undefined, { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }catch(_){
+    return String(ts||'');
+  }
+}
 
 // Helpers
 function normaliseName(s){ return String(s||'').trim().toUpperCase().replace(/\s+/g,' '); }
@@ -2076,6 +2293,11 @@ function renderLibraryEditor(){
   const title = $('#libEditorTitle');
   const hint = $('#libEditorHint');
   const wrap = $('#libColourTableWrap');
+  const btnRename = $('#libRenameBtn');
+  const btnDuplicate = $('#libDuplicateBtn');
+  const btnMerge = $('#libMergeBtn');
+  const btnChangeLog = $('#libChangeLogBtn');
+  const btnSnapshot = $('#libSnapshotBtn');
   const btnExport = $('#libExportBtn');
   const btnDelete = $('#libDeleteBtn');
   const btnScan = $('#libScanBtn');
@@ -2085,6 +2307,11 @@ if (!title || !wrap) return;
   if (lib.empty){
     title.textContent = 'Colour sets';
     hint.textContent = 'Select a custom library to edit.';
+    if (btnRename) btnRename.disabled = true;
+    if (btnDuplicate) btnDuplicate.disabled = true;
+    if (btnMerge) btnMerge.disabled = true;
+    if (btnChangeLog) btnChangeLog.disabled = true;
+    if (btnSnapshot) btnSnapshot.disabled = true;
     btnExport.disabled = true;
     btnDelete.disabled = true;
     btnScan.disabled = true;
@@ -2094,6 +2321,11 @@ wrap.innerHTML = '<div class="muted" style="padding:12px;">Select a custom libra
   title.textContent = lib.name;
 
   const editable = !lib.readonly;
+  if (btnRename) btnRename.disabled = lib.readonly;
+  if (btnDuplicate) btnDuplicate.disabled = lib.readonly;
+  if (btnMerge) btnMerge.disabled = lib.readonly || (userLibraries.length < 2);
+  if (btnChangeLog) btnChangeLog.disabled = lib.readonly;
+  if (btnSnapshot) btnSnapshot.disabled = lib.readonly;
   btnExport.disabled = lib.readonly;
   btnDelete.disabled = lib.readonly;
   btnScan.disabled = lib.readonly;
@@ -4758,6 +4990,7 @@ $('#libAddBtn').addEventListener('click', ()=>{
       const lib = { id:id, name:name, colours:colours };
       userLibraries.push(lib);
       saveLibraries();
+      logLibraryVersion(id, 'import', { notes: `Imported CSV (${colours.length} colours)`, snapshot: true });
       $('#libName').value='';
       $('#libFile').value='';
       setSettingsLibrary(id);
@@ -4782,6 +5015,7 @@ $('#libCreateBtn').addEventListener('click', ()=>{
   const lib = { id:id, name:name, colours:[] };
   userLibraries.push(lib);
   saveLibraries();
+  logLibraryVersion(id, 'create', { notes: 'Created empty library', snapshot: true });
   $('#libName').value='';
   $('#libFile').value='';
   setSettingsLibrary(id);
@@ -4838,12 +5072,244 @@ $('#libDeleteBtn')?.addEventListener('click', ()=>{
   const lib = getSettingsLibrary();
   if (lib.readonly) return;
   if (!confirm(`Delete library "${lib.name}"? This cannot be undone.`)) return;
+  logLibraryVersion(lib.id, 'delete', { notes: `Deleted library "${lib.name}"` });
   userLibraries = userLibraries.filter(l=>l.id !== lib.id);
   saveLibraries();
   if (activeLibraryId === lib.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
   refreshLibrarySelects();
   setSettingsLibrary();
 });
+
+$('#libRenameBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const current = String(lib.name||'');
+  const next = prompt('Rename library:', current);
+  if (!next) return;
+  const name = String(next).trim();
+  if (!name) return;
+  if (name === current) return;
+  const l = userLibraries.find(x=>x.id===lib.id);
+  if (!l) return;
+  const old = l.name;
+  l.name = name;
+  saveLibraries();
+  refreshLibrarySelects();
+  renderLibraryList();
+  renderLibraryEditor();
+  logLibraryVersion(l.id, 'rename', { notes: `${old} → ${name}` });
+});
+
+$('#libDuplicateBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const baseName = String(lib.name||'Library');
+  const next = prompt('Duplicate library as:', baseName + ' copy');
+  if (!next) return;
+  const name = String(next).trim();
+  if (!name) return;
+  const id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2));
+  const colours = deepCopyColours(lib.colours || []);
+  const newLib = { id, name, colours };
+  userLibraries.push(newLib);
+  saveLibraries();
+  refreshLibrarySelects();
+  setSettingsLibrary(id);
+  renderLibraryList();
+  renderLibraryEditor();
+  if (activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  logLibraryVersion(id, 'duplicate_from', { notes: `From: ${baseName}`, snapshot: true });
+  logLibraryVersion(lib.id, 'duplicated_to', { notes: `To: ${name}` });
+});
+
+function openLibMergeModal(){
+  const modal = document.getElementById('libMergeModal');
+  const selDest = document.getElementById('libMergeDest');
+  const selSrc = document.getElementById('libMergeSrc');
+  const msg = document.getElementById('libMergeMsg');
+  if (!modal || !selDest || !selSrc) return;
+
+  const lib = getSettingsLibrary();
+  const libs = userLibraries.slice();
+  selDest.innerHTML = '';
+  selSrc.innerHTML = '';
+  libs.forEach(l=>{
+    const opt1 = document.createElement('option');
+    opt1.value = l.id;
+    opt1.textContent = l.name;
+    selDest.appendChild(opt1);
+
+    const opt2 = document.createElement('option');
+    opt2.value = l.id;
+    opt2.textContent = l.name;
+    selSrc.appendChild(opt2);
+  });
+
+  // default destination = current, source = first different
+  selDest.value = lib.id || (libs[0] ? libs[0].id : '');
+  const firstOther = libs.find(l=>l.id !== selDest.value);
+  selSrc.value = firstOther ? firstOther.id : selDest.value;
+
+  if (msg) msg.textContent = '';
+  modal.classList.remove('hide');
+  modal.setAttribute('aria-hidden','false');
+}
+function closeLibMergeModal(){
+  const modal = document.getElementById('libMergeModal');
+  if (!modal) return;
+  modal.classList.add('hide');
+  modal.setAttribute('aria-hidden','true');
+}
+
+$('#libMergeBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  if (userLibraries.length < 2){
+    alert('You need at least two custom libraries to merge.');
+    return;
+  }
+  openLibMergeModal();
+});
+$('#libMergeClose')?.addEventListener('click', closeLibMergeModal);
+$('#libMergeModal')?.addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'libMergeModal') closeLibMergeModal();
+});
+
+$('#libMergeRun')?.addEventListener('click', ()=>{
+  const selDest = document.getElementById('libMergeDest');
+  const selSrc = document.getElementById('libMergeSrc');
+  const overwrite = document.getElementById('libMergeOverwrite')?.checked ? true : false;
+  const msg = document.getElementById('libMergeMsg');
+  if (!selDest || !selSrc) return;
+  const destId = selDest.value;
+  const srcId = selSrc.value;
+  if (!destId || !srcId){ if (msg) msg.textContent = 'Pick both destination and source.'; return; }
+  if (destId === srcId){ if (msg) msg.textContent = 'Destination and source must be different.'; return; }
+
+  const dest = userLibraries.find(l=>l.id===destId);
+  const src = userLibraries.find(l=>l.id===srcId);
+  if (!dest || !src){ if (msg) msg.textContent = 'Could not find one of the selected libraries.'; return; }
+
+  // snapshot destination before merge for rollback
+  logLibraryVersion(dest.id, 'pre-merge', { notes: `Before merge from ${src.name}`, snapshot: true });
+
+  const destMap = new Map();
+  (dest.colours||[]).forEach((c, i)=> destMap.set(normaliseName(c.name), i));
+  let added = 0, overwritten = 0, skipped = 0;
+
+  (src.colours||[]).forEach(c=>{
+    const nm = normaliseName(c.name);
+    const existsIdx = destMap.has(nm) ? destMap.get(nm) : -1;
+    if (existsIdx >= 0){
+      if (overwrite){
+        dest.colours[existsIdx] = { name: String(c.name||''), L:Number(c.L??0), a:Number(c.a??0), b:Number(c.b??0) };
+        overwritten++;
+      }else{
+        skipped++;
+      }
+    }else{
+      dest.colours.push({ name: String(c.name||''), L:Number(c.L??0), a:Number(c.a??0), b:Number(c.b??0) });
+      destMap.set(nm, dest.colours.length-1);
+      added++;
+    }
+  });
+
+  saveLibraries();
+  refreshLibrarySelects();
+  renderLibraryList();
+  renderLibraryEditor();
+  if (activeLibraryId === dest.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+
+  logLibraryVersion(dest.id, 'merge', { notes: `From ${src.name} — added ${added}, overwritten ${overwritten}, skipped ${skipped} (overwrite=${overwrite?'yes':'no'})` });
+  logLibraryVersion(src.id, 'merged_into', { notes: `Into ${dest.name}` });
+
+  if (msg) msg.textContent = `Merged from "${src.name}" into "${dest.name}". Added ${added}, overwritten ${overwritten}, skipped ${skipped}.`;
+});
+
+function openLibChangeLog(){
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const modal = document.getElementById('libChangeLogModal');
+  const header = document.getElementById('libChangeLogHeader');
+  const tb = document.getElementById('libChangeLogTbody');
+  const msg = document.getElementById('libChangeLogMsg');
+  if (!modal || !tb) return;
+
+  const entries = Array.isArray(LIB_VERSIONS[lib.id]) ? LIB_VERSIONS[lib.id] : [];
+  if (header) header.textContent = `${lib.name} • ${entries.length} entr${entries.length===1?'y':'ies'}`;
+  if (msg) msg.textContent = '';
+  tb.innerHTML = '';
+
+  if (!entries.length){
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="5" class="muted">No change log entries yet. Use “Snapshot” after edits or actions like rename/merge.</td>';
+    tb.appendChild(tr);
+  }else{
+    entries.forEach((e, i)=>{
+      const tr = document.createElement('tr');
+      const hasSnap = !!(e && e.snapshot && e.snapshot.colours);
+      const notes = (e.notes||'').replace(/</g,'&lt;');
+      tr.innerHTML = `
+        <td>${formatTs(e.ts)}</td>
+        <td class="mono">${(e.action||'').replace(/</g,'&lt;')}</td>
+        <td>${notes}</td>
+        <td class="mono">${Number.isFinite(e.colourCount) ? e.colourCount : ''}</td>
+        <td>${hasSnap ? `<button class="btn" data-lib-restore="${i}">Restore</button>` : '<span class="muted">—</span>'}</td>
+      `;
+      tb.appendChild(tr);
+    });
+  }
+
+  modal.classList.remove('hide');
+  modal.setAttribute('aria-hidden','false');
+}
+
+function closeLibChangeLog(){
+  const modal = document.getElementById('libChangeLogModal');
+  if (!modal) return;
+  modal.classList.add('hide');
+  modal.setAttribute('aria-hidden','true');
+}
+
+$('#libChangeLogBtn')?.addEventListener('click', openLibChangeLog);
+$('#libChangeLogClose')?.addEventListener('click', closeLibChangeLog);
+$('#libChangeLogModal')?.addEventListener('click', (e)=>{
+  if (e.target && e.target.id === 'libChangeLogModal') closeLibChangeLog();
+});
+
+$('#libChangeLogTbody')?.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-lib-restore]');
+  if (!btn) return;
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const idx = parseInt(btn.getAttribute('data-lib-restore'),10);
+  const entries = Array.isArray(LIB_VERSIONS[lib.id]) ? LIB_VERSIONS[lib.id] : [];
+  const entry = entries[idx];
+  if (!entry || !entry.snapshot || !Array.isArray(entry.snapshot.colours)) return;
+  if (!confirm(`Restore "${lib.name}" to the snapshot from ${formatTs(entry.ts)}? This will replace the current colours.`)) return;
+
+  const l = userLibraries.find(x=>x.id===lib.id);
+  if (!l) return;
+  l.name = String(entry.snapshot.name || l.name);
+  l.colours = deepCopyColours(entry.snapshot.colours);
+  saveLibraries();
+  refreshLibrarySelects();
+  renderLibraryList();
+  renderLibraryEditor();
+  if (activeLibraryId === l.id || activeLibraryId === LIB_ALL_ID) refreshActiveColours();
+  logLibraryVersion(l.id, 'restore', { notes: `Restored snapshot from ${formatTs(entry.ts)}` });
+  const msg = document.getElementById('libChangeLogMsg');
+  if (msg) msg.textContent = `Restored snapshot from ${formatTs(entry.ts)}.`;
+});
+
+$('#libSnapshotBtn')?.addEventListener('click', ()=>{
+  const lib = getSettingsLibrary();
+  if (lib.readonly) return;
+  const note = prompt('Snapshot note (optional):', '');
+  logLibraryVersion(lib.id, 'snapshot', { notes: String(note||'').trim(), snapshot: true });
+  alert('Snapshot saved to change log.');
+});
+
 
 $('#libScanBtn')?.addEventListener('click', async ()=>{
   const lib = getSettingsLibrary();
@@ -5126,6 +5592,109 @@ if (resetSettingsBtn){
     setTimeout(()=>{ const s2=document.getElementById('settingsStatus'); if (s2) s2.textContent=''; }, 1500);
   });
 }
+
+// Backup / Restore
+function buildBackupObject(){
+  return {
+    schema: 'ink_colour_matcher_backup_v1',
+    createdAt: new Date().toISOString(),
+    userLibraries: userLibraries.map(l=>({ id:l.id, name:l.name, colours: deepCopyColours(l.colours) })),
+    inkCurves: Array.isArray(INK_CURVES) ? INK_CURVES : [],
+    compareLog: Array.isArray(CMP_LOG) ? CMP_LOG : [],
+    settings: SETTINGS || {},
+    libraryVersions: { schema:'lib_versions_v1', libs: (LIB_VERSIONS || {}) }
+  };
+}
+function downloadBackupJson(){
+  const status = document.getElementById('backupStatus');
+  try{
+    const obj = buildBackupObject();
+    const txt = JSON.stringify(obj, null, 2);
+    const blob = new Blob([txt], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const da = String(d.getDate()).padStart(2,'0');
+    a.href = url;
+    a.download = `ink_colour_matcher_backup_${y}-${m}-${da}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    if (status) status.textContent = 'Backup downloaded.';
+  }catch(err){
+    if (status) status.textContent = 'Error: ' + (err.message || String(err));
+  }
+}
+async function restoreBackupFromFile(){
+  const file = document.getElementById('backupRestoreFile')?.files?.[0];
+  const status = document.getElementById('restoreStatus');
+  if (!file){ if (status) status.textContent = 'Choose a backup JSON first.'; return; }
+
+  let txt = '';
+  try{
+    txt = await file.text();
+  }catch(err){
+    if (status) status.textContent = 'Could not read file: ' + (err.message || String(err));
+    return;
+  }
+
+  let obj = null;
+  try{
+    obj = JSON.parse(txt);
+  }catch(_){
+    if (status) status.textContent = 'Invalid JSON.';
+    return;
+  }
+
+  if (!obj || obj.schema !== 'ink_colour_matcher_backup_v1'){
+    if (status) status.textContent = 'This file does not look like an app backup (schema mismatch).';
+    return;
+  }
+
+  if (!confirm('Restore this backup and REPLACE the data stored in this browser?')) return;
+
+  try{
+    userLibraries = Array.isArray(obj.userLibraries) ? obj.userLibraries.map(l=>({
+      id: String(l.id || ((crypto && crypto.randomUUID) ? crypto.randomUUID() : ('lib_'+Math.random().toString(16).slice(2)))),
+      name: String(l.name || 'Unnamed'),
+      colours: deepCopyColours(Array.isArray(l.colours) ? l.colours : [])
+    })) : [];
+
+    INK_CURVES = Array.isArray(obj.inkCurves) ? obj.inkCurves : [];
+    CMP_LOG = Array.isArray(obj.compareLog) ? obj.compareLog : [];
+    SETTINGS = (obj.settings && typeof obj.settings === 'object') ? obj.settings : { deltaEThreshold:2.0, autoSaveCompare:false };
+
+    // library versions may be wrapped
+    const lv = obj.libraryVersions && typeof obj.libraryVersions === 'object' ? obj.libraryVersions : {};
+    LIB_VERSIONS = (lv.libs && typeof lv.libs === 'object') ? lv.libs : lv;
+
+    // Persist
+    saveLibraries();
+    saveInkCurves();
+    saveCompareLog();
+    saveSettings();
+    saveLibraryVersions();
+
+    // Refresh UI
+    refreshLibrarySelects();
+    refreshActiveColours();
+    renderLibraryList();
+    renderLibraryEditor();
+    renderCompareLog();
+    applySettingsToUI();
+
+    if (status) status.textContent = 'Restore complete.';
+  }catch(err){
+    if (status) status.textContent = 'Restore failed: ' + (err.message || String(err));
+  }
+}
+
+document.getElementById('backupDownloadBtn')?.addEventListener('click', downloadBackupJson);
+document.getElementById('backupRestoreBtn')?.addEventListener('click', restoreBackupFromFile);
+
 // Data load
 Promise.all([
   fetch('colours.json').then(r=>r.json()),
@@ -5141,6 +5710,7 @@ Promise.all([
   FORMULAS=tuple[1];
   buildFormulaIndex();
   loadLibraries();
+  loadLibraryVersions();
   refreshLibrarySelects();
   refreshActiveColours();
   renderLibraryList();
