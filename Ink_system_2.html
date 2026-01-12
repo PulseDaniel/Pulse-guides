@@ -4971,7 +4971,13 @@ if (cmpExportLogBtn){
     const dst = document.getElementById('histLibrary');
     if (src && dst) {
       const v = (src.value || '').trim();
-      if (v) dst.value = v; // if blank, keep "— any —"
+      // If Compare Colours is set to "All libraries (combined)", History should default to "— any —"
+      // because individual log entries are stored against a specific library id.
+      if (v && (typeof LIB_ALL_ID !== 'undefined') && v === LIB_ALL_ID) {
+        dst.value = '';
+      } else if (v) {
+        dst.value = v; // if blank, keep "— any —"
+      }
     }
 
     modal.style.display = 'flex';
