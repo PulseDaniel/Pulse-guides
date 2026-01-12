@@ -29,7 +29,7 @@
     align-items:center;
     justify-content:flex-start;
     gap:12px;
-    flex-wrap:nowrap;
+    flex-wrap:wrap;
   }
   .app-title{
     font-weight:800;
@@ -94,7 +94,9 @@
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:var(--gap); }
   .btn{ cursor:pointer; padding:10px 12px; border-radius:10px; border:1px solid #2a2f3a; background:#141824; color:#e6e6e6; font-weight:600; }
   .btn:hover{ filter:brightness(1.08); }
-  table{ width:100%; border-collapse:collapse; }
+    .btn:disabled{ opacity:.45; cursor:not-allowed; filter:none; }
+  .btn:disabled:hover{ filter:none; }
+table{ width:100%; border-collapse:collapse; }
   th,td{ text-align:left; padding:10px; border-bottom:1px dashed #242938; font-variant-numeric:tabular-nums; }
   th{ color:#9aa4b2; font-weight:600; }
   .result-row{ transition:background .2s; cursor:pointer; }
@@ -712,313 +714,6 @@
     .lTrack{ flex: 1 1 auto; height:auto; }
   }
 
-
-
-
-/* =========================
-   Professional polish pass
-   ========================= */
-:root{
-  --accent:#3b82f6;
-  --accent-soft: rgba(59,130,246,.18);
-  --surface:#0f1219;
-  --surface-2:#111623;
-  --surface-3:#141a2a;
-  --border:rgba(255,255,255,.10);
-  --border-2:rgba(255,255,255,.14);
-  --text:#e6e6e6;
-  --muted:#9aa4b2;
-}
-
-html{
-  overflow-y:scroll;            /* prevent layout shift when scrollbar appears */
-  scrollbar-gutter:stable;      /* supported in Chromium/Firefox */
-}
-
-body{
-  letter-spacing:.1px;
-  text-rendering:optimizeLegibility;
-}
-
-/* App bar + tabs */
-.appbar{
-  position:sticky;
-  top:0;
-  z-index:50;
-  background:rgba(11,12,16,.78);
-  backdrop-filter: blur(10px);
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
-.appbar-inner{ gap:12px; }
-
-.tabs{
-  background:rgba(255,255,255,.035);
-  border:1px solid rgba(255,255,255,.075);
-  padding:6px;
-  border-radius:16px;
-  gap:6px;
-  box-shadow: 0 8px 20px rgba(0,0,0,.25) inset;
-}
-
-.tabbtn{
-  position:relative;
-  border:1px solid transparent;
-  background:transparent;
-  transition: transform .12s ease, background-color .12s ease, border-color .12s ease, box-shadow .12s ease, color .12s ease;
-  outline:none;
-}
-.tabbtn:hover{
-  background:rgba(255,255,255,.06);
-}
-.tabbtn[aria-selected="true"]{
-  background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.04));
-  border-color:rgba(255,255,255,.16);
-  color:#ffffff;
-  box-shadow: 0 8px 22px rgba(0,0,0,.35);
-  transform: translateY(-1px);
-}
-.tabbtn[aria-selected="true"]::after{
-  content:"";
-  position:absolute;
-  left:12px;
-  right:12px;
-  bottom:-7px;
-  height:3px;
-  border-radius:4px;
-  background:var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
-}
-
-/* Cards/panels */
-.card, .panel, .modal{
-  border-color: rgba(255,255,255,.10) !important;
-}
-.card{
-  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015)) !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,.35) !important;
-}
-.card:hover{
-  border-color: rgba(255,255,255,.14) !important;
-}
-
-/* Inputs & buttons */
-input, select, textarea{
-  transition: border-color .12s ease, box-shadow .12s ease, background-color .12s ease;
-}
-input:hover, select:hover, textarea:hover{
-  border-color: rgba(255,255,255,.16);
-}
-input:focus, select:focus, textarea:focus{
-  border-color: rgba(59,130,246,.55);
-  box-shadow: 0 0 0 4px rgba(59,130,246,.18);
-  outline:none;
-}
-:focus-visible{
-  outline: 2px solid rgba(59,130,246,.65);
-  outline-offset: 2px;
-  border-radius: 10px;
-}
-
-.btn{
-  transition: transform .12s ease, filter .12s ease, box-shadow .12s ease, background-color .12s ease, border-color .12s ease;
-}
-.btn:hover{
-  transform: translateY(-1px);
-}
-.btn:active{
-  transform: translateY(0);
-}
-.btn:disabled, .btn[disabled]{
-  opacity:.55;
-  cursor:not-allowed;
-  filter:none !important;
-  transform:none !important;
-}
-
-/* Better table readability (used in libraries) */
-table{
-  border-collapse:separate;
-  border-spacing:0;
-}
-thead th{
-  position:sticky;
-  top:0;
-  background: rgba(11,12,16,.85);
-  backdrop-filter: blur(10px);
-  z-index:1;
-}
-tbody tr:hover{
-  background: rgba(255,255,255,.03);
-}
-
-/* Subtle scrollbars (Chromium/WebKit) */
-::-webkit-scrollbar{ width: 10px; height:10px; }
-::-webkit-scrollbar-thumb{
-  background: rgba(255,255,255,.14);
-  border: 2px solid rgba(11,12,16,.75);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover{ background: rgba(255,255,255,.20); }
-::-webkit-scrollbar-corner{ background: rgba(11,12,16,.75); }
-
-@media (prefers-reduced-motion: reduce){
-  *{ transition:none !important; animation:none !important; scroll-behavior:auto !important; }
-}
-
-
-  /* --- Navbar brand/logo layout (refined) --- */
-  /* Make the app bar feel like a single cohesive header and keep brand pinned right */
-  .appbar{ max-width:none; margin:0 0 14px; }
-  .appbar-inner{
-    justify-content:space-between;
-    flex-wrap:nowrap;
-    gap:14px;
-  }
-  /* Tabs stay on one line; if many, they can scroll horizontally */
-  .tabs{
-    flex:0 1 auto;
-    min-width:0;
-    flex-wrap:nowrap;
-    overflow-x:auto;
-    overflow-y:hidden;
-    -webkit-overflow-scrolling:touch;
-    padding-bottom:2px; /* room for underline */
-  }
-  .tabs::-webkit-scrollbar{ height:6px; }
-  .tabs::-webkit-scrollbar-thumb{ background:#2b2f3b; border-radius:999px; }
-  .tabs::-webkit-scrollbar-track{ background:transparent; }
-
-  .app-brand{
-    margin-left:auto;
-    flex:0 0 auto;
-    display:flex;
-    align-items:center;
-    gap:12px;
-    padding-left:0;
-  }
-  .app-title{ font-size:1.05rem; }
-
-  .app-logo{
-    height:34px;
-    width:auto;
-    display:block;
-    border-radius:12px;
-    box-shadow: 0 10px 24px rgba(0,0,0,.40);
-    filter: saturate(1.08) contrast(1.08);
-  }
-  @media (max-width: 760px){
-    .app-title{ font-size:1rem; }
-    .app-logo{ height:28px; border-radius:10px; }
-  }
-  @media (max-width: 560px){
-    .app-title{ display:none; }
-    .app-logo{ height:26px; }
-  }
-
-  @media (max-width: 760px){
-    .tabs{ min-width: 260px; }
-    .app-logo{ height:18px; }
-  }
-  @media (max-width: 560px){
-    .app-brand .app-title{ display:none; }
-  }
-
-
-/* === Navbar cohesion pass === */
-html{ overflow-y: scroll; } /* keep stable scrollbar */
-.appbar{
-  padding:10px 14px;
-}
-.appbar-inner{
-  display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  gap:14px;
-  flex-wrap:nowrap;
-}
-.tabs{
-  display:flex;
-  align-items:center;
-  gap:10px;
-  padding:0 !important;
-  background:transparent !important;
-  border:none !important;
-  border-radius:0 !important;
-  box-shadow:none !important;
-  flex-wrap:nowrap;
-}
-.tabbtn{
-  position:relative;
-  padding:10px 14px;
-  border-radius:12px;
-  border:1px solid transparent;
-  background:transparent;
-  color:#cbd5e1;
-  font-weight:900;
-  letter-spacing:.1px;
-}
-.tabbtn:hover{
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.10);
-}
-.tabbtn[aria-selected="true"]{
-  background: rgba(99,102,241,.14);
-  border-color: rgba(99,102,241,.45);
-  color:#ffffff;
-  box-shadow: 0 10px 26px rgba(0,0,0,.35);
-  transform: translateY(-1px);
-}
-.tabbtn[aria-selected="true"]::after{
-  content:"";
-  position:absolute;
-  left:10px;
-  right:10px;
-  bottom:-6px;
-  height:3px;
-  border-radius:999px;
-  background: rgba(99,102,241,.9);
-  box-shadow: 0 0 0 1px rgba(99,102,241,.25), 0 10px 18px rgba(99,102,241,.18);
-}
-
-/* Put title immediately after tabs; logo pinned to far right */
-.app-brand{
-  flex:1;
-  margin-left:0 !important;
-  padding-left:0 !important;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  min-width:0;
-}
-.app-brand .app-title{
-  font-weight:950;
-  letter-spacing:.2px;
-  color:#eef2ff;
-  text-shadow: 0 10px 22px rgba(0,0,0,.35);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.app-brand .app-logo{
-  margin-left:auto;
-  height:28px;
-  width:auto;
-  border-radius:10px;
-  box-shadow: 0 10px 26px rgba(0,0,0,.35);
-}
-
-/* Responsive: allow wrap when needed */
-@media (max-width: 780px){
-  .appbar-inner{ flex-wrap:nowrap; }
-  .tabs{ flex-wrap:wrap; }
-  .app-brand{ width:100%; }
-  .app-brand .app-logo{ height:24px; }
-}
-@media (max-width: 560px){
-  .app-brand .app-title{ display:none; }
-}
-/* === End navbar cohesion pass === */
-
 </style>
 </head>
 <body>
@@ -1043,6 +738,7 @@ html{ overflow-y: scroll; } /* keep stable scrollbar */
   <div id="appRoot" class="app-hidden">
   <div class="appbar">
     <div class="appbar-inner">
+      <div class="app-title"><span>Colour Bar</span></div>
       <div class="tabs" role="tablist" aria-label="Modes">
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Calculator</button>
@@ -1050,10 +746,6 @@ html{ overflow-y: scroll; } /* keep stable scrollbar */
         
 <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
-      <div class="app-brand" aria-label="Colour Bar">
-        <div class="app-title"><span>Colour Bar</span></div>
-        <img class="app-logo" src="./ColourBarLogo.png" alt="Colour Bar" draggable="false">
-      </div>
     </div>
   </div>
 
@@ -1219,7 +911,14 @@ html{ overflow-y: scroll; } /* keep stable scrollbar */
         </div>
       </div>
 
-      <div class="formula-box" id="cmpResult" style="display:none; margin-top:12px;">
+      
+      <div class="flex" id="cmpActions" style="margin-top:10px; justify-content:flex-start; align-items:center; flex-wrap:wrap; gap:8px;">
+        <button class="btn" id="cmpHistoryBtn">History</button>
+        <button class="btn" id="cmpPrintLabelBtn">Print label</button>
+        <span class="mini muted" id="cmpPrintHint">Enter Standard and Batch LAB values to enable printing.</span>
+      </div>
+
+<div class="formula-box" id="cmpResult" style="display:none; margin-top:12px;">
         <h2 style="margin-bottom:6px;">Result</h2>
         <div id="cmpNumbers" style="font-size:1.05rem;"></div>
         <div class="muted" style="margin-top:6px;">
@@ -1240,10 +939,7 @@ html{ overflow-y: scroll; } /* keep stable scrollbar */
         <div class="mini" id="cmpSaveMsg" style="margin-top:6px;"></div>
       </div>
 
-      <div class="flex" style="margin-top:10px; justify-content:flex-start;">
-        <button class="btn" id="cmpHistoryBtn">History</button>
-        <button class="btn" id="cmpPrintLabelBtn" style="margin-left:8px;">Print label</button>
-      </div>
+      
 
 </div>
 
@@ -3351,7 +3047,7 @@ function computeCompareDE(){
   const a={L:parseFloat($('#AL').value),a:parseFloat($('#Aa').value),b:parseFloat($('#Ab').value)};
   const b={L:parseFloat($('#BL').value),a:parseFloat($('#Ba').value),b:parseFloat($('#Bb').value)};
   if ([a.L,a.a,a.b,b.L,b.a,b.b].some(v=>Number.isNaN(v))){
-    $('#cmpNumbers').innerHTML=''; $('#cmpResult').style.display='none'; requestLabDraw(); return;
+    $('$('#cmpNumbers').innerHTML=''; $('#cmpResult').style.display='none'; if (window.__cmpUpdatePrintLabel) window.__cmpUpdatePrintLabel(); requestLabDraw(); return;
   }
   const de=deltaE2000(a,b), dL=(b.L-a.L), da=(b.a-a.a), db=(b.b-a.b);
   const thr = (SETTINGS && Number.isFinite(SETTINGS.deltaEThreshold)) ? SETTINGS.deltaEThreshold : 2.0;
@@ -3364,7 +3060,7 @@ function computeCompareDE(){
       <div><strong>ΔE2000:</strong> <span class="${cls}">${de.toFixed(2)}</span> <span class="${cls}" style="margin-left:8px;">${resTxt}</span></div>
       <div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)} &nbsp; <span class="mini">(threshold: ${thr.toFixed(1)})</span></div>
     </div>`;
-  $('#cmpResult').style.display='block';
+  $('#cmpResult').style.display='block'; if (window.__cmpUpdatePrintLabel) window.__cmpUpdatePrintLabel();
   requestLabDraw();
 
   // Optional auto-save (demo-friendly)
@@ -5294,11 +4990,43 @@ if (cmpExportLogBtn){
 // QC: Print label for Standard + Batch
 (function wireComparePrintLabel(){
   const btn = document.getElementById('cmpPrintLabelBtn');
+  const hint = document.getElementById('cmpPrintHint');
   if (!btn) return;
 
-  function fmt3(x){
+function fmt3(x){
     return Number.isFinite(x) ? x.toFixed(2) : '—';
   }
+  const getVals = () => {
+    const std = { L: parseFloat($('#AL')?.value), a: parseFloat($('#Aa')?.value), b: parseFloat($('#Ab')?.value) };
+    const bat = { L: parseFloat($('#BL')?.value), a: parseFloat($('#Ba')?.value), b: parseFloat($('#Bb')?.value) };
+    const ok = ![std.L,std.a,std.b,bat.L,bat.a,bat.b].some(v => !Number.isFinite(v));
+    return { std, bat, ok };
+  };
+
+  function updateEnabled(){
+    const { ok } = getVals();
+    btn.disabled = !ok;
+    if (hint){
+      hint.style.display = ok ? 'none' : 'inline';
+      if (!ok) hint.textContent = 'Enter Standard and Batch LAB values to enable printing.';
+    }
+  }
+
+  // expose for other QC update paths (e.g., scanner writes values programmatically)
+  window.__cmpUpdatePrintLabel = updateEnabled;
+
+  ['AL','Aa','Ab','BL','Ba','Bb'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el){
+      el.addEventListener('input', updateEnabled);
+      el.addEventListener('change', updateEnabled);
+    }
+  });
+  // periodic safety net (very light)
+  setInterval(updateEnabled, 400);
+  updateEnabled();
+
+
 
   btn.addEventListener('click', () => {
     const libSel = document.getElementById('cmpLibrarySelect');
@@ -5306,12 +5034,12 @@ if (cmpExportLogBtn){
       ? libSel.selectedOptions[0].textContent.trim()
       : '—';
 
-    const std = { L: parseFloat($('#AL')?.value), a: parseFloat($('#Aa')?.value), b: parseFloat($('#Ab')?.value) };
-    const bat = { L: parseFloat($('#BL')?.value), a: parseFloat($('#Ba')?.value), b: parseFloat($('#Bb')?.value) };
-    if ([std.L,std.a,std.b,bat.L,bat.a,bat.b].some(v => !Number.isFinite(v))){
+        const { std, bat, ok } = getVals();
+    if (!ok){
       alert('Please scan or enter both Standard and Batch LAB values first.');
       return;
     }
+
 
     const de = deltaE2000(std, bat);
     const passSpec = 1.5;
