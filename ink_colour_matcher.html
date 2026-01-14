@@ -865,6 +865,10 @@
         <span class="mini"></span>
       </div>
 
+      <div class="flex" style="margin-top:10px; justify-content:flex-start;">
+        <button class="btn" id="cmpHistoryBtn" type="button">History</button>
+      </div>
+
       <div class="two-col" style="margin-top:12px;">
         <div>
           <div class="row2">
@@ -931,8 +935,7 @@
       </div>
 
       <div class="flex" style="margin-top:10px; justify-content:flex-start;">
-        <button class="btn" id="cmpHistoryBtn">History</button>
-        <button class="btn" id="cmpPrintLabelBtn" style="margin-left:8px;">Print label</button>
+        <button class="btn" id="cmpPrintLabelBtn" type="button">Print label</button>
       </div>
 
 </div>
@@ -1296,6 +1299,27 @@
         </div>
       </div>
 
+      <div style="margin-top:14px;">
+        <h2 style="margin:0 0 6px;">QC tolerances by library</h2>
+        <div class="mini" style="margin-bottom:8px;">Leave blank to use the default threshold above.</div>
+        <div style="max-height:240px; overflow:auto; border:1px solid #1f2933; border-radius:10px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Library</th>
+                <th>ΔE2000 pass threshold</th>
+                <th>Effective</th>
+              </tr>
+            </thead>
+            <tbody id="libTolTbody"></tbody>
+          </table>
+        </div>
+        <div class="flex" style="margin-top:8px; justify-content:flex-end;">
+          <button class="btn" id="libTolClearBtn" type="button">Clear overrides</button>
+        </div>
+      </div>
+
+
       <div class="flex" style="margin-top:12px;">
         <button class="btn" id="saveSettingsBtn">Save settings</button>
         <button class="btn" id="resetSettingsBtn">Reset to defaults</button>
@@ -1653,7 +1677,8 @@ const CMP_LOG_KEY = 'compare_log_v1';
 const SETTINGS_KEY = 'ink_system_settings_v1';
 let CMP_LOG = [];
 let SETTINGS = {
-  deltaEThreshold: 2.0,
+  deltaEThreshold: 2.0, // default/fallback
+  perLibraryThresholds: {}, // { [libraryId]: number }
   autoSaveCompare: false,
 };
 
@@ -1680,10 +1705,22 @@ function loadSettings(){
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return;
     const j = JSON.parse(raw);
-    if (j && typeof j === 'object'){
-      if (Number.isFinite(+j.deltaEThreshold)) SETTINGS.deltaEThreshold = +j.deltaEThreshold;
-      if (j.autoSaveCompare === true || j.autoSaveCompare === false) SETTINGS.autoSaveCompare = j.autoSaveCompare;
+    if (!j || typeof j !== 'object') return;
+
+    // Default threshold (backwards compatible)
+    if (Number.isFinite(+j.deltaEThreshold)) SETTINGS.deltaEThreshold = +j.deltaEThreshold;
+
+    // Per-library overrides
+    if (j.perLibraryThresholds && typeof j.perLibraryThresholds === 'object'){
+      const m = {};
+      Object.keys(j.perLibraryThresholds).forEach(k=>{
+        const v = parseFloat(j.perLibraryThresholds[k]);
+        if (Number.isFinite(v) && v >= 0) m[String(k)] = v;
+      });
+      SETTINGS.perLibraryThresholds = m;
     }
+
+    if (j.autoSaveCompare === true || j.autoSaveCompare === false) SETTINGS.autoSaveCompare = j.autoSaveCompare;
   }catch{}
 }
 function saveSettings(){
@@ -1694,6 +1731,7 @@ function applySettingsToUI(){
   const auto = document.getElementById('setAutoSaveCompare');
   if (thr) thr.value = String(SETTINGS.deltaEThreshold);
   if (auto) auto.value = SETTINGS.autoSaveCompare ? '1' : '0';
+  renderLibraryToleranceTable();
 }
 function readSettingsFromUI(){
   const thr = document.getElementById('setDeltaEThreshold');
@@ -1701,6 +1739,87 @@ function readSettingsFromUI(){
   const v = thr ? parseFloat(thr.value) : NaN;
   if (Number.isFinite(v) && v >= 0) SETTINGS.deltaEThreshold = v;
   SETTINGS.autoSaveCompare = (auto && auto.value === '1') ? true : false;
+  readLibraryToleranceFromUI();
+}
+
+
+function getLibraryThreshold(libId){
+  const def = (SETTINGS && Number.isFinite(+SETTINGS.deltaEThreshold)) ? +SETTINGS.deltaEThreshold : 2.0;
+  const id = String(libId || '');
+  if (!id || id === LIB_ALL_ID) return def;
+  const map = (SETTINGS && SETTINGS.perLibraryThresholds && typeof SETTINGS.perLibraryThresholds === 'object') ? SETTINGS.perLibraryThresholds : {};
+  const v = map[id];
+  return (Number.isFinite(+v) && +v >= 0) ? +v : def;
+}
+
+function renderLibraryToleranceTable(){
+  const tb = document.getElementById('libTolTbody');
+  if (!tb) return;
+  tb.innerHTML = '';
+  const opts = libraryOptions().filter(o=>o.id !== LIB_ALL_ID);
+  const def = getLibraryThreshold(LIB_ALL_ID);
+
+  opts.forEach(o=>{
+    const tr = document.createElement('tr');
+
+    const tdName = document.createElement('td');
+    tdName.textContent = o.label;
+    tr.appendChild(tdName);
+
+    const tdInput = document.createElement('td');
+    const wrap = document.createElement('div');
+    wrap.style.display = 'flex';
+    wrap.style.alignItems = 'center';
+    wrap.style.gap = '8px';
+
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.step = '0.1';
+    inp.min = '0';
+    inp.className = 'mono';
+    inp.style.maxWidth = '140px';
+    inp.placeholder = String(def);
+    inp.dataset.lib = o.id;
+
+    const map = (SETTINGS && SETTINGS.perLibraryThresholds) ? SETTINGS.perLibraryThresholds : {};
+    if (Number.isFinite(+map[o.id])) inp.value = String(+map[o.id]);
+
+    const flag = document.createElement('span');
+    flag.className = 'mini';
+    flag.textContent = (inp.value !== '') ? 'override' : 'default';
+
+    wrap.appendChild(inp);
+    wrap.appendChild(flag);
+    tdInput.appendChild(wrap);
+    tr.appendChild(tdInput);
+
+    const tdEff = document.createElement('td');
+    tdEff.className = 'mini';
+
+    const sync = ()=>{
+      const v = parseFloat(inp.value);
+      const isOverride = Number.isFinite(v) && v >= 0;
+      flag.textContent = isOverride ? 'override' : 'default';
+      tdEff.textContent = (isOverride ? v : def).toFixed(2);
+    };
+    inp.addEventListener('input', sync);
+    sync();
+
+    tr.appendChild(tdEff);
+    tb.appendChild(tr);
+  });
+}
+
+function readLibraryToleranceFromUI(){
+  const tb = document.getElementById('libTolTbody');
+  if (!tb) return;
+  const map = {};
+  tb.querySelectorAll('input[data-lib]').forEach(inp=>{
+    const id = String(inp.dataset.lib || '');
+    const v = parseFloat(inp.value);
+    if (id && Number.isFinite(v) && v >= 0) map[id] = v;
+  });
+  SETTINGS.perLibraryThresholds = map;
 }
 
 function loadCompareLog(){
@@ -1754,7 +1873,8 @@ function renderCompareLog(){
 
   rows.forEach(r=>{
     const tr = document.createElement('tr');
-    const pass = Number.isFinite(+r.deltaE) ? (+r.deltaE < SETTINGS.deltaEThreshold) : null;
+    const thr = Number.isFinite(+r.threshold) ? (+r.threshold) : getLibraryThreshold(r.libraryId);
+    const pass = Number.isFinite(+r.deltaE) ? (+r.deltaE < thr) : null;
     const cls = (pass===true) ? 'de-pass' : (pass===false ? 'de-fail' : 'de-neutral');
     const resTxt = (pass===true) ? 'PASS' : (pass===false ? 'FAIL' : '—');
     const stdName = (r.standardName || '').replace(/</g,'&lt;');
@@ -1776,9 +1896,9 @@ function exportCompareLogCsv(){
   if (!CMP_LOG.length){ alert('No saved comparisons yet.'); return; }
   const header = ['Date','JobRef','StandardName','Library','A_L','A_a','A_b','B_L','B_a','B_b','DeltaE2000','Threshold','Result'];
   const lines = [header.join(',')];
-  const thr = SETTINGS.deltaEThreshold;
   const rows = filteredAndSortedCompareLog(true);
   rows.forEach(r=>{
+    const thr = Number.isFinite(+r.threshold) ? (+r.threshold) : getLibraryThreshold(r.libraryId);
     const pass = (+r.deltaE < thr);
     lines.push([
       new Date(r.ts).toISOString(),
@@ -1815,6 +1935,7 @@ function saveCurrentComparison(opts){
   const jobRef = (document.getElementById('cmpJobRef')?.value || '').trim();
   if (!jobRef) return { ok:false, msg:'Please enter a Job reference before saving.' };
   const deltaE = deltaE2000({L:ab.A.L,a:ab.A.a,b:ab.A.b},{L:ab.B.L,a:ab.B.a,b:ab.B.b});
+  const thr = getLibraryThreshold(activeLibraryId);
   const libOpts = libraryOptions();
   const libLabel = (libOpts.find(o=>o.id===activeLibraryId)?.label) || '';
   const standardName = (CMP_STANDARD_NAME || document.getElementById('cmpASelect')?.value || '').trim();
@@ -1827,7 +1948,8 @@ function saveCurrentComparison(opts){
     libraryLabel: libLabel,
     A: ab.A,
     B: ab.B,
-    deltaE: +deltaE.toFixed(4)
+    deltaE: +deltaE.toFixed(4),
+    threshold: +thr.toFixed(4)
   };
   CMP_LOG.push(rec);
   saveCompareLog();
@@ -1978,6 +2100,7 @@ function refreshLibrarySelects(){
   const activeLabel = (opts.find(o=>o.id===activeLibraryId)?.label) || 'Pantone';
   $('#activeLibLabel').textContent = activeLabel;
   $('#cmpLibLabel').textContent = activeLabel;
+  renderLibraryToleranceTable();
 }
 function getActiveColours(){
   if (activeLibraryId === LIB_BASE_ID) return BASE_COLOURS;
@@ -3044,14 +3167,14 @@ function computeCompareDE(){
     $('#cmpNumbers').innerHTML=''; $('#cmpResult').style.display='none'; requestLabDraw(); return;
   }
   const de=deltaE2000(a,b), dL=(b.L-a.L), da=(b.a-a.a), db=(b.b-a.b);
-  const thr = (SETTINGS && Number.isFinite(SETTINGS.deltaEThreshold)) ? SETTINGS.deltaEThreshold : 2.0;
+  const thr = getLibraryThreshold(activeLibraryId);
   const pass = de < thr;
   const cls = pass ? 'de-pass' : 'de-fail';
   const resTxt = pass ? 'PASS' : 'FAIL';
 
   $('#cmpNumbers').innerHTML=
     `<div class="two-col">
-      <div><strong>ΔE2000:</strong> <span class="${cls}">${de.toFixed(2)}</span> <span class="${cls}" style="margin-left:8px;">${resTxt}</span></div>
+      <div><strong>ΔE2000:</strong> <span class="${cls}">${de.toFixed(2)}</span> <span class="${cls}" style="margin-left:8px;">${resTxt}</span> <span class="mini" style="margin-left:10px;">(thr ${thr.toFixed(2)})</span></div>
       <div><strong>ΔL:</strong> ${dL.toFixed(2)} &nbsp; <strong>Δa:</strong> ${da.toFixed(2)} &nbsp; <strong>Δb:</strong> ${db.toFixed(2)} &nbsp; <span class="mini">(threshold: ${thr.toFixed(1)})</span></div>
     </div>`;
   $('#cmpResult').style.display='block';
@@ -4726,11 +4849,13 @@ $('#librarySelect').addEventListener('change', (e)=>{
   activeLibraryId = e.target.value || LIB_BASE_ID;
   refreshLibrarySelects();
   refreshActiveColours();
+  computeCompareDE();
 });
 $('#cmpLibrarySelect').addEventListener('change', (e)=>{
   activeLibraryId = e.target.value || LIB_BASE_ID;
   refreshLibrarySelects();
   refreshActiveColours();
+  computeCompareDE();
 });
 $('#libAddBtn').addEventListener('click', ()=>{
   const name = ($('#libName').value||'').trim();
@@ -4962,6 +5087,21 @@ if (cmpExportLogBtn){
 
   const open = ()=>{
     rebuildLibraryFilter();
+
+    // Preset History -> Library filter to whatever is selected in the Compare Colours section.
+    const src = document.getElementById('cmpLibrarySelect');
+    const dst = document.getElementById('histLibrary');
+    if (src && dst) {
+      const v = (src.value || '').trim();
+      // If Compare Colours is set to "All libraries (combined)", History should default to "— any —"
+      // because individual log entries are stored against a specific library id.
+      if (v && (typeof LIB_ALL_ID !== 'undefined') && v === LIB_ALL_ID) {
+        dst.value = '';
+      } else if (v) {
+        dst.value = v; // if blank, keep "— any —"
+      }
+    }
+
     modal.style.display = 'flex';
     renderCompareLog();
   };
@@ -5095,10 +5235,24 @@ if (saveSettingsBtn){
     setTimeout(()=>{ const s2=document.getElementById('settingsStatus'); if (s2) s2.textContent=''; }, 1500);
   });
 }
+
+const libTolClearBtn = document.getElementById('libTolClearBtn');
+if (libTolClearBtn){
+  libTolClearBtn.addEventListener('click', ()=>{
+    SETTINGS.perLibraryThresholds = {};
+    renderLibraryToleranceTable();
+    renderCompareLog();
+    computeCompareDE();
+    const s = document.getElementById('settingsStatus');
+    if (s) s.textContent = 'Cleared library overrides (remember to Save settings).';
+    setTimeout(()=>{ const s2=document.getElementById('settingsStatus'); if (s2) s2.textContent=''; }, 2000);
+  });
+}
+
 const resetSettingsBtn = document.getElementById('resetSettingsBtn');
 if (resetSettingsBtn){
   resetSettingsBtn.addEventListener('click', ()=>{
-    SETTINGS = { deltaEThreshold: 2.0, autoSaveCompare: false };
+    SETTINGS = { deltaEThreshold: 2.0, perLibraryThresholds: {}, autoSaveCompare: false };
     saveSettings();
     applySettingsToUI();
     renderCompareLog();
