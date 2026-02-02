@@ -741,8 +741,9 @@
     <button class="tabbtn" id="tabBtnMatch" role="tab" aria-selected="true" aria-controls="tab-match">Match &amp; Predict</button>
     <button class="tabbtn" id="tabBtnMix" role="tab" aria-selected="false" aria-controls="tab-mix">Calculator</button>
     <button class="tabbtn" id="tabBtnCompare" style="min-width:102px" role="tab" aria-selected="false" aria-controls="tab-compare">QC</button>
+    <button class="tabbtn" id="tabBtnUvLamp" role="tab" aria-selected="false" aria-controls="tab-uv-lamp">UV Lamp Check</button>
         
-<button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
+  <button class="tabbtn" id="tabBtnSettings" role="tab" aria-selected="false" aria-controls="tab-settings">Settings</button>
 </div>
     </div>
   </div>
@@ -984,6 +985,14 @@
           </aside>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- TAB: UV Lamp Check -->
+  <section id="tab-uv-lamp" role="tabpanel" aria-labelledby="tabBtnUvLamp" hidden>
+    <div class="card" style="max-width:1200px; margin:0 auto;">
+      <h1>UV Lamp Check</h1>
+      <div class="muted">Coming soon.</div>
     </div>
   </section>
 
@@ -4720,6 +4729,18 @@ const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
 const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
 const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
 
+function setScanButtonState(btn, busy, busyText){
+  if (!btn) return;
+  if (!btn.dataset.defaultText) btn.dataset.defaultText = btn.textContent || '';
+  if (busy){
+    btn.disabled = true;
+    btn.textContent = busyText || 'Reading… keep device pressed down.';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.defaultText;
+  }
+}
+
 [spectroConnectBtn, spectroConnectBtnLib, spectroConnectBtnMatch, spectroConnectBtnCompare].forEach(btn=>{
   if (!btn) return;
   btn.addEventListener('click', async ()=>{
@@ -4731,6 +4752,7 @@ const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn')
 
 if (spectroMeasureBtn){
   spectroMeasureBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroMeasureBtn, true);
     const inkName = (document.getElementById('spectroInkName').value || '').trim();
     const concStr = (document.getElementById('spectroConcentration').value || '').trim();
     const backing = (document.getElementById('spectroBacking').value || 'white');
@@ -4778,6 +4800,8 @@ if (spectroMeasureBtn){
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroMeasureBtn, false);
     }
   });
 }
@@ -4788,6 +4812,7 @@ if (spectroExportBtn){
 
 if (spectroScanTargetBtn){
   spectroScanTargetBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanTargetBtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -4801,21 +4826,24 @@ if (spectroScanTargetBtn){
       const aInput = document.getElementById('a');
       const bInput = document.getElementById('b');
       if (LInput && aInput && bInput){
-        LInput.value = meas.L;
-        aInput.value = meas.a;
-        bInput.value = meas.b;
+        LInput.value = Number(meas.L).toFixed(2);
+        aInput.value = Number(meas.a).toFixed(2);
+        bInput.value = Number(meas.b).toFixed(2);
         updateTargetEcho();
         findClosest();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanTargetBtn, false);
     }
   });
 }
 
 if (spectroScanCompareABtn){
   spectroScanCompareABtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanCompareABtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -4829,21 +4857,24 @@ if (spectroScanCompareABtn){
       const Aa = document.getElementById('Aa');
       const Ab = document.getElementById('Ab');
       if (AL && Aa && Ab){
-        AL.value = meas.L;
-        Aa.value = meas.a;
-        Ab.value = meas.b;
+        AL.value = Number(meas.L).toFixed(2);
+        Aa.value = Number(meas.a).toFixed(2);
+        Ab.value = Number(meas.b).toFixed(2);
         setSwatchFromFields('A');
         computeCompareDE();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanCompareABtn, false);
     }
   });
 }
 
 if (spectroScanCompareBBtn){
   spectroScanCompareBBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanCompareBBtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -4857,15 +4888,17 @@ if (spectroScanCompareBBtn){
       const Ba = document.getElementById('Ba');
       const Bb = document.getElementById('Bb');
       if (BL && Ba && Bb){
-        BL.value = meas.L;
-        Ba.value = meas.a;
-        Bb.value = meas.b;
+        BL.value = Number(meas.L).toFixed(2);
+        Ba.value = Number(meas.a).toFixed(2);
+        Bb.value = Number(meas.b).toFixed(2);
         setSwatchFromFields('B');
         computeCompareDE();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanCompareBBtn, false);
     }
   });
 }
@@ -5706,21 +5739,25 @@ document.addEventListener('DOMContentLoaded', ()=>{
 const tabBtnMatch=$('#tabBtnMatch');
 const tabBtnCompare=$('#tabBtnCompare');
 const tabBtnMix=$('#tabBtnMix');
+const tabBtnUvLamp=$('#tabBtnUvLamp');
 const tabBtnSettings=$('#tabBtnSettings');
 
 const tabMatch=$('#tab-match');
 const tabCompare=$('#tab-compare');
+const tabUvLamp=$('#tab-uv-lamp');
 const tabMix=$('#tab-mix');
 const tabSettings=$('#tab-settings');
 
 function showTab(which){
   tabMatch.hidden = which!=='match';
   tabCompare.hidden = which!=='compare';
+  tabUvLamp.hidden = which!=='uv-lamp';
   tabMix.hidden = which!=='mix';
   tabSettings.hidden = which!=='settings';
 
   tabBtnMatch.setAttribute('aria-selected', which==='match' ? 'true':'false');
   tabBtnCompare.setAttribute('aria-selected', which==='compare' ? 'true':'false');
+  if (tabBtnUvLamp) tabBtnUvLamp.setAttribute('aria-selected', which==='uv-lamp' ? 'true':'false');
   if (tabBtnMix) tabBtnMix.setAttribute('aria-selected', which==='mix' ? 'true':'false');
   tabBtnSettings.setAttribute('aria-selected', which==='settings' ? 'true':'false');
 
@@ -5729,6 +5766,7 @@ function showTab(which){
 
 tabBtnMatch.addEventListener('click',()=>showTab('match'));
 tabBtnCompare.addEventListener('click',()=>showTab('compare'));
+if (tabBtnUvLamp) tabBtnUvLamp.addEventListener('click',()=>showTab('uv-lamp'));
 if (tabBtnMix) tabBtnMix.addEventListener('click',()=>showTab('mix'));
 if (tabBtnSettings) tabBtnSettings.addEventListener('click',()=>showTab('settings'));
 // Wire up
