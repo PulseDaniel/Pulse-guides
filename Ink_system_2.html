@@ -1030,7 +1030,7 @@
           <div id="mixDeltaE" class="out">—</div>
         </div>
         <div>
-          <div id="mixPantoneSwatch" class="mix-swatch" style="margin-top: 26px; aria-label="Selected Pantone swatch"></div>
+          <div id="mixPantoneSwatch" class="mix-swatch" style="margin-top: 26px;" aria-label="Selected Pantone swatch"></div>
         </div>
 
         <div style="grid-column: 1 / -1;">
@@ -2706,6 +2706,131 @@ async function saveCorrection(){
 }
 
 // ===== Spectro (Web Serial) integration & ink curve table =====
+function bytesToHex(arr){
+  return Array.from(arr).map(b => ('0' + b.toString(16).toUpperCase()).slice(-2)).join(' ');
+}
+
+function calculateDensitometerChecksum(frameBytes){
+  let sum = 0;
+  for (let i=0; i<frameBytes.length-1; i++) sum += frameBytes[i];
+  return sum & 0xFF;
+}
+
+function buildDensitometerFrame(commandByte, extraByte = 0x00){
+  const frame = new Uint8Array(60);
+  frame[0] = 0xBB;
+  frame[1] = 0x01;
+  frame[2] = commandByte;
+  frame[3] = extraByte;
+  frame[58] = 0xFF;
+  frame[59] = calculateDensitometerChecksum(frame);
+  return frame;
+}
+
+function parseDensitometerFloats(responseBytes, startByte, numFloats){
+  const floats = [];
+  for (let i=0; i<numFloats; i++){
+    const offset = startByte + (i * 4);
+    if (offset + 4 <= responseBytes.length){
+      const bytes = new Uint8Array([
+        responseBytes[offset + 3],
+        responseBytes[offset + 2],
+        responseBytes[offset + 1],
+        responseBytes[offset + 0]
+      ]);
+      const dv = new DataView(bytes.buffer);
+      floats.push(dv.getFloat32(0, false));
+    }
+  }
+  return floats;
+}
+
+// ===== Spectral reflectance to LAB conversion (D65 / 2°) =====
+function spectralToLab(reflectanceValues){
+  const data = getCie1931_2deg_D65_10nm();
+  const delta = 10.0;
+  const R = reflectanceValues.map((val) => val / 100.0);
+
+  let sumSyDelta = 0;
+  for (let i = 0; i < data.S.length; i++){
+    sumSyDelta += data.S[i] * data.ybar[i] * delta;
+  }
+  const k = 100.0 / sumSyDelta;
+
+  let X = 0, Y = 0, Z = 0;
+  const count = Math.min(R.length, data.S.length);
+  for (let i = 0; i < count; i++){
+    X += R[i] * data.S[i] * data.xbar[i] * delta;
+    Y += R[i] * data.S[i] * data.ybar[i] * delta;
+    Z += R[i] * data.S[i] * data.zbar[i] * delta;
+  }
+  X *= k; Y *= k; Z *= k;
+
+  let Xn = 0, Yn = 0, Zn = 0;
+  for (let i = 0; i < data.S.length; i++){
+    Xn += data.S[i] * data.xbar[i] * delta;
+    Yn += data.S[i] * data.ybar[i] * delta;
+    Zn += data.S[i] * data.zbar[i] * delta;
+  }
+  Xn *= k; Yn *= k; Zn *= k;
+
+  return xyzToLab_internal(X, Y, Z, Xn, Yn, Zn);
+}
+
+function xyzToLab_internal(X, Y, Z, Xn, Yn, Zn){
+  const epsilon = 216.0 / 24389.0;
+  const kappa = 24389.0 / 27.0;
+  const f = (t) => (t > epsilon ? Math.cbrt(t) : (kappa * t + 16.0) / 116.0);
+  const fx = f(X / Xn);
+  const fy = f(Y / Yn);
+  const fz = f(Z / Zn);
+  return {
+    L: 116.0 * fy - 16.0,
+    a: 500.0 * (fx - fy),
+    b: 200.0 * (fy - fz)
+  };
+}
+
+function getCie1931_2deg_D65_10nm(){
+  return {
+    S: [
+      82.7549, 91.4860, 93.4318, 86.6823, 104.8650,
+      117.0080, 117.8120, 114.8610, 115.9230, 108.8110,
+      109.3540, 107.8020, 104.7900, 107.6890, 104.4050,
+      104.0460, 100.0000, 96.3342, 95.7880, 88.6856,
+      90.0062, 89.5991, 87.6987, 83.2886, 83.6992,
+      80.0268, 80.2146, 82.2778, 78.2842, 69.7213,
+      71.6091
+    ],
+    xbar: [
+      0.01431, 0.04351, 0.13438, 0.28390, 0.34828,
+      0.33620, 0.29080, 0.19536, 0.09564, 0.03201,
+      0.00490, 0.00930, 0.06327, 0.16550, 0.29040,
+      0.4334499, 0.59450, 0.76210, 0.91630, 1.02630,
+      1.06220, 1.00260, 0.8544499, 0.64240, 0.44790,
+      0.28350, 0.16490, 0.08740, 0.04677, 0.02270,
+      0.01135916
+    ],
+    ybar: [
+      0.000396, 0.001210, 0.004000, 0.011600, 0.023000,
+      0.038000, 0.060000, 0.090980, 0.139020, 0.208020,
+      0.323000, 0.503000, 0.710000, 0.862000, 0.954000,
+      0.9949501, 0.995000, 0.952000, 0.870000, 0.757000,
+      0.631000, 0.503000, 0.381000, 0.265000, 0.175000,
+      0.107000, 0.061000, 0.032000, 0.017000, 0.008210,
+      0.004102
+    ],
+    zbar: [
+      0.06785001, 0.207400, 0.645600, 1.385600, 1.747060,
+      1.772110, 1.669200, 1.287640, 0.8129501, 0.465180,
+      0.272000, 0.158200, 0.07824999, 0.042160, 0.020300,
+      0.008749999, 0.003900, 0.002100, 0.001650001, 0.001100,
+      0.000800, 0.000340, 0.000190, 0.000050, 0.000020,
+      0.000000, 0.000000, 0.000000, 0.000000, 0.000000,
+      0.000000
+    ]
+  };
+}
 function setSpectroConnectedUI(connected){
   spectroConnected = !!connected;
   const ids = ['spectroConnectBtn','spectroConnectBtnMatch','spectroConnectBtnCompare','spectroConnectBtnLib'];
@@ -2781,6 +2906,30 @@ async function spectroConnect(){
   }
 }
 
+async function spectroNormalizeDeviceState(port, statusEl, label){
+  if (statusEl && label) statusEl.textContent = label;
+  let reader;
+  try{
+    reader = port.readable.getReader();
+    const drainStart = Date.now();
+    while ((Date.now() - drainStart) < 250){
+      try{
+        const result = await Promise.race([
+          reader.read(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+        ]);
+        if (result.done || !result.value) break;
+      } catch (e){
+        if (e.message !== 'timeout') throw e;
+        break;
+      }
+    }
+  } finally {
+    if (reader) reader.releaseLock();
+  }
+  await new Promise(r => setTimeout(r, 200));
+}
+
 async function spectroMeasureOnce(){
   const statusEl = document.getElementById('spectroStatus');
   if (!spectroPort){
@@ -2792,38 +2941,172 @@ async function spectroMeasureOnce(){
     throw new Error('Port is not open.');
   }
 
-  if (statusEl) statusEl.textContent = 'Measuring…';
+  await spectroNormalizeDeviceState(port, statusEl, 'Preparing device… keep it pressed down.');
 
-  const encoder = new TextEncoder();
-  const writer = port.writable.getWriter();
-  await writer.write(encoder.encode('SA_001_measureData\r\n'));
-  writer.releaseLock();
+  const geometry = (document.getElementById('spectroGeometry')?.value || 'SCI');
+  const isSCI = geometry !== 'SCE';
+  const baseCommand = isSCI ? 0x10 : 0x20;
 
-  const reader = port.readable.getReader();
-  const decoder = new TextDecoder();
-  let textResp = '';
+  const numWavelengths = 31;
+  const startingWavelength = 400;
+  const wavelengthInterval = 10;
 
-  try{
-    while (true){
-      const result = await reader.read();
-      const value = result.value;
-      const done = result.done;
-      if (done) break;
-      if (value){
-        textResp += decoder.decode(value, { stream:true });
-        if (textResp.includes('Data transmission has been successfully completed.')) break;
+  if (statusEl) statusEl.textContent = 'Reading… keep device pressed down.';
+
+  let reader;
+  let writer;
+
+  async function readFrame(timeout){
+    let frameBytes = new Uint8Array(0);
+    const startTime = Date.now();
+    reader = port.readable.getReader();
+    try{
+      while ((Date.now() - startTime) < timeout){
+        try{
+          const result = await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout - (Date.now() - startTime)))
+          ]);
+          if (result.done) break;
+          if (result.value){
+            const newBytes = new Uint8Array(frameBytes.length + result.value.length);
+            newBytes.set(frameBytes);
+            newBytes.set(new Uint8Array(result.value), frameBytes.length);
+            frameBytes = newBytes;
+            if (frameBytes.length >= 60) break;
+          }
+        } catch (e){
+          if (e.message === 'timeout') break;
+          throw e;
+        }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } finally {
-    reader.releaseLock();
+    return frameBytes.length >= 60 ? frameBytes : null;
   }
 
+  // Drain buffer briefly (already normalized above)
+
+  // Trigger measurement (0x02)
+  let measurementSucceeded = false;
+  let attemptCount = 0;
+  while (!measurementSucceeded && attemptCount < 10){
+    attemptCount++;
+    if (statusEl) statusEl.textContent = `Reading… keep device pressed down (attempt ${attemptCount})…`;
+
+    if (attemptCount > 1){
+      reader = port.readable.getReader();
+      try{
+        const clearStart = Date.now();
+        while ((Date.now() - clearStart) < 500){
+          try{
+            const result = await Promise.race([
+              reader.read(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+            ]);
+            if (result.done || !result.value) break;
+          } catch (e){
+            if (e.message !== 'timeout') throw e;
+            break;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    const measureFrame = buildDensitometerFrame(0x02, 0x00);
+    writer = port.writable.getWriter();
+    await writer.write(measureFrame);
+    writer.releaseLock();
+
+    await new Promise(r => setTimeout(r, 1500));
+    const measureResponse = await readFrame(3000);
+
+    if (measureResponse && measureResponse.length >= 3 && measureResponse[2] === 0x09){
+      measurementSucceeded = true;
+      break;
+    }
+  }
+
+  if (!measurementSucceeded){
+    if (statusEl) statusEl.textContent = 'Measurement failed.';
+    throw new Error('Measurement failed after retries.');
+  }
+
+  if (statusEl) statusEl.textContent = 'Reading data blocks… keep device pressed down.';
+  await new Promise(r => setTimeout(r, 250));
+
+  const baseDelay = 40;
+  const retryDelay = 140;
+  const readTimeoutFast = 1200;
+  const readTimeoutSlow = 2000;
+
+  const allFloats = [];
+  for (let blockIdx = 0; blockIdx < 3; blockIdx++){
+    const commandByte = baseCommand + blockIdx;
+    let blockResponse = null;
+    let attempt = 0;
+
+    while (attempt < 3 && !blockResponse){
+      attempt++;
+      await new Promise(r => setTimeout(r, baseDelay + (attempt - 1) * 30));
+
+      const blockFrame = buildDensitometerFrame(commandByte);
+      writer = port.writable.getWriter();
+      await writer.write(blockFrame);
+      writer.releaseLock();
+
+      await new Promise(r => setTimeout(r, baseDelay));
+
+      const resp = await readFrame(attempt === 1 ? readTimeoutFast : readTimeoutSlow);
+      if (resp && resp.length >= 54 && resp[0] === 0xBB && resp[1] === 0x01){
+        blockResponse = resp;
+        break;
+      }
+      await new Promise(r => setTimeout(r, retryDelay));
+    }
+
+    if (!blockResponse){
+      if (statusEl) statusEl.textContent = `Block ${blockIdx} missing.`;
+      throw new Error(`Block ${blockIdx} missing after retries.`);
+    }
+
+    const blockFloats = parseDensitometerFloats(blockResponse, 6, 12);
+    for (const f of blockFloats){
+      if (allFloats.length >= numWavelengths) break;
+      if (!Number.isFinite(f)) continue;
+      allFloats.push(f);
+    }
+  }
+
+  let validFloats = allFloats.slice(0, numWavelengths);
+  if (validFloats.length < numWavelengths){
+    const lastValue = validFloats[validFloats.length - 1] || 50;
+    while (validFloats.length < numWavelengths) validFloats.push(lastValue);
+  }
+
+  const lab = spectralToLab(validFloats);
+  const spectrum = {};
+  validFloats.forEach((v, i) => {
+    spectrum[startingWavelength + i * wavelengthInterval] = v;
+  });
+
+  // Gentle settle: normalize device state for next request
+  await spectroNormalizeDeviceState(port, statusEl, 'Finalizing… keep device pressed down.');
+
   if (statusEl) statusEl.textContent = 'Measurement received.';
-  return textResp;
+  return { L: lab.L, a: lab.a, b: lab.b, spectrum, raw: { floats: validFloats } };
 }
 
 function parseSpectroMeasurement(textResp){
-  const lines = textResp.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if (textResp && typeof textResp === 'object' && textResp.spectrum){
+    return textResp;
+  }
+
+  const lines = String(textResp || '').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   let L = null, a = null, b = null;
   const spectrum = {};
 
@@ -2846,9 +3129,7 @@ function parseSpectroMeasurement(textResp){
         if (m){
           const wl = parseInt(m[1],10);
           const val = parseFloat(m[2]);
-          if (!Number.isNaN(wl) && !Number.isNaN(val)){
-            spectrum[wl] = val;
-          }
+          if (!Number.isNaN(wl) && !Number.isNaN(val)) spectrum[wl] = val;
         }
       }
     }
@@ -3823,6 +4104,18 @@ const spectroConnectBtnMatch = document.getElementById('spectroConnectBtnMatch')
 const spectroConnectBtnCompare = document.getElementById('spectroConnectBtnCompare');
 const spectroMeasureBtn = document.getElementById('spectroMeasureBtn');
 const spectroExportBtn = document.getElementById('spectroExportBtn');
+
+function setScanButtonState(btn, busy, busyText){
+  if (!btn) return;
+  if (!btn.dataset.defaultText) btn.dataset.defaultText = btn.textContent || '';
+  if (busy){
+    btn.disabled = true;
+    btn.textContent = busyText || 'Reading… keep device pressed down.';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.defaultText;
+  }
+}
 const spectroScanTargetBtn = document.getElementById('spectroScanTargetBtn');
 const spectroScanCompareABtn = document.getElementById('spectroScanCompareABtn');
 const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn');
@@ -3838,6 +4131,7 @@ const spectroScanCompareBBtn = document.getElementById('spectroScanCompareBBtn')
 
 if (spectroMeasureBtn){
   spectroMeasureBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroMeasureBtn, true);
     const inkName = (document.getElementById('spectroInkName').value || '').trim();
     const concStr = (document.getElementById('spectroConcentration').value || '').trim();
     const backing = (document.getElementById('spectroBacking').value || 'white');
@@ -3885,6 +4179,8 @@ if (spectroMeasureBtn){
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroMeasureBtn, false);
     }
   });
 }
@@ -3895,6 +4191,7 @@ if (spectroExportBtn){
 
 if (spectroScanTargetBtn){
   spectroScanTargetBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanTargetBtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -3908,21 +4205,24 @@ if (spectroScanTargetBtn){
       const aInput = document.getElementById('a');
       const bInput = document.getElementById('b');
       if (LInput && aInput && bInput){
-        LInput.value = meas.L;
-        aInput.value = meas.a;
-        bInput.value = meas.b;
+        LInput.value = Number(meas.L).toFixed(2);
+        aInput.value = Number(meas.a).toFixed(2);
+        bInput.value = Number(meas.b).toFixed(2);
         updateTargetEcho();
         findClosest();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanTargetBtn, false);
     }
   });
 }
 
 if (spectroScanCompareABtn){
   spectroScanCompareABtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanCompareABtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -3936,21 +4236,24 @@ if (spectroScanCompareABtn){
       const Aa = document.getElementById('Aa');
       const Ab = document.getElementById('Ab');
       if (AL && Aa && Ab){
-        AL.value = meas.L;
-        Aa.value = meas.a;
-        Ab.value = meas.b;
+        AL.value = Number(meas.L).toFixed(2);
+        Aa.value = Number(meas.a).toFixed(2);
+        Ab.value = Number(meas.b).toFixed(2);
         setSwatchFromFields('A');
         computeCompareDE();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanCompareABtn, false);
     }
   });
 }
 
 if (spectroScanCompareBBtn){
   spectroScanCompareBBtn.addEventListener('click', async ()=>{
+    setScanButtonState(spectroScanCompareBBtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -3964,15 +4267,17 @@ if (spectroScanCompareBBtn){
       const Ba = document.getElementById('Ba');
       const Bb = document.getElementById('Bb');
       if (BL && Ba && Bb){
-        BL.value = meas.L;
-        Ba.value = meas.a;
-        Bb.value = meas.b;
+        BL.value = Number(meas.L).toFixed(2);
+        Ba.value = Number(meas.a).toFixed(2);
+        Bb.value = Number(meas.b).toFixed(2);
         setSwatchFromFields('B');
         computeCompareDE();
       }
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }finally{
+      setScanButtonState(spectroScanCompareBBtn, false);
     }
   });
 }
@@ -4968,6 +5273,8 @@ $('#libDeleteBtn')?.addEventListener('click', ()=>{
 });
 
 $('#libScanBtn')?.addEventListener('click', async ()=>{
+  const libScanBtn = document.getElementById('libScanBtn');
+  setScanButtonState(libScanBtn, true);
   const lib = getSettingsLibrary();
   if (lib.readonly) return;
 
@@ -5004,6 +5311,8 @@ $('#libScanBtn')?.addEventListener('click', async ()=>{
     renderLibraryEditor();
   }catch(e){
     alert('Scan failed: ' + (e.message||e));
+  }finally{
+    setScanButtonState(libScanBtn, false);
   }
 });
 

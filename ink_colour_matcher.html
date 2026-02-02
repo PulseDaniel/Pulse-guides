@@ -222,7 +222,6 @@
   box-shadow: 0 0 0 2px rgba(255,255,255,.20) inset, 0 0 12px rgba(255,255,255,.10);
 }
 .labNumRow.isDim{ opacity: .45; }
-.lDot{ }
 .lMarkerTag{
   position:absolute;
   left:50%;
@@ -463,6 +462,7 @@
   }
   .batch-readonly{
     -moz-appearance: textfield;
+    appearance: textfield;
   }
 
   /* Narrower LAB inputs for clearer separation */
@@ -1030,7 +1030,7 @@
           <div id="mixDeltaE" class="out">—</div>
         </div>
         <div>
-          <div id="mixPantoneSwatch" class="mix-swatch" style="margin-top: 26px; aria-label="Selected Pantone swatch"></div>
+          <div id="mixPantoneSwatch" class="mix-swatch" style="margin-top: 26px;" aria-label="Selected Pantone swatch"></div>
         </div>
 
         <div style="grid-column: 1 / -1;">
@@ -1273,6 +1273,77 @@
               <!-- Filled by JS -->
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Densitometer Test -->
+    <div class="card" style="max-width:1200px; margin:16px auto 0;">
+      <h1>Densitometer Test</h1>
+      <p class="muted">
+        Connect to the densitometer and read SCI or SCE data. Both are captured in one measurement. Raw binary responses will be displayed for debugging.
+      </p>
+
+      <div class="formula-box" id="densitometerBox" style="margin-top:12px;">
+        <h2>Connection &amp; Measurement</h2>
+
+        <div class="flex" style="gap:8px; margin-bottom:12px;">
+          <button class="btn" id="densitometerConnectBtn">Connect device</button>
+          <button class="btn" id="densitometerReadMeasurementBtn">Read measurement</button>
+          <span class="mini" id="densitometerStatus" style="margin-left:auto;"></span>
+        </div>
+
+        <div style="background:#1f2933; padding:12px; border-radius:10px; margin-bottom:12px; border-left:4px solid #60a5fa;">
+          <strong style="color:#60a5fa;">Workflow:</strong><br>
+          1. Click "Connect device"<br>
+          2. <strong>Press the measurement button on the densitometer</strong><br>
+          3. Click "Read measurement" to retrieve the data
+        </div>
+
+        <div class="row2" style="margin-bottom:12px;">
+          <div>
+            <label for="densitometerIlluminant">Illuminant</label>
+            <select id="densitometerIlluminant">
+              <option value="D65" selected>D65</option>
+              <option value="D50">D50</option>
+              <option value="A">A</option>
+            </select>
+          </div>
+          <div>
+            <label for="densitometerObserver">Observer</label>
+            <select id="densitometerObserver">
+              <option value="2" selected>2°</option>
+              <option value="10">10°</option>
+            </select>
+          </div>
+          <div>
+            <label for="densitometerMeasurementMode">Measurement Mode</label>
+            <select id="densitometerMeasurementMode">
+              <option value="SCI" selected>SCI (Specular Included)</option>
+              <option value="SCE">SCE (Specular Excluded)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:12px; border:1px solid #1f2933; border-radius:10px; padding:12px; background:#0f1219;">
+          <div style="font-weight:700; margin-bottom:8px; color:#e5e7eb;">LAB Result</div>
+          <div id="densitometerLabOutput" style="font-family:monospace; font-size:14px; color:#cbd5e1; background:#0b0e14; padding:12px; border-radius:8px; line-height:1.6;">
+            —
+          </div>
+        </div>
+
+        <div style="margin-top:12px; border:1px solid #1f2933; border-radius:10px; padding:12px; background:#0f1219;">
+          <div style="font-weight:700; margin-bottom:8px; color:#e5e7eb;">SCI Read Responses (Hex)</div>
+          <div id="densitometerHexOutput" style="font-family:monospace; font-size:12px; color:#cbd5e1; word-break:break-all; max-height:200px; overflow:auto; background:#0b0e14; padding:8px; border-radius:8px;">
+            —
+          </div>
+        </div>
+
+        <div style="margin-top:12px; border:1px solid #1f2933; border-radius:10px; padding:12px; background:#0f1219;">
+          <div style="font-weight:700; margin-bottom:8px; color:#e5e7eb;">Raw Reflectance Values</div>
+          <div id="densitometerParsedOutput" style="font-family:monospace; font-size:12px; color:#cbd5e1; word-break:break-all; max-height:150px; overflow:auto; background:#0b0e14; padding:8px; border-radius:8px;">
+            —
+          </div>
         </div>
       </div>
     </div>
@@ -2792,38 +2863,184 @@ async function spectroMeasureOnce(){
     throw new Error('Port is not open.');
   }
 
+  const geometry = (document.getElementById('spectroGeometry')?.value || 'SCI');
+  const isSCI = geometry !== 'SCE';
+  const baseCommand = isSCI ? 0x10 : 0x20;
+
+  const numWavelengths = 31;
+  const startingWavelength = 400;
+  const wavelengthInterval = 10;
+
   if (statusEl) statusEl.textContent = 'Measuring…';
 
-  const encoder = new TextEncoder();
-  const writer = port.writable.getWriter();
-  await writer.write(encoder.encode('SA_001_measureData\r\n'));
-  writer.releaseLock();
+  let reader;
+  let writer;
 
-  const reader = port.readable.getReader();
-  const decoder = new TextDecoder();
-  let textResp = '';
+  async function readFrame(timeout){
+    let frameBytes = new Uint8Array(0);
+    const startTime = Date.now();
+    reader = port.readable.getReader();
+    try{
+      while ((Date.now() - startTime) < timeout){
+        try{
+          const result = await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout - (Date.now() - startTime)))
+          ]);
+          if (result.done) break;
+          if (result.value){
+            const newBytes = new Uint8Array(frameBytes.length + result.value.length);
+            newBytes.set(frameBytes);
+            newBytes.set(new Uint8Array(result.value), frameBytes.length);
+            frameBytes = newBytes;
+            if (frameBytes.length >= 60) break;
+          }
+        } catch (e){
+          if (e.message === 'timeout') break;
+          throw e;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return frameBytes.length >= 60 ? frameBytes : null;
+  }
 
+  // Drain buffer briefly
+  reader = port.readable.getReader();
   try{
-    while (true){
-      const result = await reader.read();
-      const value = result.value;
-      const done = result.done;
-      if (done) break;
-      if (value){
-        textResp += decoder.decode(value, { stream:true });
-        if (textResp.includes('Data transmission has been successfully completed.')) break;
+    const drainStart = Date.now();
+    while ((Date.now() - drainStart) < 200){
+      try{
+        const result = await Promise.race([
+          reader.read(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+        ]);
+        if (result.done || !result.value) break;
+      } catch (e){
+        if (e.message !== 'timeout') throw e;
+        break;
       }
     }
   } finally {
     reader.releaseLock();
   }
 
+  // Trigger measurement (0x02)
+  let measurementSucceeded = false;
+  let attemptCount = 0;
+  while (!measurementSucceeded && attemptCount < 10){
+    attemptCount++;
+    if (statusEl) statusEl.textContent = `Measuring (attempt ${attemptCount})…`;
+
+    if (attemptCount > 1){
+      reader = port.readable.getReader();
+      try{
+        const clearStart = Date.now();
+        while ((Date.now() - clearStart) < 500){
+          try{
+            const result = await Promise.race([
+              reader.read(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+            ]);
+            if (result.done || !result.value) break;
+          } catch (e){
+            if (e.message !== 'timeout') throw e;
+            break;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    const measureFrame = buildDensitometerFrame(0x02, 0x00);
+    writer = port.writable.getWriter();
+    await writer.write(measureFrame);
+    writer.releaseLock();
+
+    await new Promise(r => setTimeout(r, 1500));
+    const measureResponse = await readFrame(3000);
+
+    if (measureResponse && measureResponse.length >= 3 && measureResponse[2] === 0x09){
+      measurementSucceeded = true;
+      break;
+    }
+  }
+
+  if (!measurementSucceeded){
+    if (statusEl) statusEl.textContent = 'Measurement failed.';
+    throw new Error('Measurement failed after retries.');
+  }
+
+  await new Promise(r => setTimeout(r, 250));
+
+  const baseDelay = 40;
+  const retryDelay = 140;
+  const readTimeoutFast = 1200;
+  const readTimeoutSlow = 2000;
+
+  const allFloats = [];
+  for (let blockIdx = 0; blockIdx < 3; blockIdx++){
+    const commandByte = baseCommand + blockIdx;
+    let blockResponse = null;
+    let attempt = 0;
+
+    while (attempt < 3 && !blockResponse){
+      attempt++;
+      await new Promise(r => setTimeout(r, baseDelay + (attempt - 1) * 30));
+
+      const blockFrame = buildDensitometerFrame(commandByte);
+      writer = port.writable.getWriter();
+      await writer.write(blockFrame);
+      writer.releaseLock();
+
+      await new Promise(r => setTimeout(r, baseDelay));
+
+      const resp = await readFrame(attempt === 1 ? readTimeoutFast : readTimeoutSlow);
+      if (resp && resp.length >= 54 && resp[0] === 0xBB && resp[1] === 0x01){
+        blockResponse = resp;
+        break;
+      }
+      await new Promise(r => setTimeout(r, retryDelay));
+    }
+
+    if (!blockResponse){
+      if (statusEl) statusEl.textContent = `Block ${blockIdx} missing.`;
+      throw new Error(`Block ${blockIdx} missing after retries.`);
+    }
+
+    const blockFloats = parseDensitometerFloats(blockResponse, 6, 12);
+    for (const f of blockFloats){
+      if (allFloats.length >= numWavelengths) break;
+      if (!Number.isFinite(f)) continue;
+      allFloats.push(f);
+    }
+  }
+
+  let validFloats = allFloats.slice(0, numWavelengths);
+  if (validFloats.length < numWavelengths){
+    const lastValue = validFloats[validFloats.length - 1] || 50;
+    while (validFloats.length < numWavelengths) validFloats.push(lastValue);
+  }
+
+  const lab = spectralToLab(validFloats);
+  const spectrum = {};
+  validFloats.forEach((v, i) => {
+    spectrum[startingWavelength + i * wavelengthInterval] = v;
+  });
+
   if (statusEl) statusEl.textContent = 'Measurement received.';
-  return textResp;
+  return { L: lab.L, a: lab.a, b: lab.b, spectrum, raw: { floats: validFloats } };
 }
 
 function parseSpectroMeasurement(textResp){
-  const lines = textResp.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if (textResp && typeof textResp === 'object' && textResp.spectrum){
+    return textResp;
+  }
+
+  const lines = String(textResp || '').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   let L = null, a = null, b = null;
   const spectrum = {};
 
@@ -2903,6 +3120,682 @@ function labToRgbCssForSwatch(L, a, b){
   b2 = Math.round(clamp01(b2) * 255);
 
   return `rgb(${r}, ${g}, ${b2})`;
+}
+
+// ===== Densitometer integration =====
+let densitometerPort = null;
+let densitometerConnected = false;
+
+function bytesToHex(arr){
+  return Array.from(arr).map(b => ('0' + b.toString(16).toUpperCase()).slice(-2)).join(' ');
+}
+
+function calculateDensitometerChecksum(frameBytes){
+  // Sum of all bytes except the last one, modulo 256
+  let sum = 0;
+  for (let i=0; i<frameBytes.length-1; i++){
+    sum += frameBytes[i];
+  }
+  return sum & 0xFF;
+}
+
+function buildDensitometerFrame(commandByte, extraByte = 0x00){
+  // Build a 60-byte frame for densitometer
+  // For measurement command: commandByte is the measurement mode (0x00=SCI, 0x01=SCE)
+  // For read commands: commandByte is the read command (0x10, 0x11, 0x20, 0x21, etc.)
+  const frame = new Uint8Array(60);
+  frame[0] = 0xBB;
+  frame[1] = 0x01;
+  frame[2] = commandByte;
+  frame[3] = extraByte;  // Usually 0x00, reserved for future use
+  // bytes 4-57 are already 0
+  frame[58] = 0xFF;
+  // calculate checksum on bytes 0-58
+  frame[59] = calculateDensitometerChecksum(frame);
+  return frame;
+}
+
+function parseDensitometerFloats(responseBytes, startByte, numFloats){
+  // Parse floats from response - device sends little-endian bytes, need to reverse for proper interpretation
+  const floats = [];
+  for (let i=0; i<numFloats; i++){
+    const offset = startByte + (i * 4);
+    if (offset + 4 <= responseBytes.length){
+      // Reverse the 4 bytes to correct for device's little-endian transmission
+      const bytes = new Uint8Array([
+        responseBytes[offset + 3],
+        responseBytes[offset + 2],
+        responseBytes[offset + 1],
+        responseBytes[offset + 0]
+      ]);
+      const dv = new DataView(bytes.buffer);
+      const floatVal = dv.getFloat32(0, false); // false = big-endian (now correct after reversal)
+      floats.push(floatVal);
+    }
+  }
+  return floats;
+}
+
+function setDensitometerConnectedUI(connected){
+  densitometerConnected = !!connected;
+  const btn = document.getElementById('densitometerConnectBtn');
+  if (!btn) return;
+  if (connected){
+    btn.textContent = 'Connected';
+    btn.classList.add('btn-connected');
+  } else {
+    btn.textContent = 'Connect device';
+    btn.classList.remove('btn-connected');
+  }
+  const statusEl = document.getElementById('densitometerStatus');
+  if (statusEl){
+    if (connected && !statusEl.textContent) statusEl.textContent = 'Connected.';
+    if (!connected && statusEl.textContent === 'Connected.') statusEl.textContent = '';
+  }
+}
+
+async function densitometerConnect(){
+  const statusEl = document.getElementById('densitometerStatus');
+  try{
+    if (!('serial' in navigator)){
+      throw new Error('Web Serial not supported. Use Chrome/Edge over HTTPS.');
+    }
+  }catch(err){
+    if (statusEl) statusEl.textContent = err.message || String(err);
+    throw err;
+  }
+
+  if (densitometerPort && densitometerPort.readable && densitometerPort.writable){
+    setDensitometerConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Already connected.';
+    return densitometerPort;
+  }
+
+  try{
+    if (statusEl) statusEl.textContent = 'Select device…';
+    const port = await navigator.serial.requestPort();
+    await port.open({
+      baudRate: 115200,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'none',
+      flowControl: 'none'
+    });
+    densitometerPort = port;
+    setDensitometerConnectedUI(true);
+    if (statusEl) statusEl.textContent = 'Connected.';
+
+    if (navigator.serial && typeof navigator.serial.addEventListener === 'function'){
+      navigator.serial.addEventListener('disconnect', (event)=>{
+        if (event.target === densitometerPort){
+          densitometerPort = null;
+          setDensitometerConnectedUI(false);
+          const s = document.getElementById('densitometerStatus');
+          if (s) s.textContent = 'Device disconnected.';
+        }
+      });
+    }
+
+    return port;
+  }catch(err){
+    if (statusEl) statusEl.textContent = 'Connect failed: ' + (err.message || err);
+    setDensitometerConnectedUI(false);
+    throw err;
+  }
+}
+
+async function densitometerMeasureSceOnce(blockIndex = 0){
+  const statusEl = document.getElementById('densitometerStatus');
+  if (!densitometerPort){
+    await densitometerConnect();
+  }
+  const port = densitometerPort;
+  if (!port || !port.readable || !port.writable){
+    setDensitometerConnectedUI(false);
+    throw new Error('Port is not open.');
+  }
+
+  if (statusEl) statusEl.textContent = 'Sending measurement command…';
+
+  // === STEP 1: Send Measurement Command ===
+  // Build 60-byte frame for SCE measurement (mode = 0x01)
+  const measureFrame = buildDensitometerFrame(0x01); // 0x01 = SCE mode
+
+  let writer;
+  try{
+    writer = port.writable.getWriter();
+    await writer.write(measureFrame);
+    writer.releaseLock();
+  }catch(e){
+    if (writer) writer.releaseLock();
+    throw e;
+  }
+
+  // Wait for device to measure
+  await new Promise(r => setTimeout(r, 600));
+
+  // Read measurement response
+  let reader;
+  let measureResponse = new Uint8Array(0);
+  const maxTimeout = 5000;
+  let startTime = Date.now();
+
+  try{
+    reader = port.readable.getReader();
+    while (measureResponse.length < 60 && (Date.now() - startTime) < maxTimeout){
+      const result = await reader.read();
+      if (result.done) break;
+      if (result.value){
+        const newBytes = new Uint8Array(measureResponse.length + result.value.length);
+        newBytes.set(measureResponse);
+        newBytes.set(new Uint8Array(result.value), measureResponse.length);
+        measureResponse = newBytes;
+      }
+    }
+  } finally {
+    if (reader) reader.releaseLock();
+  }
+
+  // Display measurement response
+  const measureHexEl = document.getElementById('densitometerMeasureHexOutput');
+  if (measureHexEl){
+    measureHexEl.textContent = bytesToHex(measureResponse) + `\n(${measureResponse.length} bytes)`;
+  }
+
+  if (statusEl) statusEl.textContent = 'Reading SCE data…';
+
+  // === STEP 2: Send Read SCE Data Command ===
+  // Small delay between commands
+  await new Promise(r => setTimeout(r, 100));
+
+  const commandByte = 0x20 + blockIndex; // 0x20 = SCE (1-12)
+  const readFrame = buildDensitometerFrame(commandByte);
+
+  try{
+    writer = port.writable.getWriter();
+    await writer.write(readFrame);
+    writer.releaseLock();
+  }catch(e){
+    if (writer) writer.releaseLock();
+    throw e;
+  }
+
+  await new Promise(r => setTimeout(r, 200));
+
+  // Read SCE response
+  let responseBytes = new Uint8Array(0);
+  startTime = Date.now();
+
+  try{
+    reader = port.readable.getReader();
+    while (responseBytes.length < 60 && (Date.now() - startTime) < maxTimeout){
+      const result = await reader.read();
+      if (result.done) break;
+      if (result.value){
+        const newBytes = new Uint8Array(responseBytes.length + result.value.length);
+        newBytes.set(responseBytes);
+        newBytes.set(new Uint8Array(result.value), responseBytes.length);
+        responseBytes = newBytes;
+      }
+    }
+  } finally {
+    if (reader) reader.releaseLock();
+  }
+
+  if (statusEl) statusEl.textContent = 'Data received. Parsing…';
+  return { measureResponse, responseBytes };
+}
+
+function parseDensitometerResponse(responseBytes){
+  const hexOutput = document.getElementById('densitometerHexOutput');
+  const parsedOutput = document.getElementById('densitometerParsedOutput');
+
+  // Display raw hex
+  const hexStr = bytesToHex(responseBytes);
+  if (hexOutput){
+    hexOutput.textContent = hexStr + `\n(${responseBytes.length} bytes total)`;
+  }
+
+  // Parse structure
+  let parsed = '';
+  parsed += `Total bytes received: ${responseBytes.length}\n`;
+  parsed += `\n=== Frame Header ===\n`;
+  parsed += `Byte 0 (header): 0x${responseBytes[0]?.toString(16).padStart(2,'0').toUpperCase() || '--'} (expect 0xBB)\n`;
+  parsed += `Byte 1 (class): 0x${responseBytes[1]?.toString(16).padStart(2,'0').toUpperCase() || '--'} (expect 0x01)\n`;
+  parsed += `Byte 2 (command): 0x${responseBytes[2]?.toString(16).padStart(2,'0').toUpperCase() || '--'} (expect 0x20-0x23 for SCE)\n`;
+  parsed += `Bytes 3-57: Zeros\n`;
+  parsed += `Byte 58: 0x${responseBytes[58]?.toString(16).padStart(2,'0').toUpperCase() || '--'} (expect 0xFF)\n`;
+  parsed += `Byte 59: 0x${responseBytes[59]?.toString(16).padStart(2,'0').toUpperCase() || '--'} (checksum)\n`;
+
+  // Parse float data (bytes 6-53: 12 floats × 4 bytes)
+  if (responseBytes.length >= 54){
+    parsed += `\n=== Float Data (BIG-ENDIAN) ===\n`;
+    const floats = parseDensitometerFloats(responseBytes, 6, 12);
+    floats.forEach((val, idx) => {
+      parsed += `  Float ${idx+1}: ${val.toFixed(6)}\n`;
+    });
+  }
+
+  if (parsedOutput){
+    parsedOutput.textContent = parsed;
+  }
+}
+
+// ===== Densitometer: Read SCI blocks (device triggers measurement via button) =====
+async function densitometerReadMeasurement(measurementMode = 'SCI'){
+  // measurementMode can be 'SCI' (0x10-0x13) or 'SCE' (0x20-0x23)
+  const isSCI = measurementMode === 'SCI';
+  const baseCommand = isSCI ? 0x10 : 0x20;
+  const measurementModeCode = isSCI ? 0x00 : 0x01;  // 0x00=SCI, 0x01=SCE per protocol
+  const modeLabel = isSCI ? 'SCI' : 'SCE';
+  
+  const statusEl = document.getElementById('densitometerStatus');
+  const hexOutputEl = document.getElementById('densitometerHexOutput');
+  const parsedOutputEl = document.getElementById('densitometerParsedOutput');
+  const labOutputEl = document.getElementById('densitometerLabOutput');
+  
+  if (statusEl) statusEl.textContent = `Reading full ${modeLabel} reflectance curve…`;
+
+  try{
+    await densitometerConnect();
+    const port = densitometerPort;
+    if (!port || !port.readable || !port.writable){
+      throw new Error('Port is not open.');
+    }
+
+    const maxTimeout = 5000;
+    let reader;
+    let writer;
+
+    // Helper: Read exact frame (60 bytes) from device
+    async function readFrame(timeout) {
+      let frameBytes = new Uint8Array(0);
+      const startTime = Date.now();
+      
+      reader = port.readable.getReader();
+      try {
+        while ((Date.now() - startTime) < timeout) {
+          try {
+            const result = await Promise.race([
+              reader.read(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeout - (Date.now() - startTime)))
+            ]);
+            
+            if (result.done) break;
+            if (result.value) {
+              const newBytes = new Uint8Array(frameBytes.length + result.value.length);
+              newBytes.set(frameBytes);
+              newBytes.set(new Uint8Array(result.value), frameBytes.length);
+              frameBytes = newBytes;
+              
+              if (frameBytes.length >= 60) break;
+            }
+          } catch (e) {
+            if (e.message === 'timeout') break;
+            throw e;
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      
+      return frameBytes.length >= 60 ? frameBytes : null;
+    }
+
+    // === MINIMAL, STRAIGHTFORWARD MEASUREMENT SEQUENCE ===
+    // Core principle: Keep retrying until device actually measures
+    
+    const numWavelengths = 31;
+    const startingWavelength = 400;
+    const wavelengthInterval = 10;
+
+    // Step 1: Quick buffer drain
+    if (statusEl) statusEl.textContent = 'Clearing buffer…';
+    reader = port.readable.getReader();
+    try {
+      let drainStart = Date.now();
+      while ((Date.now() - drainStart) < 200) {
+        try {
+          const result = await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+          ]);
+          if (result.done || !result.value) break;
+        } catch (e) {
+          if (e.message !== 'timeout') throw e;
+          break;
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Step 2: Keep retrying measurement until device responds with 0x09
+    let measurementSucceeded = false;
+    let attemptCount = 0;
+    
+    while (!measurementSucceeded && attemptCount < 10) {
+      attemptCount++;
+      if (statusEl) statusEl.textContent = `Measuring (attempt ${attemptCount})…`;
+      
+      // Before each attempt (except the first), aggressively clear the buffer
+      if (attemptCount > 1) {
+        console.log(`Aggressive buffer clear before attempt ${attemptCount}…`);
+        reader = port.readable.getReader();
+        try {
+          let cleared = 0;
+          const clearStart = Date.now();
+          while ((Date.now() - clearStart) < 500) {
+            try {
+              const result = await Promise.race([
+                reader.read(),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 50))
+              ]);
+              if (result.done || !result.value) break;
+              cleared += result.value.length;
+            } catch (e) {
+              if (e.message !== 'timeout') throw e;
+              break;
+            }
+          }
+          console.log(`Cleared ${cleared} bytes before retry`);
+        } finally {
+          reader.releaseLock();
+        }
+        
+        // Extra wait after clearing
+        await new Promise(r => setTimeout(r, 300));
+      }
+      
+      const measureFrame = buildDensitometerFrame(0x02, 0x00);
+      console.log(`[Attempt ${attemptCount}] Sending: 0x02 (measure)`);
+      
+      writer = port.writable.getWriter();
+      await writer.write(measureFrame);
+      writer.releaseLock();
+      
+      // Wait for measurement
+      await new Promise(r => setTimeout(r, 1500));
+
+      // Try to read response
+      const measureResponse = await readFrame(3000);
+      
+      if (measureResponse && measureResponse.length >= 3 && measureResponse[2] === 0x09) {
+        console.log(`✓ Measurement successful on attempt ${attemptCount}`);
+        
+        // DEBUG: Check what's in the buffer right after 0x09
+        reader = port.readable.getReader();
+        try {
+          const result = await Promise.race([
+            reader.read(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 100))
+          ]);
+          if (result.value && result.value.length > 0) {
+            console.warn(`⚠️ DEBUG: ${result.value.length} bytes in buffer right after 0x09 response`);
+            const preview = Array.from(result.value.slice(0, 10)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            console.log(`   First 10 bytes: ${preview}`);
+          }
+        } catch (e) {
+          // Timeout OK
+        } finally {
+          reader.releaseLock();
+        }
+        
+        measurementSucceeded = true;
+        break;
+      } else {
+        const statusCode = measureResponse?.[2];
+        console.log(`Attempt ${attemptCount}: status=0x${statusCode?.toString(16) || '??'} (not ready yet)`);
+        
+        // DEBUG: What's in buffer when we get 0x?? ?
+        if (measureResponse && measureResponse.length > 0) {
+          const fullResponse = Array.from(measureResponse).map(b => b.toString(16).padStart(2, '0')).join(' ');
+          console.log(`   Full response: ${fullResponse}`);
+        }
+      }
+    }
+    
+    if (!measurementSucceeded) {
+      console.error('Measurement failed after 10 attempts');
+      if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">⚠️ Device not responding. Check connection and try again.</span>`;
+      return;
+    }
+
+    // Step 3: Wait briefly before reading blocks (gentle but faster)
+    await new Promise(r => setTimeout(r, 250));
+
+    // Step 4: Read all 3 data blocks (0x10, 0x11, 0x12 for SCI)
+    // This gives us 36 floats total; we use the first 31
+    if (statusEl) statusEl.textContent = 'Reading data blocks…';
+    
+    const blockResponses = [];
+    const allFloats = [];
+    
+    const baseDelay = 40;
+    const retryDelay = 140;
+    const readTimeoutFast = 1200;
+    const readTimeoutSlow = 2000;
+
+    for (let blockIdx = 0; blockIdx < 3; blockIdx++) {
+      const commandByte = baseCommand + blockIdx;
+      let blockResponse = null;
+      let attempt = 0;
+
+      while (attempt < 3 && !blockResponse) {
+        attempt++;
+
+        // Gentle spacing between requests (short, adaptive)
+        await new Promise(r => setTimeout(r, baseDelay + (attempt - 1) * 30));
+
+        // Send block request
+        const blockFrame = buildDensitometerFrame(commandByte);
+        writer = port.writable.getWriter();
+        await writer.write(blockFrame);
+        writer.releaseLock();
+
+        // Small wait before reading
+        await new Promise(r => setTimeout(r, baseDelay));
+
+        // Read response
+        const resp = await readFrame(attempt === 1 ? readTimeoutFast : readTimeoutSlow);
+        if (resp && resp.length >= 54 && resp[0] === 0xBB && resp[1] === 0x01) {
+          blockResponse = resp;
+          break;
+        }
+
+        console.warn(`Block ${blockIdx} (cmd 0x${commandByte.toString(16)}) attempt ${attempt} failed`);
+        await new Promise(r => setTimeout(r, retryDelay));
+      }
+
+      if (!blockResponse) {
+        console.error(`Block ${blockIdx} (cmd 0x${commandByte.toString(16)}) failed after retries`);
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">⚠️ Block ${blockIdx} missing. Try again.</span>`;
+        return;
+      }
+
+      blockResponses.push(blockResponse);
+
+      // Parse floats
+      const blockFloats = parseDensitometerFloats(blockResponse, 6, 12);
+      const floatBytes = Array.from(blockResponse.slice(6, 54));
+      console.log(`Block ${blockIdx}: 0x${commandByte.toString(16).toUpperCase()} → ${floatBytes.map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+      console.log(`  Floats: ${blockFloats.map(f => f.toFixed(2)).join(', ')}`);
+
+      // Add floats
+      for (const f of blockFloats) {
+        if (allFloats.length >= numWavelengths) break;
+        if (!Number.isFinite(f)) continue;
+        allFloats.push(f);
+      }
+    }
+
+    let validFloats = allFloats.slice(0, numWavelengths);
+    console.log(`Collected: ${validFloats.length}/${numWavelengths} floats (3 blocks read)`);
+
+    // Pad to 31 with last value (if we somehow got fewer than 31 floats)
+    if (validFloats.length < numWavelengths) {
+      const lastValue = validFloats[validFloats.length - 1] || 50;
+      console.warn(`⚠️ Only got ${validFloats.length} floats, padding to ${numWavelengths}`);
+      while (validFloats.length < numWavelengths) {
+        validFloats.push(lastValue);
+      }
+    }
+
+    // Display raw reflectance
+    if (hexOutputEl) {
+      let hexText = `Device: 400-700nm, 31 points [${modeLabel}]\n`;
+      hexText += `✓ Measurement complete (3 blocks, 31 points)\n\n`;
+      hexText += validFloats.map((v, i) => 
+        `${(startingWavelength + i * wavelengthInterval)}nm: ${v.toFixed(4)}`
+      ).join('\n');
+      hexOutputEl.textContent = hexText;
+    }
+
+    if (parsedOutputEl) {
+      parsedOutputEl.textContent = validFloats.map((v, i) =>
+        `${(startingWavelength + i * wavelengthInterval).toString().padStart(3)}nm: ${v.toFixed(4)}`
+      ).join('\n');
+    }
+
+    // Step 5: Convert to LAB
+    if (statusEl) statusEl.textContent = 'Converting to LAB…';
+
+    const lab = spectralToLab(validFloats);
+
+    // Display LAB
+    if (labOutputEl) {
+      labOutputEl.innerHTML = `
+        <strong>L*:</strong> ${lab.L.toFixed(2)}<br>
+        <strong>a*:</strong> ${lab.a.toFixed(2)}<br>
+        <strong>b*:</strong> ${lab.b.toFixed(2)}<br><br>
+        <small>D65 2° • ${validFloats.length} points</small>
+      `;
+    }
+
+    if (statusEl) statusEl.textContent = '✓ Complete';
+    return lab;
+
+  } catch (err) {
+    const statusEl = document.getElementById('densitometerStatus');
+    if (statusEl) statusEl.textContent = 'Error: ' + (err.message || err);
+    console.error('Densitometer error:', err);
+    const labOutputEl = document.getElementById('densitometerLabOutput');
+    if (labOutputEl) labOutputEl.textContent = '—';
+    throw err;
+  }
+}
+
+// ===== Spectral reflectance to LAB conversion (D65 / 2°) =====
+function spectralToLab(reflectanceValues){
+  const data = getCie1931_2deg_D65_10nm();
+  const delta = 10.0; // nm step
+
+  // Reflectance as fraction (0–1)
+  const R = reflectanceValues.map((val) => val / 100.0);
+
+  // k = 100 / Σ(S * ybar * Δλ)
+  let sumSyDelta = 0;
+  for (let i = 0; i < data.S.length; i++) {
+    sumSyDelta += data.S[i] * data.ybar[i] * delta;
+  }
+  const k = 100.0 / sumSyDelta;
+
+  // Tristimulus integration
+  let X = 0;
+  let Y = 0;
+  let Z = 0;
+  const count = Math.min(R.length, data.S.length);
+  for (let i = 0; i < count; i++) {
+    X += R[i] * data.S[i] * data.xbar[i] * delta;
+    Y += R[i] * data.S[i] * data.ybar[i] * delta;
+    Z += R[i] * data.S[i] * data.zbar[i] * delta;
+  }
+  X *= k;
+  Y *= k;
+  Z *= k;
+
+  // Reference white (perfect diffuser)
+  let Xn = 0;
+  let Yn = 0;
+  let Zn = 0;
+  for (let i = 0; i < data.S.length; i++) {
+    Xn += data.S[i] * data.xbar[i] * delta;
+    Yn += data.S[i] * data.ybar[i] * delta;
+    Zn += data.S[i] * data.zbar[i] * delta;
+  }
+  Xn *= k;
+  Yn *= k;
+  Zn *= k;
+
+  return xyzToLab_internal(X, Y, Z, Xn, Yn, Zn);
+}
+
+function xyzToLab_internal(X, Y, Z, Xn, Yn, Zn){
+  const epsilon = 216.0 / 24389.0; // ≈ 0.008856
+  const kappa = 24389.0 / 27.0;    // ≈ 903.3
+
+  const f = (t) => {
+    if (t > epsilon) {
+      return Math.cbrt(t);
+    }
+    return (kappa * t + 16.0) / 116.0;
+  };
+
+  const xr = X / Xn;
+  const yr = Y / Yn;
+  const zr = Z / Zn;
+
+  const fx = f(xr);
+  const fy = f(yr);
+  const fz = f(zr);
+
+  const L = 116.0 * fy - 16.0;
+  const a = 500.0 * (fx - fy);
+  const b = 200.0 * (fy - fz);
+
+  return { L, a, b };
+}
+
+function getCie1931_2deg_D65_10nm(){
+  // CIE 1931 2° CMFs and D65 SPD sampled at 10 nm from 400–700 nm
+  return {
+    S: [
+      82.7549, 91.4860, 93.4318, 86.6823, 104.8650,
+      117.0080, 117.8120, 114.8610, 115.9230, 108.8110,
+      109.3540, 107.8020, 104.7900, 107.6890, 104.4050,
+      104.0460, 100.0000, 96.3342, 95.7880, 88.6856,
+      90.0062, 89.5991, 87.6987, 83.2886, 83.6992,
+      80.0268, 80.2146, 82.2778, 78.2842, 69.7213,
+      71.6091
+    ],
+    xbar: [
+      0.01431, 0.04351, 0.13438, 0.28390, 0.34828,
+      0.33620, 0.29080, 0.19536, 0.09564, 0.03201,
+      0.00490, 0.00930, 0.06327, 0.16550, 0.29040,
+      0.4334499, 0.59450, 0.76210, 0.91630, 1.02630,
+      1.06220, 1.00260, 0.8544499, 0.64240, 0.44790,
+      0.28350, 0.16490, 0.08740, 0.04677, 0.02270,
+      0.01135916
+    ],
+    ybar: [
+      0.000396, 0.001210, 0.004000, 0.011600, 0.023000,
+      0.038000, 0.060000, 0.090980, 0.139020, 0.208020,
+      0.323000, 0.503000, 0.710000, 0.862000, 0.954000,
+      0.9949501, 0.995000, 0.952000, 0.870000, 0.757000,
+      0.631000, 0.503000, 0.381000, 0.265000, 0.175000,
+      0.107000, 0.061000, 0.032000, 0.017000, 0.008210,
+      0.004102
+    ],
+    zbar: [
+      0.06785001, 0.207400, 0.645600, 1.385600, 1.747060,
+      1.772110, 1.669200, 1.287640, 0.8129501, 0.465180,
+      0.272000, 0.158200, 0.07824999, 0.042160, 0.020300,
+      0.008749999, 0.003900, 0.002100, 0.001650001, 0.001100,
+      0.000800, 0.000340, 0.000190, 0.000050, 0.000020,
+      0.000000, 0.000000, 0.000000, 0.000000, 0.000000,
+      0.000000
+    ]
+  };
 }
 
 function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas){
@@ -3973,6 +4866,30 @@ if (spectroScanCompareBBtn){
     }catch(err){
       const s = document.getElementById('spectroStatus');
       if (s) s.textContent = 'Error: ' + (err.message || err);
+    }
+  });
+}
+
+// ===== Densitometer Test UI wiring =====
+const densitometerConnectBtn = document.getElementById('densitometerConnectBtn');
+const densitometerReadMeasurementBtn = document.getElementById('densitometerReadMeasurementBtn');
+
+if (densitometerConnectBtn){
+  densitometerConnectBtn.addEventListener('click', async ()=>{
+    try{
+      await densitometerConnect();
+    }catch(_e){}
+  });
+}
+
+if (densitometerReadMeasurementBtn){
+  densitometerReadMeasurementBtn.addEventListener('click', async ()=>{
+    try{
+      const modeSelector = document.getElementById('densitometerMeasurementMode');
+      const mode = modeSelector ? modeSelector.value : 'SCI';
+      await densitometerReadMeasurement(mode);
+    }catch(err){
+      console.error('Error reading measurement:', err);
     }
   });
 }

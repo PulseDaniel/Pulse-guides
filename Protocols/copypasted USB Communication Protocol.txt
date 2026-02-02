@@ -1,0 +1,166 @@
+Measurement	Byte number	0	1	2	3	4	5	6	7	8--9	10--13	14--17	18	19-22	23-57	58	59
+	PC to Instrument	0xbb	0x01	Measurement Mode	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0x00	0xff	Checksum
+	Byte number	0	1	2	3	4	5	6	7	8--9	10--13	14--17	18	19-22	23-57	58	59
+	Instrument to PC	0xbb	0x01	Success Status	Measurement Mode	Starting Wavelength	Number of Wavelengths	Wavelength Interval	UV Status	Aperture	Temperature	Humidity	Measurement Failure Code	Aperture	0x00	0xff	Checksum
+				Measurement Mode=0x00：SCI	Measurement Mode=0x00：SCI	"ex：
+36 represents 360nm
+40 represents 400nm"	"ex:
+31 represents 31个"	"ex:
+10 represents 10nm"	0:UV included	short	float	float		float			
+				Measurement Mode=0x01：SCE	Measurement Mode=0x01：SCE				1:UV400 cutoff	"Need to divide 
+the short value by 100 
+to convert to float"			0x01:Measurement Failed				
+				Measurement Mode=0x02：SCI+SCE	Measurement Mode=0x02：SCI+SCE				2:UV420 cutoff 	0xffff:This field is invalid	"0xffffffff:This field
+ is invalid"	0xffffffff:This field is invalid	0x02:Calibration required	0xffffffff:This field is invalid			
+				0x09:Measurement Successful					3:UV460 cutoff				0x03:Measurement timeout				
+				0xff:Measurement Failed					0xff:This field is invalid				0x04:Hardware error				
+																	
+Reading one set of reflectance data requires multiple transmissions to complete. Each transmission retrieves 12 data points, requiring a total of 4 transmissions.																	
+Read SCI data																	
+Read SCI data（1-12）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x10	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6	7-57	58	59						
+	Instrument to PC	0xbb	0x01	0x10	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCI data（13-24）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x11	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x11	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCI data（25-36）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x12	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x12	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCI data（37-48）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x13	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6	7-57	58	59						
+	Instrument to PC	0xbb	0x01	0x13	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCE data																	
+Read SCE data（1-12）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x20	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x20	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCE data（13-24）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x21	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x21	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCE data（25-36）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x22	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x22	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+																	
+																	
+Read SCE data（37-48）	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	PC to Instrument	0xbb	0x01	0x23	0x00	0x00	0x00	0x00	0x00	0xff	Checksum						
+	Byte number	0	1	2	3	4	5	6-53	54-57	58	59						
+	Instrument to PC	0xbb	0x01	0x23	0x00	0x00	0x00	"12 float 
+data points"	0x00	0xff	Checksum						
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"Reflectance: Black calibration
+Transmittance: 0%"	Byte number	0	1	2	3	4	5	6	7-57	58	59
+	PC to Instrument	0xbb	0x10	0x00	0x00	0x00	0x00	0x00	0x00	0xff	Checksum
+	Byte number	0	1	2	3	4	5	6	7-57	58	59
+	Instrument to PC	0xbb	0x10	0x00	0x00	0x00	0x00	"Calibration 
+successful/failed"	0x00	0xff	Checksum
+								"0：Failed
+1：Successful"			
+											
+											
+											
+"Reflectance: White calibration
+Transmittance: 0%"	Byte number	0	1	2	3	4	5	6	7-57	58	59
+	PC to Instrument	0xbb	0x11	0x00	0x00	0x00	0x00	0x00	0x00	0xff	Checksum
+	Byte number	0	1	2	3	4	5	6	7-57	58	59
+	Instrument to PC	0xbb	0x11	0x00	0x00	0x00	0x00	"Calibration 
+successful/failed"	0x00	0xff	Checksum
+								"0：Failed
+1：Successful"			
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"Read instrument
+ serial number"	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	PC to Instrument	0xbb	0x18	0x00	0x00	0x00	0x00	0xff	Checksum		
+	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	Instrument to PC	0xbb	0x18	0x00	0x00	Serial number	0x00	0xff	Checksum		
+						Ends when '/0' (0x00) is encountered					
+											
+											
+"Read instrument
+ model"	Byte number	0	1	2	3--4	5-34	35-57			58	59
+	PC to Instrument	0xbb	0x18	0x01	0x00	0x00	0x00			0xff	Checksum
+	Byte number	0	1	2	3--4	5-34	35-57	54-55	56-57	58	59
+	Instrument to PC	0xbb	0x18	0x01	0x00	Instrument model	0x00	Instrument code	0x00	0xff	Checksum
+						Ends when '/0' (0x00) is encountered		unsigned short			
+											
+											
+"Read software
+ version"	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	PC to Instrument	0xbb	0x18	0x02	0x00	0x00	0x00	0xff	Checksum		
+	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	Instrument to PC	0xbb	0x18	0x02	0x00	Software version	0x00	0xff	Checksum		
+						Ends when '/0' (0x00) is encountered		unsigned short			
+											
+											
+"Read Hardware
+ version"	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	PC to Instrument	0xbb	0x18	0x03	0x00	0x00	0x00	0xff	Checksum		
+	Byte number	0	1	2	3--4	5-34	35-57	58	59		
+	Instrument to PC	0xbb	0x18	0x03	0x00	Hardware version	0x00	0xff	Checksum		
+						Ends when '/0' (0x00) is encountered					
+

@@ -1,0 +1,74 @@
+import numpy as np
+import pandas as pd
+
+# --- Inputs: your reflectance (%) at 10 nm from 400–700 nm ---
+R_dict_percent = {
+	400: 1.4035, 410: 1.3649, 420: 1.4617, 430: 1.5504, 440: 1.6474,
+	450: 1.7616, 460: 2.2711, 470: 3.5498, 480: 5.9449, 490: 8.8927,
+	500: 12.4908, 510: 17.5395, 520: 24.6714, 530: 36.0904, 540: 53.0641,
+	550: 68.2597, 560: 75.9065, 570: 78.1787, 580: 78.7539, 590: 79.0636,
+	600: 78.9482, 610: 78.8349, 620: 78.9672, 630: 79.2471, 640: 79.6711,
+	650: 80.5051, 660: 81.1039, 670: 81.7590, 680: 82.4264, 690: 83.7048,
+	700: 84.9408
+}
+
+# --- CIE open datasets (1 nm), we sample them at your 10 nm wavelengths ---
+D65_CSV_URL = "https://files.cie.co.at/CIE_std_illum_D65.csv"
+CMF_CSV_URL = "https://files.cie.co.at/CIE_xyz_1931_2deg.csv"
+
+d65 = pd.read_csv(D65_CSV_URL, header=None, names=["nm", "spd"])
+cmf = pd.read_csv(CMF_CSV_URL, header=None, names=["nm", "xbar", "ybar", "zbar"])
+
+# Wavelengths you provided:
+wls = np.arange(400, 701, 10)
+
+# Sanity check:
+missing = [int(w) for w in wls if int(w) not in R_dict_percent]
+if missing:
+	raise ValueError(f"Missing reflectance values for: {missing}")
+
+# Subset CIE data to those wavelengths:
+d65_10 = d65[d65["nm"].isin(wls)].set_index("nm").sort_index()
+cmf_10 = cmf[cmf["nm"].isin(wls)].set_index("nm").sort_index()
+
+S = d65_10["spd"].to_numpy(dtype=float)
+xbar = cmf_10["xbar"].to_numpy(dtype=float)
+ybar = cmf_10["ybar"].to_numpy(dtype=float)
+zbar = cmf_10["zbar"].to_numpy(dtype=float)
+
+# Reflectance as fraction (0–1):
+R = np.array([R_dict_percent[int(w)] for w in wls], dtype=float) / 100.0
+
+# Tristimulus integration (reflective object)
+delta = 10.0  # nm step
+
+k = 100.0 / np.sum(S * ybar * delta)
+
+X = k * np.sum(R * S * xbar * delta)
+Y = k * np.sum(R * S * ybar * delta)
+Z = k * np.sum(R * S * zbar * delta)
+
+# Reference white under same illuminant/observer (perfect diffuser R=1)
+Xn = k * np.sum(1.0 * S * xbar * delta)
+Yn = k * np.sum(1.0 * S * ybar * delta)  # should be 100
+Zn = k * np.sum(1.0 * S * zbar * delta)
+
+# XYZ -> Lab
+epsilon = 216.0 / 24389.0
+kappa = 24389.0 / 27.0
+
+def f(t: float) -> float:
+	if t > epsilon:
+		return t ** (1.0 / 3.0)
+	return (kappa * t + 16.0) / 116.0
+
+xr, yr, zr = X / Xn, Y / Yn, Z / Zn
+fx, fy, fz = f(xr), f(yr), f(zr)
+
+L = 116.0 * fy - 16.0
+a = 500.0 * (fx - fy)
+b = 200.0 * (fy - fz)
+
+print("XYZ:", X, Y, Z)
+print("White XYZ:", Xn, Yn, Zn)
+print("Lab (D65/2°):", L, a, b)
