@@ -1194,10 +1194,49 @@
 
         <div class="row2" style="margin-bottom:8px;">
           <div>
+            <label for="spectroConcentrationUnits">Concentration units</label>
+            <select id="spectroConcentrationUnits">
+              <option value="pigment_pct" selected>Pigment % by weight</option>
+              <option value="ink_pct">Ink % in mix</option>
+              <option value="film_weight">Film weight (g/m²)</option>
+              <option value="bcm">BCM / Anilox volume</option>
+              <option value="other">Other (see notes)</option>
+            </select>
+          </div>
+          <div>
+            <label for="spectroSampleType">Sample type</label>
+            <select id="spectroSampleType">
+              <option value="tint" selected>Tint ramp point</option>
+              <option value="masstone">Masstone (100%)</option>
+              <option value="mixture">Ink mixture</option>
+              <option value="substrate">Substrate only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroSubstrate">Substrate</label>
+            <input id="spectroSubstrate" type="text" placeholder="e.g. White Gloss 250gsm">
+          </div>
+          <div>
             <label for="spectroBacking">Backing</label>
             <select id="spectroBacking">
               <option value="white" selected>White backing</option>
               <option value="black">Black backing</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroMeasurementCondition">ISO 13655 condition</label>
+            <select id="spectroMeasurementCondition">
+              <option value="M1" selected>M1 (D50, UV included)</option>
+              <option value="M0">M0 (Unfiltered, UV included)</option>
+              <option value="M2">M2 (UV excluded)</option>
+              <option value="M3">M3 (Polarized)</option>
+              <option value="unknown">Unknown / Not specified</option>
             </select>
           </div>
           <div>
@@ -1215,30 +1254,78 @@
             <select id="spectroIlluminant">
               <option value="D50" selected>D50</option>
               <option value="D65">D65</option>
+              <option value="D55">D55</option>
+              <option value="D75">D75</option>
               <option value="A">A</option>
+              <option value="C">C</option>
+              <option value="F2">F2 (CWF)</option>
+              <option value="F7">F7 (D65 simulator)</option>
+              <option value="F11">F11 (TL84)</option>
+              <option value="TL83">TL83</option>
+              <option value="TL84">TL84</option>
+              <option value="U30">U30</option>
+              <option value="U35">U35</option>
             </select>
           </div>
           <div>
             <label for="spectroAperture">Aperture</label>
             <select id="spectroAperture">
-              <option value="8mm" selected>8 mm</option>
-              <option value="4mm">4 mm</option>
+              <option value="2mm" selected>Φ2 mm</option>
+              <option value="1.5mm">Φ1.5 mm</option>
             </select>
           </div>
         </div>
 
         <div class="row2" style="margin-bottom:8px;">
           <div>
-            <label for="spectroGeometry">Geometry</label>
-            <select id="spectroGeometry">
-              <option value="SCI" selected>SCI</option>
-              <option value="SCE">SCE</option>
+            <label>Geometry</label>
+            <input type="text" value="45°/0°" readonly style="background:#1f2933; cursor:not-allowed;">
+          </div>
+          <div>
+            <label for="spectroPrintMethod">Print method</label>
+            <select id="spectroPrintMethod">
+              <option value="drawdown" selected>Drawdown</option>
+              <option value="flexo">Flexo</option>
+              <option value="offset">Offset</option>
+              <option value="gravure">Gravure</option>
+              <option value="screen">Screen</option>
+              <option value="digital">Digital</option>
+              <option value="other">Other</option>
             </select>
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroInkBatch">Ink batch / lot</label>
+            <input id="spectroInkBatch" type="text" placeholder="e.g. B2024-123">
+          </div>
+          <div>
+            <label for="spectroReplicateNum">Replicate number</label>
+            <input id="spectroReplicateNum" type="number" step="1" placeholder="1" value="1">
+          </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroNotes">Notes</label>
+            <input id="spectroNotes" type="text" placeholder="Optional notes">
           </div>
           <div>
             <label>Timestamp</label>
             <input id="spectroTimestampPreview" type="text" readonly class="mono" placeholder="Set when measured">
           </div>
+        </div>
+
+        <div class="row2" style="margin-bottom:8px;">
+          <div>
+            <label for="spectroDeviceType">Device</label>
+            <select id="spectroDeviceType">
+              <option value="ex-pro" selected>EX Pro (reflectance)</option>
+              <option value="legacy">SKZ-SY3060 (legacy)</option>
+            </select>
+          </div>
+          <div></div>
         </div>
 
         <div class="flex">
@@ -2861,6 +2948,45 @@ async function spectroConnect(){
   }
 }
 
+function getSpectroDeviceType(){
+  return document.getElementById('spectroDeviceType')?.value || 'ex-pro';
+}
+
+async function spectroMeasureOnceLegacy(port, statusEl){
+  if (statusEl) statusEl.textContent = 'Measuring…';
+
+  const encoder = new TextEncoder();
+  let writer;
+  try{
+    writer = port.writable.getWriter();
+    await writer.write(encoder.encode('SA_001_measureData\r\n'));
+  } finally {
+    if (writer) writer.releaseLock();
+  }
+
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
+  let textResp = '';
+  const maxTimeout = 8000;
+  const startTime = Date.now();
+
+  try{
+    while ((Date.now() - startTime) < maxTimeout){
+      const result = await reader.read();
+      if (result.done) break;
+      if (result.value){
+        textResp += decoder.decode(result.value, { stream:true });
+        if (textResp.includes('Data transmission has been successfully completed.')) break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (statusEl) statusEl.textContent = 'Measurement received.';
+  return textResp;
+}
+
 async function spectroMeasureOnce(){
   const statusEl = document.getElementById('spectroStatus');
   if (!spectroPort){
@@ -2870,6 +2996,10 @@ async function spectroMeasureOnce(){
   if (!port || !port.readable || !port.writable){
     setSpectroConnectedUI(false);
     throw new Error('Port is not open.');
+  }
+
+  if (getSpectroDeviceType() === 'legacy'){
+    return spectroMeasureOnceLegacy(port, statusEl);
   }
 
   const geometry = (document.getElementById('spectroGeometry')?.value || 'SCI');
@@ -3807,16 +3937,24 @@ function getCie1931_2deg_D65_10nm(){
   };
 }
 
-function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas){
+function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas, extraData){
   const now = new Date();
   const rec = {
     inkName: String(inkName || '').trim(),
     concentration: Number(concentration),
+    concentrationUnits: (extraData && extraData.concentrationUnits) || 'pigment_pct',
+    sampleType: (extraData && extraData.sampleType) || 'tint',
+    substrate: (extraData && extraData.substrate) || '',
     backing: backing || 'white',
+    measurementCondition: (extraData && extraData.measurementCondition) || 'M1',
     angle: angle || '2',
     illuminant: illuminant || 'D50',
-    aperture: aperture || '8mm',
-    geometry: geometry || 'SCI',
+    aperture: aperture || '2mm',
+    geometry: geometry || '45/0',
+    printMethod: (extraData && extraData.printMethod) || 'drawdown',
+    inkBatch: (extraData && extraData.inkBatch) || '',
+    replicateNum: (extraData && extraData.replicateNum) || 1,
+    notes: (extraData && extraData.notes) || '',
     L: meas.L,
     a: meas.a,
     b: meas.b,
@@ -4004,11 +4142,19 @@ function downloadInkCurvesCsv(){
   const header = [
     'InkName',
     'Concentration',
+    'ConcentrationUnits',
+    'SampleType',
+    'Substrate',
     'Backing',
+    'MeasurementCondition',
     'Angle',
     'Illuminant',
     'Aperture',
     'Geometry',
+    'PrintMethod',
+    'InkBatch',
+    'ReplicateNum',
+    'Notes',
     'TimestampISO',
     'L',
     'a',
@@ -4021,11 +4167,19 @@ function downloadInkCurvesCsv(){
     const row = [
       rec.inkName || '',
       rec.concentration != null ? rec.concentration : '',
+      rec.concentrationUnits || 'pigment_pct',
+      rec.sampleType || 'tint',
+      rec.substrate || '',
       rec.backing || '',
+      rec.measurementCondition || 'M1',
       rec.angle || '',
       rec.illuminant || '',
       rec.aperture || '',
       rec.geometry || '',
+      rec.printMethod || 'drawdown',
+      rec.inkBatch || '',
+      rec.replicateNum != null ? rec.replicateNum : 1,
+      rec.notes || '',
       formatTimestamp(rec),
       rec.L != null ? rec.L : '',
       rec.a != null ? rec.a : '',
@@ -4752,14 +4906,13 @@ function setScanButtonState(btn, busy, busyText){
 
 if (spectroMeasureBtn){
   spectroMeasureBtn.addEventListener('click', async ()=>{
-    setScanButtonState(spectroMeasureBtn, true);
     const inkName = (document.getElementById('spectroInkName').value || '').trim();
     const concStr = (document.getElementById('spectroConcentration').value || '').trim();
     const backing = (document.getElementById('spectroBacking').value || 'white');
     const angle = (document.getElementById('spectroAngle').value || '2');
     const illuminant = (document.getElementById('spectroIlluminant').value || 'D50');
-    const aperture = (document.getElementById('spectroAperture').value || '8mm');
-    const geometry = (document.getElementById('spectroGeometry').value || 'SCI');
+    const aperture = (document.getElementById('spectroAperture').value || '2mm');
+    const geometry = '45/0';
 
     if (!inkName){
       alert('Please enter an ink name.');
@@ -4770,6 +4923,7 @@ if (spectroMeasureBtn){
       alert('Please enter a valid concentration (e.g. 0.10 for 10%).');
       return;
     }
+    setScanButtonState(spectroMeasureBtn, true);
     try{
       await spectroConnect();
       const raw = await spectroMeasureOnce();
@@ -4779,7 +4933,19 @@ if (spectroMeasureBtn){
         console.log('Raw spectro text:', raw);
         return;
       }
-      const rec = addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas);
+
+      const extraData = {
+        concentrationUnits: document.getElementById('spectroConcentrationUnits')?.value || 'pigment_pct',
+        sampleType: document.getElementById('spectroSampleType')?.value || 'tint',
+        substrate: (document.getElementById('spectroSubstrate')?.value || '').trim(),
+        measurementCondition: document.getElementById('spectroMeasurementCondition')?.value || 'M1',
+        printMethod: document.getElementById('spectroPrintMethod')?.value || 'drawdown',
+        inkBatch: (document.getElementById('spectroInkBatch')?.value || '').trim(),
+        replicateNum: parseInt(document.getElementById('spectroReplicateNum')?.value) || 1,
+        notes: (document.getElementById('spectroNotes')?.value || '').trim()
+      };
+
+      const rec = addInkCurveRecord(inkName, concentration, backing, angle, illuminant, aperture, geometry, meas, extraData);
 
       const tsPreview = document.getElementById('spectroTimestampPreview');
       if (tsPreview){
@@ -4790,9 +4956,9 @@ if (spectroMeasureBtn){
       const aInput = document.getElementById('a');
       const bInput = document.getElementById('b');
       if (LInput && aInput && bInput){
-        LInput.value = rec.L;
-        aInput.value = rec.a;
-        bInput.value = rec.b;
+        LInput.value = Number(rec.L).toFixed(2);
+        aInput.value = Number(rec.a).toFixed(2);
+        bInput.value = Number(rec.b).toFixed(2);
         updateTargetEcho();
       }
       const s = document.getElementById('spectroStatus');
