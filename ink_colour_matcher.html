@@ -1270,8 +1270,8 @@
           <div>
             <label for="spectroAperture">Aperture</label>
             <select id="spectroAperture">
-              <option value="2mm" selected>Φ2 mm</option>
-              <option value="1.5mm">Φ1.5 mm</option>
+              <option value="5mm" selected>Φ5 mm</option>
+              <option value="3mm">Φ3 mm</option>
             </select>
           </div>
         </div>
@@ -3949,7 +3949,7 @@ function addInkCurveRecord(inkName, concentration, backing, angle, illuminant, a
     measurementCondition: (extraData && extraData.measurementCondition) || 'M1',
     angle: angle || '2',
     illuminant: illuminant || 'D50',
-    aperture: aperture || '2mm',
+    aperture: aperture || '5mm',
     geometry: geometry || '45/0',
     printMethod: (extraData && extraData.printMethod) || 'drawdown',
     inkBatch: (extraData && extraData.inkBatch) || '',
@@ -4911,7 +4911,7 @@ if (spectroMeasureBtn){
     const backing = (document.getElementById('spectroBacking').value || 'white');
     const angle = (document.getElementById('spectroAngle').value || '2');
     const illuminant = (document.getElementById('spectroIlluminant').value || 'D50');
-    const aperture = (document.getElementById('spectroAperture').value || '2mm');
+    const aperture = (document.getElementById('spectroAperture').value || '5mm');
     const geometry = '45/0';
 
     if (!inkName){
